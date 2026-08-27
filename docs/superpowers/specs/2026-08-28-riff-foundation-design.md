@@ -54,7 +54,7 @@ Settled during brainstorming. Each entry is binding for implementation.
 | D10 | State ownership: **Rust owns settings; React renders them** | One place for validation, migration and atomic writes; the webview gets no filesystem permissions. |
 | D11 | **No TanStack Query** this milestone | It earns its keep on cached, paginated, refetched data. One always-loaded local document does not qualify. |
 | D12 | **No** `react-resizable-panels`, `@tanstack/react-table`, `@tanstack/react-virtual`, `pdfjs-dist` | D8 makes them unused code. Recorded here as the seams to add later. |
-| D13 | CI on `ubuntu-26.04`; **release builds on `ubuntu-24.04`** | 26.04 matches the development stack. Release artifacts built there would link against a glibc newer than Ubuntu 24.04 and Debian stable, making the binaries unrunnable on both. |
+| D13 | CI on `ubuntu-24.04` (GA, stable) with a non-blocking `ubuntu-26.04` canary. **deb and AppImage build on `ubuntu-22.04`; rpm builds in a `fedora:latest` container.** | A binary links against the glibc of the machine that built it and runs on anything newer, never anything older, so the portable formats take the oldest viable floor. RPMs are distribution-specific by nature and belong on Fedora, where the dependency names are real. GitHub hosts no Fedora runner, so it runs as a container on an Ubuntu host. |
 | D14 | Bundles: **deb, rpm, AppImage** | All three, every release, with checksums. |
 | D15 | Repository accepts **no external code contributions** | Bug reports via issues are welcome; pull requests are declined. MIT still permits forks. |
 
@@ -97,15 +97,21 @@ Two, both deliberate.
 
 Eliminating the flash of unthemed content is a hard requirement, not a nicety.
 
-1. Rust starts. `paths::resolve()` determines the XDG directories, creating them if absent.
-2. `SettingsStore::load()` reads and validates `settings.json` (§4.3).
+1. Rust starts. `paths::resolve()` determines the XDG directories, creating them if absent. If neither `$HOME` nor the `RIFF_*` overrides yield a usable location, Riff shows a native error dialog naming the variables it looked for and exits — silently falling back to the working directory would scatter configuration wherever the user launched from.
+2. `SettingsStore::load()` reads and validates `settings.json` (§4.3). **This happens before `tauri::Builder` is constructed**, because step 3 needs the settings as a string at plugin-registration time.
 3. A Tauri plugin registers a `js_init_script` — confirmed available on `tauri::plugin::Builder` in 2.11 — which assigns `window.__RIFF_BOOTSTRAP__ = { settings, paths, appInfo }` before any page script runs.
 4. The window is created with `"visible": false` and `backgroundColor` set to the resolved theme's surface colour, so even the pre-paint frame is the right colour.
 5. `index.html` runs a small synchronous inline script in `<head>`, before any stylesheet, that reads `__RIFF_BOOTSTRAP__` and sets `data-theme`, `data-density`, `data-contrast` and `--ui-scale` on `<html>`.
 6. React mounts, hydrating `useSettings` from the same object. Zero IPC round-trips, no loading state, no spinner.
-7. After first paint the frontend calls `app_ready()`; Rust shows the window.
+7. Window geometry is restored by `tauri-plugin-window-state` **before** the window is shown, so it never appears at a default size and then jumps.
+8. After first paint the frontend calls `app_ready()`; Rust shows the window.
 
-If the bootstrap object is missing — which can only happen if the init script failed — the frontend falls back to an async `settings_get()` call and logs a warning. The app must never be unusable because of an optimisation.
+Two failure paths, because both are silent and fatal if unhandled:
+
+- **The bootstrap object is missing** (the init script failed). The frontend falls back to an async `settings_get()` and logs a warning. Slower start, never a broken one.
+- **`app_ready()` never arrives** (React threw before its first effect). A 3-second watchdog in Rust reveals the window regardless. Without it, a frontend crash is indistinguishable from the application failing to launch — the user sees nothing at all, with no window to read an error in. The window must always become visible; what it contains is the error boundary's problem.
+
+An optimisation must never be able to prevent the application from appearing.
 
 ---
 
@@ -118,7 +124,7 @@ XDG Base Directory specification, using the plain name `riff` rather than the re
 | Path | Contents |
 |---|---|
 | `$XDG_CONFIG_HOME/riff/settings.json` | User settings. Hand-editable. |
-| `$XDG_CONFIG_HOME/riff/settings.schema.json` | JSON Schema, regenerated on every launch from the Rust types via `schemars`. Referenced by the `$schema` key so editors give autocompletion and validation. |
+| `$XDG_CONFIG_HOME/riff/settings.schema.json` | JSON Schema generated from the Rust types via `schemars`. Written at launch **only when its content differs** from what is already there, so an unchanged launch touches no file. |
 | `$XDG_DATA_HOME/riff/history.jsonl` | Practice sessions, one JSON object per line. Created empty; unused this milestone. |
 | `$XDG_DATA_HOME/riff/window-state.json` | Managed by `tauri-plugin-window-state`. |
 | `$XDG_STATE_HOME/riff/logs/riff.log` | Rolling daily, seven retained. |
@@ -188,11 +194,15 @@ The temp file must share a directory with the target, because `rename` is only a
 
 Dragging the UI-scale slider produces one write, not forty.
 
+**When a write fails** — read-only filesystem, full disk, wrong permissions — the in-memory state is authoritative and is kept. Riff logs at ERROR, raises one toast per failure cause rather than one per attempt, and retries on the next change. The application stays fully usable with unsaved settings; it never crashes and never silently reverts the user's choice in the interface, which would be a lie about what is on disk.
+
+**Concurrent instances** are prevented with `tauri-plugin-single-instance`: a second launch focuses the existing window instead of starting a rival process. Two processes would each hold their own `RwLock<Settings>` and overwrite each other on flush, and the file watcher would make them fight. Focusing the first window is also what users expect from a desktop application.
+
 ### 4.5 External edits
 
 A `notify` watcher on the config directory, debounced 300 ms, reloads `settings.json` when it changes on disk and emits `settings://changed`; the frontend store patches itself in place. Editing the JSON in a text editor updates the running application live.
 
-Self-suppression compares the new file bytes against the bytes of our own last write. Byte comparison rather than hashing: the file is a few kilobytes, and it avoids a dependency for no measurable gain.
+Two filters, both load-bearing. The watcher must **match on `settings.json` by name** — `notify` reports directory-level events, so writing `settings.schema.json` or leaving a `settings.json.corrupt-*` file behind would otherwise trigger a spurious reload on every launch. And self-suppression compares the new file bytes against the bytes of our own last write, so our own flush does not bounce back through the watcher and re-enter the store. Byte comparison rather than hashing: the file is a few kilobytes, and it avoids a dependency for no measurable gain.
 
 ### 4.6 History
 
@@ -212,7 +222,7 @@ Every command returns `Result<T, RiffError>`. TypeScript bindings are generated 
 | `settings_patch` | `(SettingsPatch) -> Settings` | Typed partial update. Returns the full validated result. |
 | `settings_reset` | `(Option<Section>) -> Settings` | One section, or everything. |
 | `settings_export` | `(PathBuf) -> ()` | Writes the current settings to a user-chosen path. |
-| `settings_import` | `(PathBuf) -> Settings` | Validates and migrates before applying. Rejects invalid files without changing state. |
+| `settings_import` | `(PathBuf) -> Settings` | Runs the imported file through the full §4.3 read path — migration, unknown-field preservation, newer-version tolerance — before applying. A file that fails validation is rejected with a `Validation` error and current settings are left untouched. |
 | `paths_get` | `() -> AppPaths` | Config, data, state, cache, log directories. |
 | `open_path` | `(PathKind) -> ()` | Opens one of our own directories. Enum, never a raw path. |
 | `open_external` | `(ExternalLink) -> ()` | Enum of fixed destinations. See §12. |
@@ -352,6 +362,8 @@ The mockups are drawn on a 1920×1089 canvas at a scale larger than a real windo
 | Card radius / pane radius | 12px / 10px |
 | Focus ring | 2px, 2px offset |
 
+Because UI scale multiplies the root font size and every dimension is in `rem`, the chrome grows with it: at 1.5× the sidebar and settings sub-navigation together claim roughly 700px of a 960px minimum window, leaving the settings content column unusably narrow. Two container-query breakpoints handle it, keyed to available width rather than window width so they behave correctly at any scale: below 900px the sidebar drops to its 56px icon rail; below 700px the settings sub-navigation becomes a horizontal segmented control above the content. Neither is a mobile layout — they are the honest response to a legitimate combination of settings.
+
 Collapsing the sidebar yields an icon-only rail rather than hiding it entirely, so navigation and `aria-current` remain available. Tooltips supply the labels.
 
 ### 7.5 Icons
@@ -366,7 +378,7 @@ Collapsing the sidebar yields an icon-only rail rather than hiding it entirely, 
 
 `decorations: false`. Layout: `[panel-left] riff [search] · · · drag region · · · [− □ ✕]`.
 
-The drag region uses `data-tauri-drag-region`; double-clicking it toggles maximise, which custom decorations must implement by hand. Window controls are 44×32 hit targets with `aria-label`s. Setting `appearance.titleBar` to `system` calls `set_decorations(true)` and hides the custom bar live, with no restart — this matters on GNOME and KDE, where users expect their own decorations.
+The drag region uses `data-tauri-drag-region`. Double-click-to-maximise is verified against Tauri 2.11's built-in drag-region behaviour first, and only hand-implemented if it turns out not to be covered — writing the handler unconditionally risks toggling maximise twice per double-click. Window controls are 44×32 hit targets with `aria-label`s. Setting `appearance.titleBar` to `system` calls `set_decorations(true)` and hides the custom bar live, with no restart — this matters on GNOME and KDE, where users expect their own decorations.
 
 ### 8.2 Onboarding
 
@@ -457,7 +469,7 @@ Radix supplies keyboard behaviour and ARIA for every primitive; the work is not 
 - The UI-scale slider is operable by keyboard with announced values
 - Disabled placeholder controls use `aria-disabled` with an explanatory label rather than vanishing from the accessibility tree
 
-`vitest-axe` asserts zero violations on every route and every dialog in component tests. Biome's a11y rules run on every commit. Both catch different classes of problem, which is why both are present.
+`axe-core` 4.13 asserts zero violations on every route and every dialog in component tests, driven by a ~15-line local Vitest matcher. Not `vitest-axe`: it sits at 0.1.0 with a `vitest >=0.16` peer range, and taking an unmaintained wrapper as a dependency to save fifteen lines is a bad trade against Vitest 4. Biome's a11y rules run on every commit. The two catch different classes of problem, which is why both are present.
 
 ---
 
@@ -519,6 +531,9 @@ Test-driven throughout: a failing test precedes the implementation.
 - Debounced writes coalesce; exit forces a flush
 - The watcher ignores our own write and fires on a genuine external edit
 - XDG resolution, including `RIFF_CONFIG_HOME` override
+- A failed write keeps in-memory state, surfaces once, and retries on the next change
+- The reveal watchdog shows the window when `app_ready()` never arrives
+- The watcher ignores `settings.schema.json` and `settings.json.corrupt-*` writes
 - `RiffError` serialises to the documented shape
 
 All against `tempfile` directories; no test touches a real configuration.
@@ -532,7 +547,7 @@ All against `tempfile` directories; no test touches a real configuration.
 - Every settings control renders its persisted value and writes on change
 - Onboarding gating: redirect while incomplete, redirect away once complete
 - Router redirect honours `startupRoute`
-- `vitest-axe` on every route and dialog
+- `axe-core` on every route and dialog, via the local matcher
 
 Coverage gate: 80% of lines across `src/features` and `src/lib`, enforced in CI. IPC is mocked at the generated-bindings boundary, so tests exercise real store logic against a typed fake.
 
@@ -600,7 +615,7 @@ A file that outgrows roughly 200 lines is a signal it is doing two things.
 
 ## 17. CI, packaging, distribution
 
-**`ci.yml`** on push and pull request, running on `ubuntu-26.04`:
+**`ci.yml`** on push and pull request, running on `ubuntu-24.04`:
 
 | Job | Contents |
 |---|---|
@@ -612,7 +627,26 @@ A file that outgrows roughly 200 lines is a signal it is doing two things.
 
 System dependencies: `libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev patchelf`. No app-indicator package: Riff has no tray icon, and installing dependencies "because the template did" is how build times rot. Caching via `Swatinem/rust-cache` and pnpm's store cache.
 
-**`release.yml`** on `v*` tags, running on **`ubuntu-24.04`** (D13), using `tauri-apps/tauri-action@v1` to produce **deb, rpm and AppImage** with `sha256sums.txt`, and a draft release whose notes come from `git-cliff`. Building on the older image is what keeps the artifacts runnable on Ubuntu 24.04 and Debian stable; building on 26.04 would silently restrict the audience to the newest distributions.
+A second `canary` job repeats `lint`, `test-rust` and `build` on `ubuntu-26.04` with `continue-on-error: true`. It is early warning for the next LTS and for the development machine's newer toolchain, and it can never block a merge — a preview runner failing is not a reason to stop working.
+
+### 17.1 Release matrix
+
+`release.yml` fires on `v*` tags. The three formats have genuinely different constraints, so they are built in different places rather than pretending one image suits all three.
+
+| Job | Runs on | Produces |
+|---|---|---|
+| `bundle-portable` | `ubuntu-22.04` (glibc 2.35) | `.deb`, `.AppImage` |
+| `bundle-rpm` | `ubuntu-24.04` host, `fedora:latest` container | `.rpm` |
+| `verify-rpm` | fresh `fedora:latest` container | installs the built `.rpm`, asserts `ldd` reports no missing libraries |
+| `publish` | `ubuntu-24.04` | `sha256sums.txt`, draft release with `git-cliff` notes |
+
+Everything is built with `tauri-apps/tauri-action@v1`.
+
+The portable formats take the oldest floor deliberately: a binary built on glibc 2.35 runs on Ubuntu 22.04 and everything newer, including Fedora, Arch and openSUSE. Built on 26.04 instead, the same AppImage would refuse to start on Ubuntu 24.04 and Debian stable — a failure the maintainer would only ever learn about from a user's bug report.
+
+The RPM is built on Fedora because that is the only way its dependency metadata is real rather than hand-transcribed. Inside a container, AppImage tooling needs `APPIMAGE_EXTRACT_AND_RUN=1` since FUSE is unavailable; the RPM job does not build an AppImage, so this only matters if the jobs are ever merged.
+
+`verify-rpm` exists because "the package built" and "the package installs and its libraries resolve" are different claims, and only the second one matters to a Fedora user.
 
 **Dependabot** monthly, grouped by ecosystem, for npm, cargo and actions.
 
@@ -640,11 +674,11 @@ Every package is pinned to the version verified current on 2026-08-28. Nothing i
 
 **Runtime (npm)** — `react` 19.1, `react-dom` 19.1, `@tanstack/react-router` 1.170, `zustand` 5.0, `i18next` 26.4, `react-i18next` 17.0, `lucide-react` 1.34, `cmdk` 1.1, `sonner` 2.0, `radix-ui` 1.6, `class-variance-authority` 0.7, `clsx`, `tailwind-merge` 3.6, `react-error-boundary` 6.1, `@fontsource-variable/outfit` 5.3, `@fontsource/playfair-display` 5.3, `@fontsource-variable/jetbrains-mono` 5.3, `@tauri-apps/api` 2, `@tauri-apps/plugin-{opener,dialog,log,window-state}` 2.
 
-**Development (npm)** — `vite` 7, `@vitejs/plugin-react` 4.6, `babel-plugin-react-compiler` 1.0, `tailwindcss` 4.3, `@tailwindcss/vite` 4.3, `@tanstack/router-plugin` 1.168, `@tanstack/router-devtools`, `typescript` 5.8, `@biomejs/biome` 2.5, `vitest` 4.1, `@vitest/coverage-v8`, `jsdom`, `@testing-library/react` 16.3, `@testing-library/user-event`, `@testing-library/jest-dom`, `vitest-axe`, `lefthook` 2.1, `@commitlint/{cli,config-conventional}`, `i18next-parser`, `rollup-plugin-visualizer`, `@tauri-apps/cli` 2.11, `shadcn` 4.19.
+**Development (npm)** — `vite` 7, `@vitejs/plugin-react` 4.6, `babel-plugin-react-compiler` 1.0, `tailwindcss` 4.3, `@tailwindcss/vite` 4.3, `@tanstack/router-plugin` 1.168, `@tanstack/router-devtools`, `typescript` 5.8, `@biomejs/biome` 2.5, `vitest` 4.1, `@vitest/coverage-v8`, `jsdom`, `@testing-library/react` 16.3, `@testing-library/user-event`, `@testing-library/jest-dom`, `axe-core` 4.13, `lefthook` 2.1, `@commitlint/{cli,config-conventional}`, `i18next-parser`, `rollup-plugin-visualizer`, `@tauri-apps/cli` 2.11, `shadcn` 4.19.
 
-**Rust** — `tauri` 2.11, `tauri-plugin-{opener,dialog,log,window-state}` 2, `serde` 1, `serde_json` 1, `thiserror` 2.0, `tracing` 0.1, `tracing-subscriber` 0.3, `tracing-appender` 0.2, `notify` 8.2, `schemars` 1.2, `directories` 6.0, `tempfile` 3.27, `specta` 1.0, `tauri-specta` 1.0, `time` 0.3.
+**Rust** — `tauri` 2.11, `tauri-plugin-{opener,dialog,log,window-state,single-instance}` 2, `serde` 1, `serde_json` 1, `thiserror` 2.0, `tracing` 0.1, `tracing-subscriber` 0.3, `tracing-appender` 0.2, `notify` 8.2, `schemars` 1.2, `directories` 6.0, `tempfile` 3.27, `specta` 1.0, `tauri-specta` 1.0, `time` 0.3.
 
-**Explicitly not installed** — `@tanstack/react-query`, `@tanstack/react-table`, `@tanstack/react-virtual`, `react-resizable-panels`, `pdfjs-dist`, `eslint`, `prettier`, any HTTP client in either language. Each is either deferred with the feature that needs it (D11, D12) or forbidden outright (D7).
+**Explicitly not installed** — `@tanstack/react-query`, `@tanstack/react-table`, `@tanstack/react-virtual`, `react-resizable-panels`, `pdfjs-dist`, `eslint`, `prettier`, `vitest-axe`, any HTTP client in either language. Each is either deferred with the feature that needs it (D11, D12) or forbidden outright (D7).
 
 ---
 
@@ -672,5 +706,7 @@ Every package is pinned to the version verified current on 2026-08-28. Nothing i
 - `axe` reports zero violations on every route; the application is fully operable by keyboard alone
 - No string reaches the user outside `t()`
 - CI is green: lint, typecheck, both test suites, build, coverage gate, licence check
-- A tagged release produces deb, rpm and AppImage with checksums
+- A tagged release produces deb, rpm and AppImage with checksums, and the RPM installs cleanly in a fresh Fedora container with no unresolved libraries
+- Killing the frontend before `app_ready()` still results in a visible window
+- A second launch focuses the existing window rather than starting a second process
 - The running application opens no network connection — verifiable with `ss -tup`
