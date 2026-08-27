@@ -156,10 +156,14 @@ Defaults follow the specification: `~/.config`, `~/.local/share`, `~/.local/stat
   },
   "onboarding": {
     "completedAt": null,               // RFC 3339 timestamp
-    "version": 1                       // bump to re-present onboarding after a major change
+    "version": 1                       // see below
   }
 }
 ```
+
+`onboarding.version` records which onboarding the user completed. If it is **lower** than the current one, onboarding is presented again — that is the mechanism for re-introducing first-run after adding a step worth showing existing users. If it is **higher**, onboarding is skipped and the value left untouched; a downgraded install must not force a wizard the user already finished. Bumping it is a deliberate act, never automatic.
+
+`general.lastRoute` is validated on read against the live route table and falls back to `/practice` if it does not resolve. Two cases make this necessary rather than defensive: it can hold `/onboarding`, which would trap the user in a completed wizard on every launch, and it can hold a route removed by an update.
 
 Rust representation: `#[serde(default, rename_all = "camelCase")]` on every struct, so a file missing any key still loads. The root struct carries `#[serde(flatten)] unknown: serde_json::Map<String, Value>`, preserving keys it does not recognise through a read-modify-write cycle — a user who downgrades and upgrades again does not lose settings written by the newer version.
 
@@ -220,9 +224,9 @@ Every command returns `Result<T, RiffError>`. TypeScript bindings are generated 
 |---|---|---|
 | `settings_get` | `() -> Settings` | Fallback only; boot uses the injected object. |
 | `settings_patch` | `(SettingsPatch) -> Settings` | `SettingsPatch` mirrors `Settings` with every field `Option`, applied recursively, so a caller sends only what changed and `None` never means "clear this". Returns the full validated result, which is what the store adopts — the frontend never assumes its optimistic guess was right. |
-| `settings_reset` | `(Option<Section>) -> Settings` | One section, or everything. |
-| `settings_export` | `(PathBuf) -> ()` | Writes the current settings to a user-chosen path. |
-| `settings_import` | `(PathBuf) -> Settings` | Runs the imported file through the full §4.3 read path — migration, unknown-field preservation, newer-version tolerance — before applying. A file that fails validation is rejected with a `Validation` error and current settings are left untouched. |
+| `settings_reset` | `(Option<Section>) -> Settings` | One section, or everything. "Everything" means General and Appearance; `onboarding` is preserved, because resetting preferences is not the same request as being made to redo first-run. Re-running onboarding is its own explicit action. |
+| `settings_export` | `() -> Option<PathBuf>` | Opens the native save dialog **in Rust**, writes the file, and returns the chosen path for a confirmation toast. `None` means the user cancelled. |
+| `settings_import` | `() -> Option<Settings>` | Opens the native open dialog in Rust, then runs the file through the full §4.3 read path — migration, unknown-field preservation, newer-version tolerance. A file that fails validation is rejected with a `Validation` error and current settings are left untouched. `None` means cancelled. If the imported file has `onboarding.completedAt` null, the current completion state is **kept**: importing someone's appearance preferences must not throw you back into a first-run wizard. |
 | `paths_get` | `() -> AppPaths` | Config, data, state, cache, log directories. |
 | `open_path` | `(PathKind) -> ()` | Opens one of our own directories. Enum, never a raw path. |
 | `open_external` | `(ExternalLink) -> ()` | Enum of fixed destinations. See §12. |
@@ -230,6 +234,8 @@ Every command returns `Result<T, RiffError>`. TypeScript bindings are generated 
 | `licenses_get` | `() -> Vec<LicenseEntry>` | Reads the bundled third-party notices resource. |
 | `app_ready` | `() -> ()` | Reveals the window. |
 | `window_minimize` / `window_toggle_maximize` / `window_close` | `() -> ()` | Custom title bar controls. |
+
+Neither import nor export accepts a path. The picker is opened by Rust, so no filesystem path is ever chosen by, passed through, or visible to the webview — the same rule `open_path` and `open_external` follow. An earlier draft had these two taking `PathBuf` from the frontend, which quietly contradicted that rule and would have been the one hole in it.
 
 Errors serialise discriminated:
 
@@ -385,7 +391,7 @@ The drag region uses `data-tauri-drag-region`. Double-click-to-maximise is verif
 Full window, title bar retained so the window can still be closed. Three steps with progress dots and Back/Next.
 
 1. **Welcome** — the Playfair wordmark, one line of description.
-2. **Theme** — two large cards, each a miniature static render of the real interface in dark and light. The card matching the desktop's `prefers-color-scheme` is pre-selected as a courtesy; the user still confirms. Clicking applies immediately, so the choice is felt rather than described.
+2. **Theme** — two large cards, each a miniature static render of the real interface in dark and light. The card matching the desktop's `prefers-color-scheme` is pre-selected as a courtesy and is applied on arrival, so the step opens already looking like the recommendation rather than describing it. Clicking the other card applies it instantly. Continuing without touching either commits whatever is currently applied — the pre-selection is a real answer, not a hint the user can accidentally skip past into a default they never saw.
 3. **Privacy** — plain statement: everything stays on this machine, no telemetry, no accounts, no network connections at all. Lists the exact directories, each with an Open button.
 
 Finishing writes `onboarding.completedAt` and routes to `general.startupRoute`. Re-runnable from Settings → General.
@@ -408,11 +414,13 @@ The sections are written by hand, **not generated** from the JSON Schema. Fiftee
 
 **General** — Startup route; Restore window size and position; Confirm before quitting; Data locations with per-directory Open buttons; Export settings; Import settings; Reset all settings (destructive confirmation dialog); Re-run onboarding.
 
+Window *position* restore is a request, not a guarantee: under Wayland the compositor owns placement and Hyprland, the primary development target, ignores it outright. Size is honoured everywhere. The control's description says so plainly rather than promising behaviour the user's desktop will quietly discard — the same honesty the title bar setting applies in §8.1.
+
 **Appearance** — Theme (Dark / Light); Density; UI scale slider with live preview and a Reset affordance; Reduce motion; High contrast; Title bar style; Remember sidebar state.
 
 Reduce motion offers a System option although Theme deliberately does not (D2), and the asymmetry is intentional: `prefers-reduced-motion` is an unambiguous accessibility declaration that the desktop makes on the user's behalf and that Riff should honour by default, whereas colour scheme is a taste question the user was already asked once, during onboarding.
 
-**About** — Version, Tauri and WebKitGTK versions, build date and git SHA, each copyable; MIT licence text in full; third-party notices generated from npm and cargo, searchable; repository and issue links; a Copy diagnostics button producing a paste-ready report for bug reports, with the home directory rewritten to `$HOME` so pasting it into a public issue does not disclose the user's account name. A privacy-first application should not leak identity through its own bug-report affordance.
+**About** — Version, Tauri and WebKitGTK versions, build date and git SHA, each copyable; MIT licence text in full; third-party notices generated from npm and cargo, searchable, rendered as collapsed rows that expand one licence at a time — several hundred entries of full licence text mounted at once would be the only place in this application capable of janking, and it would do so on the one screen nobody profiles; repository and issue links; a Copy diagnostics button producing a paste-ready report for bug reports, with the home directory rewritten to `$HOME` so pasting it into a public issue does not disclose the user's account name. A privacy-first application should not leak identity through its own bug-report affordance.
 
 The language selector is intentionally absent: a picker with one option is noise. `general.language` exists in the schema and is honoured; the control appears when a second locale ships.
 
@@ -492,15 +500,17 @@ default-src 'self';
 script-src 'self';
 style-src 'self' 'unsafe-inline';
 font-src 'self';
-img-src 'self' data: asset: http://asset.localhost;
-media-src 'self' asset: http://asset.localhost;
+img-src 'self' data:;
+media-src 'none';
 connect-src ipc: http://ipc.localhost;
 object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none';
 ```
 
 `connect-src` admits the IPC origins and nothing else, so D7 is enforced by the runtime rather than by discipline. `style-src 'unsafe-inline'` is required by Radix's inline positioning styles; `script-src` stays strict, which is where it matters.
 
-Capabilities are minimal: `core:default`, `opener:default`, `dialog:default`, `log:default`, `window-state:default`. No `fs`, no `shell`, no `http`. `open_path` and `open_external` accept enums, never caller-supplied strings — there is no path or URL a compromised frontend could pass that we would open. `asset:` and `media-src` appear in the CSP now so that the media work in §15 does not later require loosening policy under deadline pressure.
+`media-src 'none'` is accurate rather than anticipatory: no media exists this milestone. When §15 lands it becomes `media-src asset: http://asset.localhost`, and that one line is the whole change. Granting a permission now for a feature that does not exist is dead permission, and "we would have had to add it later anyway" is not a security argument.
+
+Capabilities are `core:default` and `log:default`. That is the entire list. The `opener`, `dialog` and `window-state` plugins are used **only from Rust**, so the webview needs no capability for any of them — a plugin's JS permission is required only if JavaScript calls it, and none of ours does. No `fs`, no `shell`, no `http`. `open_path` and `open_external` accept enums, never caller-supplied strings, so there is no path or URL a compromised frontend could pass that we would open.
 
 ---
 
@@ -538,6 +548,10 @@ Test-driven throughout: a failing test precedes the implementation.
 - A failed write keeps in-memory state, surfaces once, and retries on the next change
 - The reveal watchdog shows the window when `app_ready()` never arrives
 - The watcher ignores `settings.schema.json` and `settings.json.corrupt-*` writes
+- `settings_reset(None)` restores General and Appearance defaults while leaving `onboarding` untouched
+- An imported file with `onboarding.completedAt` null does not clear the current completion
+- `onboarding.version` lower than current re-presents onboarding; higher skips it and preserves the value
+- `general.lastRoute` holding `/onboarding`, or a route that no longer exists, falls back to `/practice`
 - `RiffError` serialises to the documented shape
 
 All against `tempfile` directories; no test touches a real configuration.
@@ -550,6 +564,7 @@ All against `tempfile` directories; no test touches a real configuration.
 - Palette filtering, keyboard navigation, focus restoration
 - Every settings control renders its persisted value and writes on change
 - Onboarding gating: redirect while incomplete, redirect away once complete
+- The theme pre-selected on arrival at step 2 is what gets committed if the user presses Continue without clicking
 - Router redirect honours `startupRoute`
 - `axe-core` on every route and dialog, via the local matcher
 
@@ -615,6 +630,14 @@ src-tauri/src/
 
 A file that outgrows roughly 200 lines is a signal it is doing two things.
 
+### 16.2 Scaffold removal and assets
+
+The repository is `create-tauri-app` output, and the template's demo code must be deleted rather than left to rot around the real application. Explicitly: the `greet` command in `src-tauri/src/lib.rs` and its `invoke_handler` entry, `src/App.tsx`, `src/App.css`, `src/assets/react.svg`, `public/tauri.svg`, `public/vite.svg`, and the `index.html` title and favicon still reading "Tauri + React + Typescript". None of it is load-bearing, and a dead `greet` command in a shipped binary is a small but real IPC surface nobody meant to expose.
+
+Icons are generated from the `icon.png` already in the repository root with `pnpm tauri icon`, which produces the full `src-tauri/icons/` set replacing the template's placeholders. The Linux packages install into the hicolor theme at the sizes the desktop actually asks for, which together with `StartupWMClass` (§17) is what makes the icon appear correctly in docks, switchers and software centres. The root `icon.png` stays as the source of truth; the generated set is committed so a clean checkout builds without needing the generator.
+
+The three design mockups in the repository root are moved to `docs/design/` — reference material belongs in the tree, not scattered at top level where it reads like build output.
+
 ---
 
 ## 17. CI, packaging, distribution
@@ -662,7 +685,7 @@ Desktop integration: a `.desktop` entry in the Audio/Music categories that delib
 ## 18. Legal and repository hygiene
 
 - `LICENSE` — MIT, © 2026 valasme
-- `THIRD-PARTY-LICENSES.md` — generated from `pnpm licenses list` and `cargo about`, and shipped as a resource so About can render it offline
+- `THIRD-PARTY-LICENSES.md` plus a machine-readable `third-party-licenses.json`, generated from `pnpm licenses list` and `cargo about`. Both are **committed**, not generated at build time: they are declared in `bundle.resources`, so a build that generates them on the fly would fail on a clean checkout before the generator had run, and would make release artifacts depend on network access to resolve licence metadata. A CI job regenerates them and fails if the committed copies are stale — the same freshness pattern used for the specta bindings and the route tree
 - `README.md` — screenshots, what Riff is, install instructions for all three package formats, required runtime packages including the GStreamer plugin sets, build-from-source steps, the privacy statement, and the contribution policy
 - `SECURITY.md` — private disclosure route and supported-version statement
 - `CHANGELOG.md` — Keep a Changelog, generated by `git-cliff`
@@ -677,7 +700,7 @@ Desktop integration: a `.desktop` entry in the Audio/Music categories that delib
 
 Every package is pinned to the version verified current on 2026-08-28. Nothing is listed that this milestone does not use.
 
-**Runtime (npm)** — `react` 19.1, `react-dom` 19.1, `@tanstack/react-router` 1.170, `zustand` 5.0, `i18next` 26.4, `react-i18next` 17.0, `lucide-react` 1.34, `cmdk` 1.1, `sonner` 2.0, `radix-ui` 1.6, `class-variance-authority` 0.7, `clsx`, `tailwind-merge` 3.6, `react-error-boundary` 6.1, `@fontsource-variable/outfit` 5.3, `@fontsource/playfair-display` 5.3, `@fontsource-variable/jetbrains-mono` 5.3, `@tauri-apps/api` 2, `@tauri-apps/plugin-{opener,dialog,log,window-state}` 2.
+**Runtime (npm)** — `react` 19.1, `react-dom` 19.1, `@tanstack/react-router` 1.170, `zustand` 5.0, `i18next` 26.4, `react-i18next` 17.0, `lucide-react` 1.34, `cmdk` 1.1, `sonner` 2.0, `radix-ui` 1.6, `class-variance-authority` 0.7, `clsx`, `tailwind-merge` 3.6, `react-error-boundary` 6.1, `@fontsource-variable/outfit` 5.3, `@fontsource/playfair-display` 5.3, `@fontsource-variable/jetbrains-mono` 5.3, `@tauri-apps/api` 2, `@tauri-apps/plugin-log` 2 — and no other plugin's JS package, because the `opener`, `dialog` and `window-state` plugins are driven entirely from Rust (§12).
 
 **Development (npm)** — `vite` 7, `@vitejs/plugin-react` 4.6, `babel-plugin-react-compiler` 1.0, `tailwindcss` 4.3, `@tailwindcss/vite` 4.3, `@tanstack/router-plugin` pinned to the **exact same version** as `@tanstack/react-router` — the plugin generates the route tree the runtime consumes, and a version skew between them produces generation bugs that look like application bugs, `@tanstack/router-devtools`, `typescript` 5.8, `@biomejs/biome` 2.5, `vitest` 4.1, `@vitest/coverage-v8`, `jsdom`, `@testing-library/react` 16.3, `@testing-library/user-event`, `@testing-library/jest-dom`, `axe-core` 4.13, `lefthook` 2.1, `@commitlint/{cli,config-conventional}`, `i18next-parser`, `rollup-plugin-visualizer`, `@tauri-apps/cli` 2.11, `shadcn` 4.19.
 
