@@ -54,7 +54,7 @@ Settled during brainstorming. Each entry is binding for implementation.
 | D10 | State ownership: **Rust owns settings; React renders them** | One place for validation, migration and atomic writes; the webview gets no filesystem permissions. |
 | D11 | **No TanStack Query** this milestone | It earns its keep on cached, paginated, refetched data. One always-loaded local document does not qualify. |
 | D12 | **No** `react-resizable-panels`, `@tanstack/react-table`, `@tanstack/react-virtual`, `pdfjs-dist` | D8 makes them unused code. Recorded here as the seams to add later. |
-| D13 | CI on `ubuntu-24.04` (GA, stable) with a non-blocking `ubuntu-26.04` canary. **deb and AppImage build on `ubuntu-22.04`; rpm builds in a `fedora:latest` container.** | A binary links against the glibc of the machine that built it and runs on anything newer, never anything older, so the portable formats take the oldest viable floor. RPMs are distribution-specific by nature and belong on Fedora, where the dependency names are real. GitHub hosts no Fedora runner, so it runs as a container on an Ubuntu host. |
+| D13 | **Everything — CI and all three bundles — on `ubuntu-24.04`.** Fedora and Debian appear as verification containers, never as build hosts. | Not a preference; the constraint decides it. Tauri v2 needs webkit2gtk **4.1**, whose earliest Ubuntu series is 24.04 — `libwebkit2gtk-4.1-dev` does not exist in 22.04. So 24.04 is simultaneously the oldest image that can build Riff and, near enough, the oldest system that can run it: building there leaves no compatibility unclaimed. Building on 26.04 instead would raise the glibc floor and lock out 24.04 users for nothing. |
 | D14 | Bundles: **deb, rpm, AppImage** | All three, every release, with checksums. |
 | D15 | Repository accepts **no external code contributions** | Bug reports via issues are welcome; pull requests are declined. MIT still permits forks. |
 
@@ -219,7 +219,7 @@ Every command returns `Result<T, RiffError>`. TypeScript bindings are generated 
 | Command | Signature | Notes |
 |---|---|---|
 | `settings_get` | `() -> Settings` | Fallback only; boot uses the injected object. |
-| `settings_patch` | `(SettingsPatch) -> Settings` | Typed partial update. Returns the full validated result. |
+| `settings_patch` | `(SettingsPatch) -> Settings` | `SettingsPatch` mirrors `Settings` with every field `Option`, applied recursively, so a caller sends only what changed and `None` never means "clear this". Returns the full validated result, which is what the store adopts — the frontend never assumes its optimistic guess was right. |
 | `settings_reset` | `(Option<Section>) -> Settings` | One section, or everything. |
 | `settings_export` | `(PathBuf) -> ()` | Writes the current settings to a user-chosen path. |
 | `settings_import` | `(PathBuf) -> Settings` | Runs the imported file through the full §4.3 read path — migration, unknown-field preservation, newer-version tolerance — before applying. A file that fails validation is rejected with a `Validation` error and current settings are left untouched. |
@@ -378,7 +378,7 @@ Collapsing the sidebar yields an icon-only rail rather than hiding it entirely, 
 
 `decorations: false`. Layout: `[panel-left] riff [search] · · · drag region · · · [− □ ✕]`.
 
-The drag region uses `data-tauri-drag-region`. Double-click-to-maximise is verified against Tauri 2.11's built-in drag-region behaviour first, and only hand-implemented if it turns out not to be covered — writing the handler unconditionally risks toggling maximise twice per double-click. Window controls are 44×32 hit targets with `aria-label`s. Setting `appearance.titleBar` to `system` calls `set_decorations(true)` and hides the custom bar live, with no restart — this matters on GNOME and KDE, where users expect their own decorations.
+The drag region uses `data-tauri-drag-region`. Double-click-to-maximise is verified against Tauri 2.11's built-in drag-region behaviour first, and only hand-implemented if it turns out not to be covered — writing the handler unconditionally risks toggling maximise twice per double-click. Window controls are 44×32 hit targets with `aria-label`s. Setting `appearance.titleBar` to `system` calls `set_decorations(true)` and hides the custom bar live, with no restart — this matters on GNOME and KDE, where users expect their own decorations. Under Wayland, whether a compositor honours the request is up to the compositor; Hyprland and others may ignore it entirely. Riff therefore reads `is_decorated()` back after the call, and if the window manager refused, reverts to the custom bar and says so in a toast rather than leaving the user with a window that has no title bar at all and a setting that claims otherwise.
 
 ### 8.2 Onboarding
 
@@ -404,11 +404,15 @@ Three-column shell: sidebar, 240px sub-navigation (General, Appearance, About), 
 
 Every control writes through `useSettings.patch()` and takes effect immediately. There is no Save button and no dirty state — a settings screen that can be abandoned half-applied is a settings screen with a bug in it.
 
+The sections are written by hand, **not generated** from the JSON Schema. Fifteen controls do not repay a rendering framework, and a generator would immediately need escape hatches for the UI-scale slider's live preview, the destructive-reset confirmation and the licence viewer. Hand-written sections stay readable and are trivially testable; a generator would be the more impressive and worse decision.
+
 **General** — Startup route; Restore window size and position; Confirm before quitting; Data locations with per-directory Open buttons; Export settings; Import settings; Reset all settings (destructive confirmation dialog); Re-run onboarding.
 
 **Appearance** — Theme (Dark / Light); Density; UI scale slider with live preview and a Reset affordance; Reduce motion; High contrast; Title bar style; Remember sidebar state.
 
-**About** — Version, Tauri and WebKitGTK versions, build date and git SHA, each copyable; MIT licence text in full; third-party notices generated from npm and cargo, searchable; repository and issue links; a Copy diagnostics button producing a paste-ready report for bug reports.
+Reduce motion offers a System option although Theme deliberately does not (D2), and the asymmetry is intentional: `prefers-reduced-motion` is an unambiguous accessibility declaration that the desktop makes on the user's behalf and that Riff should honour by default, whereas colour scheme is a taste question the user was already asked once, during onboarding.
+
+**About** — Version, Tauri and WebKitGTK versions, build date and git SHA, each copyable; MIT licence text in full; third-party notices generated from npm and cargo, searchable; repository and issue links; a Copy diagnostics button producing a paste-ready report for bug reports, with the home directory rewritten to `$HOME` so pasting it into a public issue does not disclose the user's account name. A privacy-first application should not leak identity through its own bug-report affordance.
 
 The language selector is intentionally absent: a picker with one option is noise. `general.language` exists in the schema and is honoured; the control appears when a second locale ships.
 
@@ -475,7 +479,7 @@ Radix supplies keyboard behaviour and ARIA for every primitive; the work is not 
 
 ## 12. Error handling, logging, security
 
-**Rust.** `thiserror` for typed errors, no `unwrap` outside tests — enforced by `clippy::unwrap_used` at deny level. A panic hook writes the payload and backtrace to the log and shows a native dialog before exit, because a desktop application that vanishes silently is indistinguishable from one the user broke.
+**Rust.** `thiserror` for typed errors, no `unwrap` outside tests — enforced by `clippy::unwrap_used` at deny level. `expect_used` is deliberately *not* denied: a genuine invariant should be stated with a message explaining why it holds, and banning that only pushes people back to `unwrap`. A panic hook writes the payload and backtrace to the log unconditionally, then attempts a native dialog on a best-effort, non-blocking basis — a blocking dialog raised from a panic on the GTK main thread can deadlock, turning a crash report into a hang. Logging always succeeds; the dialog is a courtesy, because an application that vanishes silently is indistinguishable from one the user broke.
 
 **Frontend.** `react-error-boundary` at the root plus a TanStack Router `errorComponent` per route, so one broken screen does not take down the shell. The crash screen shows the error code, a Copy diagnostics button, Open logs, and Reload. `window.onerror` and `unhandledrejection` forward to the log file through `tauri-plugin-log`. Recoverable problems use `sonner` toasts and never block.
 
@@ -504,11 +508,11 @@ Capabilities are minimal: `core:default`, `opener:default`, `dialog:default`, `l
 
 - React Compiler via `babel-plugin-react-compiler`, removing hand-written memoisation
 - Route-level code splitting through TanStack Router's lazy routes
-- Vite `build.target: "safari16"` — Riff's minimum is **WebKitGTK 2.40**, stated in the README and declared as a dependency by the deb and rpm packages
+- Vite `build.target: "safari16"` — Riff requires **webkit2gtk 4.1** (libsoup3) and **glibc ≥ 2.39**. The 4.1 ABI, not a version number, is the binding constraint: it is what excludes Ubuntu 22.04 and Debian 12 no matter how Riff is built. Stated in the README, declared by the deb and rpm packages, asserted by `glibc-floor`
 - Selector-based Zustand subscriptions; no component subscribes to the whole settings object
 - Debounced writes (§4.4) so slider drags produce one write
 - Fonts subset, preloaded, self-hosted; no runtime font fetch is even possible under the CSP
-- `rollup-plugin-visualizer` on demand, with a CI budget failing the build if the initial chunk exceeds 350 KB gzipped
+- `rollup-plugin-visualizer` on demand, with a CI budget failing the build if the initial chunk exceeds 250 KB gzipped — the projected dependency set lands near 140 KB, so the ceiling is a real constraint with headroom rather than a number nothing will ever approach
 - Blocking filesystem work runs on `spawn_blocking`, never on the async runtime's threads
 
 Startup target: window visible with correct theme in under 400 ms on the reference machine, achieved by §3.1 rather than by measurement after the fact.
@@ -627,30 +631,31 @@ A file that outgrows roughly 200 lines is a signal it is doing two things.
 
 System dependencies: `libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev patchelf`. No app-indicator package: Riff has no tray icon, and installing dependencies "because the template did" is how build times rot. Caching via `Swatinem/rust-cache` and pnpm's store cache.
 
-A second `canary` job repeats `lint`, `test-rust` and `build` on `ubuntu-26.04` with `continue-on-error: true`. It is early warning for the next LTS and for the development machine's newer toolchain, and it can never block a merge — a preview runner failing is not a reason to stop working.
+No newer-runner canary job. The development machine runs Arch with glibc and WebKitGTK newer than any Ubuntu image, so it already exercises the newest toolchain daily; a CI job asserting the same thing would be a permanently-ignorable check, and ignorable checks train you to ignore checks.
 
-### 17.1 Release matrix
+### 17.1 Release
 
-`release.yml` fires on `v*` tags. The three formats have genuinely different constraints, so they are built in different places rather than pretending one image suits all three.
+`release.yml` fires on `v*` tags. **One build job**, on `ubuntu-24.04`, producing all three bundles through `tauri-apps/tauri-action@v1`.
 
-| Job | Runs on | Produces |
+Splitting the build per format is tempting and wrong. A binary links against the glibc of its build host and runs on anything newer, never older — so the only question is which host is oldest, and webkit2gtk-4.1 answers it: Ubuntu 24.04 or nothing. Building the RPM on Fedora would be strictly worse, raising the glibc floor while changing no dependency metadata, because Tauri's RPM bundler writes `Requires` from `bundle.rpm.depends` in configuration rather than scanning the binary the way `rpmbuild` would. The declared dependencies are ours either way; only the linkage would suffer.
+
+Fedora and Debian belong in verification instead, where they are genuinely load-bearing:
+
+| Job | Environment | Asserts |
 |---|---|---|
-| `bundle-portable` | `ubuntu-22.04` (glibc 2.35) | `.deb`, `.AppImage` |
-| `bundle-rpm` | `ubuntu-24.04` host, `fedora:latest` container | `.rpm` |
-| `verify-rpm` | fresh `fedora:latest` container | installs the built `.rpm`, asserts `ldd` reports no missing libraries |
+| `glibc-floor` | build host | `objdump -T` reports no required symbol newer than `GLIBC_2.39` |
+| `verify-rpm` | `fedora:latest` container | `dnf install ./riff*.rpm` resolves, then `ldd` finds no missing libraries |
+| `verify-deb` | `debian:trixie` container | `apt install ./riff*.deb` resolves, then the same `ldd` check |
+| `verify-appimage` | bare container, `APPIMAGE_EXTRACT_AND_RUN=1` | the AppImage extracts and its payload links cleanly without FUSE |
 | `publish` | `ubuntu-24.04` | `sha256sums.txt`, draft release with `git-cliff` notes |
 
-Everything is built with `tauri-apps/tauri-action@v1`.
-
-The portable formats take the oldest floor deliberately: a binary built on glibc 2.35 runs on Ubuntu 22.04 and everything newer, including Fedora, Arch and openSUSE. Built on 26.04 instead, the same AppImage would refuse to start on Ubuntu 24.04 and Debian stable — a failure the maintainer would only ever learn about from a user's bug report.
-
-The RPM is built on Fedora because that is the only way its dependency metadata is real rather than hand-transcribed. Inside a container, AppImage tooling needs `APPIMAGE_EXTRACT_AND_RUN=1` since FUSE is unavailable; the RPM job does not build an AppImage, so this only matters if the jobs are ever merged.
-
-`verify-rpm` exists because "the package built" and "the package installs and its libraries resolve" are different claims, and only the second one matters to a Fedora user.
+`glibc-floor` is the important one. It turns "these binaries are portable" from an assumption into an assertion, so a future runner-image bump cannot silently narrow the audience — that class of regression is otherwise only discovered from a user's bug report. The three install checks exist because "the package built" and "the package installs and its libraries resolve" are different claims, and only the second matters to anyone downloading it.
 
 **Dependabot** monthly, grouped by ecosystem, for npm, cargo and actions.
 
 Desktop integration: a `.desktop` entry in the Audio/Music categories that deliberately claims **no** video or audio MIME types — quietly becoming someone's default media player is hostile — and an AppStream `metainfo.xml` so the application appears correctly in software centres.
+
+`Name=Riff`, capitalised, while the binary and `productName` stay lowercase `riff`. The entry also sets `StartupWMClass=riff` to match the window's application ID: without it, Wayland compositors including Hyprland fail to associate the running window with its desktop entry, and the application shows a generic placeholder icon in docks and switchers. It is a one-line fix for a bug that otherwise looks like a broken icon install.
 
 ---
 
@@ -674,7 +679,7 @@ Every package is pinned to the version verified current on 2026-08-28. Nothing i
 
 **Runtime (npm)** — `react` 19.1, `react-dom` 19.1, `@tanstack/react-router` 1.170, `zustand` 5.0, `i18next` 26.4, `react-i18next` 17.0, `lucide-react` 1.34, `cmdk` 1.1, `sonner` 2.0, `radix-ui` 1.6, `class-variance-authority` 0.7, `clsx`, `tailwind-merge` 3.6, `react-error-boundary` 6.1, `@fontsource-variable/outfit` 5.3, `@fontsource/playfair-display` 5.3, `@fontsource-variable/jetbrains-mono` 5.3, `@tauri-apps/api` 2, `@tauri-apps/plugin-{opener,dialog,log,window-state}` 2.
 
-**Development (npm)** — `vite` 7, `@vitejs/plugin-react` 4.6, `babel-plugin-react-compiler` 1.0, `tailwindcss` 4.3, `@tailwindcss/vite` 4.3, `@tanstack/router-plugin` 1.168, `@tanstack/router-devtools`, `typescript` 5.8, `@biomejs/biome` 2.5, `vitest` 4.1, `@vitest/coverage-v8`, `jsdom`, `@testing-library/react` 16.3, `@testing-library/user-event`, `@testing-library/jest-dom`, `axe-core` 4.13, `lefthook` 2.1, `@commitlint/{cli,config-conventional}`, `i18next-parser`, `rollup-plugin-visualizer`, `@tauri-apps/cli` 2.11, `shadcn` 4.19.
+**Development (npm)** — `vite` 7, `@vitejs/plugin-react` 4.6, `babel-plugin-react-compiler` 1.0, `tailwindcss` 4.3, `@tailwindcss/vite` 4.3, `@tanstack/router-plugin` pinned to the **exact same version** as `@tanstack/react-router` — the plugin generates the route tree the runtime consumes, and a version skew between them produces generation bugs that look like application bugs, `@tanstack/router-devtools`, `typescript` 5.8, `@biomejs/biome` 2.5, `vitest` 4.1, `@vitest/coverage-v8`, `jsdom`, `@testing-library/react` 16.3, `@testing-library/user-event`, `@testing-library/jest-dom`, `axe-core` 4.13, `lefthook` 2.1, `@commitlint/{cli,config-conventional}`, `i18next-parser`, `rollup-plugin-visualizer`, `@tauri-apps/cli` 2.11, `shadcn` 4.19.
 
 **Rust** — `tauri` 2.11, `tauri-plugin-{opener,dialog,log,window-state,single-instance}` 2, `serde` 1, `serde_json` 1, `thiserror` 2.0, `tracing` 0.1, `tracing-subscriber` 0.3, `tracing-appender` 0.2, `notify` 8.2, `schemars` 1.2, `directories` 6.0, `tempfile` 3.27, `specta` 1.0, `tauri-specta` 1.0, `time` 0.3.
 
@@ -687,7 +692,8 @@ Every package is pinned to the version verified current on 2026-08-28. Nothing i
 | Risk | Handling |
 |---|---|
 | The source palette fails WCAG boundary contrast | High contrast toggle; controls identifiable without borders (§7.3) |
-| `ubuntu-26.04` is a public-preview runner and may be unstable | CI only. Releases build on `ubuntu-24.04`, which is generally available |
+| The webkit2gtk-4.1 requirement excludes Ubuntu 22.04 and Debian 12 | Unavoidable — it is Tauri v2's own floor, not a build choice. Stated plainly in the README, and declared as a package dependency so apt and dnf refuse the install with a clear message instead of the application failing to start |
+| A future runner-image bump silently raises the glibc floor | The `glibc-floor` job fails the release if any required symbol exceeds `GLIBC_2.39` |
 | WebKitGTK CSS gaps versus Chromium | `build.target: safari16`; no `backdrop-filter`, no bleeding-edge selectors; verified on the WebKitGTK 2.52 development machine |
 | `js_init_script` failing would break themed boot | Frontend falls back to an async `settings_get()` and logs a warning; startup is slower, never broken |
 | Static placeholders drift from the eventual real implementation | Placeholders are presentational only, with no state of their own to unwind |
@@ -706,7 +712,7 @@ Every package is pinned to the version verified current on 2026-08-28. Nothing i
 - `axe` reports zero violations on every route; the application is fully operable by keyboard alone
 - No string reaches the user outside `t()`
 - CI is green: lint, typecheck, both test suites, build, coverage gate, licence check
-- A tagged release produces deb, rpm and AppImage with checksums, and the RPM installs cleanly in a fresh Fedora container with no unresolved libraries
+- A tagged release produces deb, rpm and AppImage with checksums; the rpm installs in a fresh Fedora container and the deb in Debian trixie, both with no unresolved libraries, and no binary requires a glibc symbol newer than 2.39
 - Killing the frontend before `app_ready()` still results in a visible window
 - A second launch focuses the existing window rather than starting a second process
 - The running application opens no network connection — verifiable with `ss -tup`
