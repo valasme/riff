@@ -1,1 +1,24 @@
-{}
+{
+  "placeholder": "Search or jump to…",
+  "empty": "Nothing matches that.",
+  "groups": {
+    "navigation": "Navigation",
+    "appearance": "Appearance",
+    "application": "Application"
+  },
+  "commands": {
+    "nav.practice": "Go to Practice",
+    "nav.history": "Go to History",
+    "nav.settings": "Go to Settings",
+    "nav.about": "Go to About",
+    "ui.toggleSidebar": "Toggle the sidebar",
+    "ui.togglePalette": "Open this palette",
+    "appearance.toggleTheme": "Switch between dark and light",
+    "appearance.toggleDensity": "Switch between comfortable and compact",
+    "appearance.toggleContrast": "Toggle high contrast",
+    "app.openConfig": "Open the settings folder",
+    "app.openLogs": "Open the log folder",
+    "ui.closeOverlay": "Close the topmost overlay",
+    "app.quit": "Quit Riff"
+  }
+}
