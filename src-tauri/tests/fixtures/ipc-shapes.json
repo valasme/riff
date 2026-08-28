@@ -14,8 +14,17 @@
     "logDir": "/s/logs",
     "stateDir": "/s"
   },
-  "ExternalLink": ["repository", "issues", "license"],
-  "PathKind": ["config", "data", "cache", "logs"],
+  "ExternalLink": [
+    "repository",
+    "issues",
+    "license"
+  ],
+  "PathKind": [
+    "config",
+    "data",
+    "cache",
+    "logs"
+  ],
   "RiffError": [
     {
       "code": "io",
@@ -52,7 +61,11 @@
       }
     }
   ],
-  "Section": ["general", "appearance", "onboarding"],
+  "Section": [
+    "general",
+    "appearance",
+    "onboarding"
+  ],
   "Settings": {
     "$schema": "./settings.schema.json",
     "appearance": {
