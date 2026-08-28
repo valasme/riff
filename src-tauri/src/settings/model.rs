@@ -1,0 +1,300 @@
+//! The settings document.
+//!
+//! Every field carries `#[serde(default)]` so a partial or older file still
+//! loads, and every enum deserialises leniently so one unrecognised value
+//! costs the user that value alone rather than the entire document.
+
+use schemars::JsonSchema;
+use serde::{Deserialize, Deserializer, Serialize};
+
+pub const CURRENT_VERSION: u32 = 1;
+pub const CURRENT_ONBOARDING_VERSION: u32 = 1;
+
+/// Deserialises `T`, falling back to `T::default()` and a warning when the
+/// value is not recognised. This is what makes an unknown enum variant a
+/// local problem instead of a total load failure.
+fn lenient<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: serde::de::DeserializeOwned + Default,
+{
+    let raw = serde_json::Value::deserialize(deserializer)?;
+    match serde_json::from_value::<T>(raw.clone()) {
+        Ok(value) => Ok(value),
+        Err(err) => {
+            tracing::warn!(%err, %raw, "unrecognised settings value; using the default");
+            Ok(T::default())
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Settings {
+    #[serde(rename = "$schema")]
+    pub schema: String,
+    pub version: u32,
+    pub general: General,
+    pub appearance: Appearance,
+    pub onboarding: Onboarding,
+    /// Keys Riff does not recognise, kept verbatim so a downgrade followed by
+    /// an upgrade does not silently delete a newer version's settings.
+    #[serde(flatten)]
+    #[schemars(skip)]
+    pub unknown: serde_json::Map<String, serde_json::Value>,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            schema: "./settings.schema.json".to_owned(),
+            version: CURRENT_VERSION,
+            general: General::default(),
+            appearance: Appearance::default(),
+            onboarding: Onboarding::default(),
+            unknown: serde_json::Map::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(default, rename_all = "camelCase")]
+pub struct General {
+    /// Keys this build does not recognise. Present on every section, not only
+    /// the root: new settings are added *inside* sections, so root-only
+    /// preservation would protect exactly the case that never happens and
+    /// lose the one that does.
+    #[serde(flatten)]
+    #[schemars(skip)]
+    pub unknown: serde_json::Map<String, serde_json::Value>,
+    #[serde(deserialize_with = "lenient")]
+    pub startup_route: StartupRoute,
+    pub last_route: String,
+    pub restore_window_state: bool,
+    pub confirm_on_quit: bool,
+    pub language: String,
+}
+
+impl Default for General {
+    fn default() -> Self {
+        Self {
+            startup_route: StartupRoute::Practice,
+            last_route: "/practice".to_owned(),
+            restore_window_state: true,
+            confirm_on_quit: false,
+            language: "en".to_owned(),
+            unknown: serde_json::Map::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Appearance {
+    /// Keys this build does not recognise. Present on every section, not only
+    /// the root: new settings are added *inside* sections, so root-only
+    /// preservation would protect exactly the case that never happens and
+    /// lose the one that does.
+    #[serde(flatten)]
+    #[schemars(skip)]
+    pub unknown: serde_json::Map<String, serde_json::Value>,
+    #[serde(deserialize_with = "lenient")]
+    pub theme: Theme,
+    #[serde(deserialize_with = "lenient")]
+    pub density: Density,
+    pub ui_scale: UiScale,
+    #[serde(deserialize_with = "lenient")]
+    pub reduce_motion: ReduceMotion,
+    pub high_contrast: bool,
+    #[serde(deserialize_with = "lenient")]
+    pub title_bar: TitleBar,
+    pub sidebar: Sidebar,
+}
+
+impl Default for Appearance {
+    fn default() -> Self {
+        Self {
+            theme: Theme::Dark,
+            density: Density::Comfortable,
+            ui_scale: UiScale::default(),
+            reduce_motion: ReduceMotion::System,
+            high_contrast: false,
+            title_bar: TitleBar::Custom,
+            sidebar: Sidebar::default(),
+            unknown: serde_json::Map::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Sidebar {
+    pub collapsed: bool,
+    pub remember_collapsed: bool,
+}
+
+impl Default for Sidebar {
+    fn default() -> Self {
+        Self {
+            collapsed: false,
+            remember_collapsed: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Onboarding {
+    /// RFC 3339. `None` means first run has not been completed.
+    pub completed_at: Option<String>,
+    pub version: u32,
+    #[serde(flatten)]
+    #[schemars(skip)]
+    pub unknown: serde_json::Map<String, serde_json::Value>,
+}
+
+macro_rules! kebab_enum {
+    ($name:ident { $default:ident, $($variant:ident),* $(,)? }) => {
+        #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+        #[serde(rename_all = "kebab-case")]
+        pub enum $name {
+            #[default]
+            $default,
+            $($variant),*
+        }
+    };
+}
+
+kebab_enum!(StartupRoute {
+    Practice,
+    History,
+    LastUsed
+});
+kebab_enum!(Theme { Dark, Light });
+kebab_enum!(Density {
+    Comfortable,
+    Compact
+});
+kebab_enum!(ReduceMotion {
+    System,
+    Always,
+    Never
+});
+kebab_enum!(TitleBar { Custom, System });
+
+/// Clamped on the way in, so an out-of-range value in a hand-edited file is
+/// corrected rather than rejected.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, JsonSchema)]
+pub struct UiScale(f32);
+
+impl UiScale {
+    pub const MIN: f32 = 0.8;
+    pub const MAX: f32 = 1.5;
+
+    pub fn new(value: f32) -> Self {
+        if value.is_finite() {
+            Self(value.clamp(Self::MIN, Self::MAX))
+        } else {
+            Self::default()
+        }
+    }
+
+    pub fn get(self) -> f32 {
+        self.0
+    }
+}
+
+impl Default for UiScale {
+    fn default() -> Self {
+        Self(1.0)
+    }
+}
+
+impl<'de> Deserialize<'de> for UiScale {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        Ok(serde_json::from_value::<f32>(raw)
+            .map(Self::new)
+            .unwrap_or_default())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn defaults_match_the_spec() {
+        let s = Settings::default();
+        assert_eq!(s.version, CURRENT_VERSION);
+        assert_eq!(s.general.startup_route, StartupRoute::Practice);
+        assert!(s.general.restore_window_state);
+        assert!(!s.general.confirm_on_quit);
+        assert_eq!(s.appearance.theme, Theme::Dark);
+        assert_eq!(s.appearance.density, Density::Comfortable);
+        assert_eq!(s.appearance.ui_scale.get(), 1.0);
+        assert!(!s.appearance.high_contrast);
+        assert_eq!(s.appearance.title_bar, TitleBar::Custom);
+        assert!(s.onboarding.completed_at.is_none());
+    }
+
+    #[test]
+    fn a_partial_file_loads_with_defaults_for_everything_absent() {
+        let s: Settings = serde_json::from_str(r#"{"appearance":{"theme":"light"}}"#)
+            .expect("partial documents must load");
+        assert_eq!(s.appearance.theme, Theme::Light);
+        assert_eq!(s.appearance.density, Density::Comfortable);
+        assert_eq!(s.general.startup_route, StartupRoute::Practice);
+    }
+
+    #[test]
+    fn an_unrecognised_enum_value_falls_back_instead_of_failing_the_whole_load() {
+        let s: Settings = serde_json::from_str(r#"{"appearance":{"theme":"solarized"}}"#)
+            .expect("one bad key must not cost the user every setting");
+        assert_eq!(s.appearance.theme, Theme::Dark);
+    }
+
+    #[test]
+    fn ui_scale_clamps_rather_than_rejecting() {
+        let low: Settings =
+            serde_json::from_str(r#"{"appearance":{"uiScale":0.1}}"#).expect("loads");
+        assert_eq!(low.appearance.ui_scale.get(), 0.8);
+        let high: Settings =
+            serde_json::from_str(r#"{"appearance":{"uiScale":9.0}}"#).expect("loads");
+        assert_eq!(high.appearance.ui_scale.get(), 1.5);
+        let junk: Settings =
+            serde_json::from_str(r#"{"appearance":{"uiScale":"big"}}"#).expect("loads");
+        assert_eq!(junk.appearance.ui_scale.get(), 1.0);
+    }
+
+    #[test]
+    fn unknown_keys_inside_a_section_survive_too() {
+        // The case that actually happens: a newer build adds
+        // `appearance.accentColor`, the user downgrades, and the older build
+        // writes the file back. Root-only preservation would destroy it.
+        let original = r##"{"version":1,"appearance":{"theme":"light","accentColor":"#ff0000"}}"##;
+        let s: Settings = serde_json::from_str(original).expect("loads");
+        let round_tripped = serde_json::to_value(&s).expect("serialises");
+        assert_eq!(round_tripped["appearance"]["accentColor"], "#ff0000");
+        assert_eq!(round_tripped["appearance"]["theme"], "light");
+    }
+
+    #[test]
+    fn unknown_top_level_keys_survive_a_round_trip() {
+        let original = r#"{"version":1,"futureFeature":{"enabled":true}}"#;
+        let s: Settings = serde_json::from_str(original).expect("loads");
+        let round_tripped = serde_json::to_value(&s).expect("serialises");
+        assert_eq!(
+            round_tripped["futureFeature"]["enabled"], true,
+            "a downgrade must not destroy settings written by a newer version"
+        );
+    }
+
+    #[test]
+    fn serialises_camel_case_with_a_schema_pointer() {
+        let json = serde_json::to_value(Settings::default()).expect("serialises");
+        assert_eq!(json["$schema"], "./settings.schema.json");
+        assert!(json["general"]["startupRoute"].is_string());
+        assert!(json["appearance"]["uiScale"].is_number());
+    }
+}
