@@ -73,7 +73,10 @@ pub fn sessions_newest_first(log_dir: &Path) -> Vec<std::path::PathBuf> {
         .map(|entries| {
             entries
                 .filter_map(Result::ok)
-                .filter(|e| e.path().is_dir())
+                // `latest` is a symlink to the newest session dir, not a
+                // session of its own — counting it would duplicate that
+                // session's content in every exported bundle.
+                .filter(|e| e.path().is_dir() && e.file_name() != "latest")
                 .map(|e| e.path())
                 .collect()
         })
@@ -88,6 +91,22 @@ pub fn sessions_newest_first(log_dir: &Path) -> Vec<std::path::PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_latest_symlink_is_not_counted_as_its_own_session() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let real = tmp.path().join("2026-08-28T10-00-00Z-1");
+        std::fs::create_dir_all(&real).expect("seed");
+        std::os::unix::fs::symlink(&real, tmp.path().join("latest")).expect("symlink");
+
+        let sessions = sessions_newest_first(tmp.path());
+        assert_eq!(
+            sessions,
+            vec![real],
+            "`latest` points at the newest session; it must not also be listed \
+             as a session, or its content is duplicated in every export"
+        );
+    }
 
     #[test]
     fn rewrites_the_home_directory_and_the_username() {

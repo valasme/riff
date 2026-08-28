@@ -96,7 +96,7 @@ fn check_writable(paths: &AppPaths) -> Check {
     }
 }
 
-fn is_read_only(dir: &std::path::Path) -> bool {
+pub(crate) fn is_read_only(dir: &std::path::Path) -> bool {
     match std::fs::metadata(dir) {
         Ok(meta) => meta.permissions().readonly(),
         Err(_) => true,

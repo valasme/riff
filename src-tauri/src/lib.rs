@@ -1,4 +1,5 @@
 pub mod bootstrap;
+pub mod cli;
 pub mod commands;
 pub mod diagnostics;
 pub mod error;
@@ -82,7 +83,19 @@ pub fn run() {
         }
     });
 
-    // 3. Settings, BEFORE the Tauri builder exists — the bootstrap script
+    // 3. The CLI, before anything else that could need a window. Argument
+    //    parsing, health checks and repair need no GTK, no webview and no
+    //    display, so `riff doctor` works over SSH on a machine whose window
+    //    will not open. This also runs before `tauri_plugin_single_instance`
+    //    is registered below — that plugin forwards a second process's
+    //    arguments to the running window and exits, so `riff --help` typed
+    //    while Riff is open would otherwise print nothing at all.
+    let cli = <cli::Cli as clap::Parser>::parse();
+    if let Some(code) = cli::dispatch(&cli, &paths) {
+        std::process::exit(code);
+    }
+
+    // 4. Settings, BEFORE the Tauri builder exists — the bootstrap script
     //    needs them as a string at plugin-registration time.
     let (store, outcome) = SettingsStore::load(paths.clone());
     match &outcome {
@@ -104,6 +117,9 @@ pub fn run() {
     if let Err(err) = store.flush_if_dirty() {
         tracing::error!(%err, "could not write initial settings");
     }
+    // Lets `riff repair`, run from another terminal, warn that it may race
+    // with a session that is already live rather than fixing things blind.
+    let _ = std::fs::write(cli::pid_file(&paths), std::process::id().to_string());
     if let Err(err) = settings::schema::write(&paths) {
         tracing::warn!(%err, "could not write settings.schema.json");
     }
@@ -242,6 +258,7 @@ pub fn run() {
                 if let Err(err) = store.flush_if_dirty() {
                     tracing::error!(%err, "settings could not be saved on exit");
                 }
+                let _ = std::fs::remove_file(cli::pid_file(store.paths()));
                 // The last line of a healthy session. If it is absent, the
                 // run crashed — which makes triage a single `tail -1`.
                 tracing::info!("shutdown complete");
