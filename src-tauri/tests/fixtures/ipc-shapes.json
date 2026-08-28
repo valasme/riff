@@ -1,0 +1,83 @@
+{
+  "AppInfo": {
+    "buildDate": "1970-01-01",
+    "gitSha": "0000000",
+    "tauriVersion": "0.0.0",
+    "version": "0.0.0",
+    "webkitVersion": "0.0.0"
+  },
+  "AppPaths": {
+    "cacheDir": "/k",
+    "configDir": "/c",
+    "dataDir": "/d",
+    "homeDir": "/h",
+    "logDir": "/s/logs",
+    "stateDir": "/s"
+  },
+  "ExternalLink": ["repository", "issues", "license"],
+  "PathKind": ["config", "data", "cache", "logs"],
+  "RiffError": [
+    {
+      "code": "io",
+      "details": {
+        "message": "m",
+        "path": "p"
+      }
+    },
+    {
+      "code": "parse",
+      "details": {
+        "line": 1,
+        "message": "m",
+        "path": "p"
+      }
+    },
+    {
+      "code": "validation",
+      "details": {
+        "field": "f",
+        "reason": "r"
+      }
+    },
+    {
+      "code": "not-found",
+      "details": {
+        "what": "w"
+      }
+    },
+    {
+      "code": "denied",
+      "details": {
+        "what": "w"
+      }
+    }
+  ],
+  "Section": ["general", "appearance", "onboarding"],
+  "Settings": {
+    "$schema": "./settings.schema.json",
+    "appearance": {
+      "density": "comfortable",
+      "highContrast": false,
+      "reduceMotion": "system",
+      "sidebar": {
+        "collapsed": false,
+        "rememberCollapsed": true
+      },
+      "theme": "dark",
+      "titleBar": "custom",
+      "uiScale": 1.0
+    },
+    "general": {
+      "confirmOnQuit": false,
+      "language": "en",
+      "lastRoute": "/practice",
+      "restoreWindowState": true,
+      "startupRoute": "practice"
+    },
+    "onboarding": {
+      "completedAt": null,
+      "version": 0
+    },
+    "version": 1
+  }
+}
