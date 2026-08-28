@@ -19,6 +19,12 @@
     "issues",
     "license"
   ],
+  "LicenseEntry": {
+    "ecosystem": "npm",
+    "license": "MIT",
+    "name": "n",
+    "version": "0.0.0"
+  },
   "LogLevel": [
     "error",
     "warn",

@@ -8,6 +8,7 @@
 
 use riff_lib::commands::app::{AppInfo, ExternalLink, PathKind};
 use riff_lib::commands::diagnostics::LogLevel;
+use riff_lib::commands::licenses::LicenseEntry;
 use riff_lib::error::RiffError;
 use riff_lib::settings::model::Settings;
 use riff_lib::settings::store::Section;
@@ -44,6 +45,12 @@ fn shapes() -> serde_json::Value {
             webkit_version: "0.0.0".into(),
             build_date: "1970-01-01".into(),
             git_sha: "0000000".into(),
+        },
+        "LicenseEntry": LicenseEntry {
+            name: "n".into(),
+            version: "0.0.0".into(),
+            license: "MIT".into(),
+            ecosystem: "npm".into(),
         },
         "RiffError": [
             RiffError::Io { path: "p".into(), message: "m".into() },

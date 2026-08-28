@@ -7,6 +7,7 @@ import i18n from "@/app/i18n";
 const openExternal = vi.fn().mockResolvedValue(undefined);
 const writeText = vi.fn().mockResolvedValue(undefined);
 const diagnosticsExport = vi.fn().mockResolvedValue(null);
+const licensesGet = vi.fn().mockResolvedValue([]);
 
 vi.mock("@/stores/settings", () => ({
   useSettings: (selector: (s: Record<string, unknown>) => unknown) =>
@@ -28,7 +29,7 @@ vi.mock("@/stores/settings", () => ({
       },
     }),
 }));
-vi.mock("@/lib/ipc", () => ({ ipc: { openExternal, diagnosticsExport } }));
+vi.mock("@/lib/ipc", () => ({ ipc: { openExternal, diagnosticsExport, licensesGet } }));
 
 const { AboutSection } = await import("./AboutSection");
 
@@ -65,6 +66,20 @@ describe("AboutSection", () => {
     await user.click(screen.getByRole("button", { name: /export/i }));
     expect(diagnosticsExport).toHaveBeenCalled();
     expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it("fetches third-party licences only once the list is expanded", async () => {
+    const user = userEvent.setup();
+    licensesGet.mockResolvedValueOnce([
+      { name: "react", version: "19.1.0", license: "MIT", ecosystem: "npm" },
+    ]);
+    renderSection();
+    expect(licensesGet).not.toHaveBeenCalled();
+
+    await user.click(screen.getByText(/third-party licences/i));
+
+    expect(licensesGet).toHaveBeenCalled();
+    expect(await screen.findByText("react@19.1.0")).toBeInTheDocument();
   });
 
   it("has no accessibility violations", async () => {

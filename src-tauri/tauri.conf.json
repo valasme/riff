@@ -33,6 +33,7 @@
     "active": true,
     "targets": ["deb", "rpm", "appimage"],
     "publisher": "valasme",
+    "resources": { "../third-party-licenses.json": "third-party-licenses.json" },
     "category": "Music",
     "shortDescription": "Practise with sheet music, video and audio in one place",
     "longDescription": "Riff is a local-first practice workspace for musicians. It keeps a PDF score, a video lesson and an audio track side by side on one page. No accounts, no telemetry, no network.",

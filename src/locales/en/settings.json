@@ -95,6 +95,7 @@
     "issues": "Report an issue",
     "license": "Licence",
     "licenseBody": "Riff is free software released under the MIT Licence.",
+    "thirdParty": "Third-party licences",
     "exportDiagnostics": {
       "label": "Export diagnostics",
       "description": "Writes one text file with your logs, versions and settings. Your home directory and username are replaced before it is saved, so it is safe to attach to a bug report.",

@@ -8,7 +8,8 @@
       "!src-tauri/target",
       "!coverage",
       "!src/routeTree.gen.ts",
-      "!src-tauri/tests/fixtures"
+      "!src-tauri/tests/fixtures",
+      "!third-party-licenses.json"
     ]
   },
   "formatter": {

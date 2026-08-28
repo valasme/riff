@@ -4,6 +4,7 @@ import type {
   AppPaths,
   DeepPartial,
   ExternalLink,
+  LicenseEntry,
   LogLevel,
   PathKind,
   RiffError,
@@ -43,6 +44,7 @@ export const ipc = {
   diagnosticsExport: () => invoke<string | null>("diagnostics_export"),
   logWrite: (level: LogLevel, message: string, context?: unknown) =>
     invoke<void>("log_write", { level, message, context: context ?? null }),
+  licensesGet: () => invoke<LicenseEntry[]>("licenses_get"),
   windowMinimize: () => invoke<void>("window_minimize"),
   windowToggleMaximize: () => invoke<void>("window_toggle_maximize"),
   windowClose: () => invoke<void>("window_close"),

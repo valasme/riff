@@ -62,6 +62,13 @@ export interface AppInfo {
   gitSha: string;
 }
 
+export interface LicenseEntry {
+  name: string;
+  version: string;
+  license: string;
+  ecosystem: string;
+}
+
 export type RiffError =
   | { code: "io"; details: { path: string; message: string } }
   | { code: "parse"; details: { path: string; message: string; line: number | null } }
