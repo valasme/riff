@@ -56,12 +56,12 @@ The `create-tauri-app` scaffold is **already committed** — it landed alongside
 **Files:**
 - Modify: `.gitignore`
 
-- [ ] **Step 1: Confirm the scaffold is tracked and the tree is clean**
+- [x] **Step 1: Confirm the scaffold is tracked and the tree is clean**
 
 Run: `git status --short && git ls-files src-tauri/Cargo.toml`
 Expected: no output from the first command, and `src-tauri/Cargo.toml` from the second. If `git status` shows `??` entries for `src/` or `src-tauri/`, the scaffold is untracked after all — commit it unchanged first so later diffs are not buried in template noise.
 
-- [ ] **Step 2: Ignore Tauri build output**
+- [x] **Step 2: Ignore Tauri build output**
 
 Append to `.gitignore`:
 
@@ -75,12 +75,12 @@ src-tauri/gen/schemas/
 coverage/
 ```
 
-- [ ] **Step 3: Verify the ignore rules took effect**
+- [x] **Step 3: Verify the ignore rules took effect**
 
 Run: `git status --short | grep -c 'src-tauri/target'`
 Expected: `0`
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A
@@ -99,7 +99,7 @@ git commit -m "chore: ignore tauri build output and coverage"
 - Modify: `src/main.tsx`, `index.html`, `src-tauri/src/lib.rs`
 - Move: `Riff *.png` → `docs/design/`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src-tauri/tests/no_template_code.rs`:
 
@@ -117,12 +117,12 @@ fn greet_command_is_gone() {
 }
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `cd src-tauri && cargo test --test no_template_code`
 Expected: FAIL — `src-tauri/src/lib.rs still contains the template greet command`
 
-- [ ] **Step 3: Strip the demo command**
+- [x] **Step 3: Strip the demo command**
 
 Replace the whole of `src-tauri/src/lib.rs` with:
 
@@ -136,7 +136,7 @@ pub fn run() {
 }
 ```
 
-- [ ] **Step 4: Delete the template's frontend assets**
+- [x] **Step 4: Delete the template's frontend assets**
 
 ```bash
 rm src/App.tsx src/App.css src/assets/react.svg public/tauri.svg public/vite.svg
@@ -150,7 +150,7 @@ will: the webview holds one capability and calls the plugin through none of
 them. Shipping it would be a dependency in the bundle for an API nothing
 imports.
 
-- [ ] **Step 5: Replace the entry point**
+- [x] **Step 5: Replace the entry point**
 
 Overwrite `src/main.tsx`:
 
@@ -168,7 +168,7 @@ ReactDOM.createRoot(root).render(
 );
 ```
 
-- [ ] **Step 6: Fix the document head**
+- [x] **Step 6: Fix the document head**
 
 Overwrite `index.html`:
 
@@ -187,7 +187,7 @@ Overwrite `index.html`:
 </html>
 ```
 
-- [ ] **Step 7: Move the mockups out of the repository root**
+- [x] **Step 7: Move the mockups out of the repository root**
 
 ```bash
 mkdir -p docs/design
@@ -196,7 +196,7 @@ git mv "Riff History Route.png"  docs/design/history-route.png
 git mv "Riff Settings Route.png" docs/design/settings-route.png
 ```
 
-- [ ] **Step 8: Run the test and the builds**
+- [x] **Step 8: Run the test and the builds**
 
 Run: `cd src-tauri && cargo test --test no_template_code && cargo build`
 Expected: test PASS, build succeeds
@@ -204,7 +204,7 @@ Expected: test PASS, build succeeds
 Run: `pnpm build`
 Expected: succeeds, `dist/` produced
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add -A
@@ -219,7 +219,7 @@ git commit -m "chore: remove create-tauri-app demo code and relocate mockups"
 - Create: `.nvmrc`, `rust-toolchain.toml`, `.editorconfig`
 - Modify: `package.json`
 
-- [ ] **Step 1: Pin Node**
+- [x] **Step 1: Pin Node**
 
 Create `.nvmrc`:
 
@@ -227,7 +227,7 @@ Create `.nvmrc`:
 26
 ```
 
-- [ ] **Step 2: Pin Rust**
+- [x] **Step 2: Pin Rust**
 
 Create `rust-toolchain.toml`:
 
@@ -238,7 +238,7 @@ components = ["rustfmt", "clippy"]
 profile = "minimal"
 ```
 
-- [ ] **Step 3: Pin pnpm**
+- [x] **Step 3: Pin pnpm**
 
 In `package.json`, add the `packageManager` field immediately after `"version"`:
 
@@ -246,7 +246,7 @@ In `package.json`, add the `packageManager` field immediately after `"version"`:
   "packageManager": "pnpm@11.3.0",
 ```
 
-- [ ] **Step 4: Add editor defaults**
+- [x] **Step 4: Add editor defaults**
 
 Create `.editorconfig`:
 
@@ -268,7 +268,7 @@ indent_size = 4
 trim_trailing_whitespace = false
 ```
 
-- [ ] **Step 5: Verify the pins resolve**
+- [x] **Step 5: Verify the pins resolve**
 
 Run: `cd src-tauri && cargo fmt --version && rustc --version`
 Expected: rustc reports `1.98.0`
@@ -276,7 +276,7 @@ Expected: rustc reports `1.98.0`
 Run: `pnpm -v`
 Expected: `11.3.0`
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A
@@ -293,14 +293,14 @@ Biome replaces ESLint and Prettier entirely. Generate the config with `biome ini
 - Create: `biome.json`
 - Modify: `package.json`
 
-- [ ] **Step 1: Install Biome and generate a baseline config**
+- [x] **Step 1: Install Biome and generate a baseline config**
 
 ```bash
 pnpm add -D @biomejs/biome@2.5.11
 pnpm exec biome init
 ```
 
-- [ ] **Step 2: Configure it**
+- [x] **Step 2: Configure it**
 
 Overwrite `biome.json`, keeping the `$schema` line that `biome init` generated — it encodes the installed version:
 
@@ -343,7 +343,7 @@ Overwrite `biome.json`, keeping the `$schema` line that `biome init` generated �
 
 If `biome check` rejects a key, the installed schema differs — run `pnpm exec biome check --write` and consult the error, which names the offending path exactly. Do not silence rules to make it pass.
 
-- [ ] **Step 3: Add the scripts**
+- [x] **Step 3: Add the scripts**
 
 In `package.json`, replace the `scripts` block:
 
@@ -366,7 +366,7 @@ In `package.json`, replace the `scripts` block:
 
 `dev` stays `vite` on purpose: `tauri.conf.json` sets `beforeDevCommand` to `pnpm dev`, so renaming it to `tauri dev` would make the two invoke each other forever.
 
-- [ ] **Step 4: Prove the linter actually rejects bad code**
+- [x] **Step 4: Prove the linter actually rejects bad code**
 
 Create `src/lint-probe.ts`:
 
@@ -377,7 +377,7 @@ export const probe: any = 1;
 Run: `pnpm lint`
 Expected: FAIL, reporting `noExplicitAny` in `src/lint-probe.ts`
 
-- [ ] **Step 5: Remove the probe and confirm green**
+- [x] **Step 5: Remove the probe and confirm green**
 
 ```bash
 rm src/lint-probe.ts
@@ -386,7 +386,7 @@ pnpm lint
 ```
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A
@@ -403,7 +403,7 @@ git commit -m "build: add biome for linting and formatting"
 **Files:**
 - Modify: `tsconfig.json`, `vite.config.ts`
 
-- [ ] **Step 1: Tighten the compiler options**
+- [x] **Step 1: Tighten the compiler options**
 
 In `tsconfig.json`, add these inside `compilerOptions`:
 
@@ -419,7 +419,7 @@ Also add `"types": ["node"]` to `tsconfig.node.json`, which is the project that 
 
 `exactOptionalPropertyTypes` is deliberately **not** enabled: it fights third-party React prop types constantly and buys little in an application this size.
 
-- [ ] **Step 2: Teach Vite the same alias**
+- [x] **Step 2: Teach Vite the same alias**
 
 Overwrite `vite.config.ts`:
 
@@ -447,7 +447,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 3: Prove the alias resolves**
+- [x] **Step 3: Prove the alias resolves**
 
 Create `src/alias-probe.ts`:
 
@@ -465,7 +465,7 @@ console.log(aliasWorks);
 Run: `pnpm typecheck && pnpm build`
 Expected: both succeed
 
-- [ ] **Step 4: Remove the probe**
+- [x] **Step 4: Remove the probe**
 
 ```bash
 rm src/alias-probe.ts
@@ -475,7 +475,7 @@ Then delete the two lines you appended to `src/main.tsx`.
 Run: `pnpm typecheck`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -490,13 +490,13 @@ git commit -m "build: enable strict typescript options and the @/ path alias"
 - Create: `src/styles/globals.css`
 - Modify: `vite.config.ts`, `src/main.tsx`, `package.json`
 
-- [ ] **Step 1: Install**
+- [x] **Step 1: Install**
 
 ```bash
 pnpm add -D tailwindcss@4.3.3 @tailwindcss/vite@4.3.3 babel-plugin-react-compiler@1.0.0
 ```
 
-- [ ] **Step 2: Wire both plugins into Vite**
+- [x] **Step 2: Wire both plugins into Vite**
 
 In `vite.config.ts`, add the import and replace the `plugins` array:
 
@@ -519,7 +519,7 @@ Also add the build target — WebKitGTK is the only engine this ever runs in:
   build: { target: "safari16" },
 ```
 
-- [ ] **Step 3: Create the stylesheet**
+- [x] **Step 3: Create the stylesheet**
 
 Create `src/styles/globals.css`:
 
@@ -529,7 +529,7 @@ Create `src/styles/globals.css`:
 
 Plan 05 replaces this file with the full token system. For now it only has to prove the pipeline works.
 
-- [ ] **Step 4: Import it and use one utility**
+- [x] **Step 4: Import it and use one utility**
 
 In `src/main.tsx`, add as the first import:
 
@@ -543,17 +543,17 @@ and change the placeholder element to:
   <div id="app-root" className="flex" />
 ```
 
-- [ ] **Step 5: Verify Tailwind emitted the utility**
+- [x] **Step 5: Verify Tailwind emitted the utility**
 
 Run: `pnpm build && grep -l 'display:flex' dist/assets/*.css`
 Expected: prints a CSS filename. If it prints nothing, Tailwind is not scanning `src/` — check that `globals.css` is imported.
 
-- [ ] **Step 6: Verify the React Compiler ran**
+- [x] **Step 6: Verify the React Compiler ran**
 
 Run: `pnpm build 2>&1 | grep -i 'react-compiler\|babel' || echo "no compiler errors"`
 Expected: no errors. The compiler is silent on success; a misconfiguration fails the build loudly.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -571,7 +571,7 @@ git commit -m "build: add tailwind v4 and the react compiler"
 - Create: `src/test/setup.ts`, `src/test/axe.ts`, `src/test/axe.test.tsx`
 - Modify: `vite.config.ts`, `package.json`
 
-- [ ] **Step 1: Install**
+- [x] **Step 1: Install**
 
 ```bash
 pnpm add -D @types/node vitest@4.1.11 @vitest/coverage-v8@4.1.11 jsdom \
@@ -579,7 +579,7 @@ pnpm add -D @types/node vitest@4.1.11 @vitest/coverage-v8@4.1.11 jsdom \
   axe-core@4.13.0
 ```
 
-- [ ] **Step 2: Configure the test runner**
+- [x] **Step 2: Configure the test runner**
 
 In `vite.config.ts`, add a `test` block after `build`:
 
@@ -602,7 +602,7 @@ In `vite.config.ts`, add a `test` block after `build`:
   },
 ```
 
-- [ ] **Step 3: Write the axe matcher**
+- [x] **Step 3: Write the axe matcher**
 
 Create `src/test/axe.ts`:
 
@@ -650,7 +650,7 @@ declare module "vitest" {
 // `expect.extend` augments and match it — do not cast the expectation.
 ```
 
-- [ ] **Step 4: Write the setup file**
+- [x] **Step 4: Write the setup file**
 
 Create `src/test/setup.ts`:
 
@@ -665,7 +665,7 @@ afterEach(() => {
 });
 ```
 
-- [ ] **Step 5: Write the failing test that proves the matcher detects real violations**
+- [x] **Step 5: Write the failing test that proves the matcher detects real violations**
 
 Create `src/test/axe.test.tsx`:
 
@@ -697,19 +697,19 @@ describe("axe matcher", () => {
 });
 ```
 
-- [ ] **Step 6: Run it and watch it fail**
+- [x] **Step 6: Run it and watch it fail**
 
 Run: `pnpm test`
 Expected: FAIL — `toHaveNoAxeViolations is not a function` or a module-resolution error, because the setup file is not yet picked up.
 
-- [ ] **Step 7: Make it pass**
+- [x] **Step 7: Make it pass**
 
 If Step 6 failed on config rather than the matcher, confirm `setupFiles` in `vite.config.ts` points at `./src/test/setup.ts` and that `@/` resolves inside tests (it does, via `resolve.alias`).
 
 Run: `pnpm test`
 Expected: PASS, 2 tests
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add -A
@@ -724,14 +724,14 @@ git commit -m "test: add vitest, testing library and an axe-core matcher"
 - Create: `lefthook.yml`, `commitlint.config.mjs`
 - Modify: `package.json`
 
-- [ ] **Step 1: Install**
+- [x] **Step 1: Install**
 
 ```bash
 pnpm add -D lefthook@2.1.10 @commitlint/cli @commitlint/config-conventional
 pnpm exec lefthook install
 ```
 
-- [ ] **Step 2: Configure the hooks**
+- [x] **Step 2: Configure the hooks**
 
 Create `lefthook.yml`:
 
@@ -763,7 +763,7 @@ pre-push:
       run: cd src-tauri && cargo test
 ```
 
-- [ ] **Step 3: Configure commit message rules**
+- [x] **Step 3: Configure commit message rules**
 
 Create `commitlint.config.mjs`:
 
@@ -771,22 +771,22 @@ Create `commitlint.config.mjs`:
 export default { extends: ["@commitlint/config-conventional"] };
 ```
 
-- [ ] **Step 4: Prove commitlint rejects a bad message**
+- [x] **Step 4: Prove commitlint rejects a bad message**
 
 Run: `echo "broken message" | pnpm exec commitlint`
 Expected: FAIL — `subject may not be empty` / `type may not be empty`
 
-- [ ] **Step 5: Prove it accepts a good one**
+- [x] **Step 5: Prove it accepts a good one**
 
 Run: `echo "feat: add a thing" | pnpm exec commitlint`
 Expected: exit code 0, no output
 
-- [ ] **Step 6: Run the pre-commit hook end to end**
+- [x] **Step 6: Run the pre-commit hook end to end**
 
 Run: `pnpm exec lefthook run pre-commit`
 Expected: all jobs pass
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -801,7 +801,7 @@ git commit -m "build: add lefthook hooks and commitlint"
 - Modify: `src-tauri/Cargo.toml`
 - Create: `src-tauri/deny.toml`
 
-- [ ] **Step 1: Set the lint levels**
+- [x] **Step 1: Set the lint levels**
 
 Append to `src-tauri/Cargo.toml`:
 
@@ -822,7 +822,7 @@ unsafe_code = "deny"
 
 `expect_used` stays allowed on purpose: a genuine invariant should be stated with a message explaining why it holds, and banning that only pushes people back to `unwrap`.
 
-- [ ] **Step 2: Prove the gate bites**
+- [x] **Step 2: Prove the gate bites**
 
 Temporarily add to `src-tauri/src/lib.rs`:
 
@@ -836,7 +836,7 @@ pub fn probe() -> i32 {
 Run: `cd src-tauri && cargo clippy --all-targets -- -D warnings`
 Expected: FAIL — `used `unwrap()` on an `Option` value`
 
-- [ ] **Step 3: Remove the probe and confirm green**
+- [x] **Step 3: Remove the probe and confirm green**
 
 Delete the `probe` function.
 
@@ -845,7 +845,7 @@ Expected: PASS
 
 `--all-targets` on purpose, and it is the form every later plan and CI use. Without it clippy checks only the lib target, so `unwrap_used` — the lint this gate exists for — never looks at a single test.
 
-- [ ] **Step 4: Add the licence allow-list**
+- [x] **Step 4: Add the licence allow-list**
 
 ```bash
 cargo install cargo-deny --locked
@@ -871,7 +871,7 @@ allow = [
 
 GPL and AGPL are absent deliberately: a copyleft transitive dependency must not be able to enter an MIT binary unnoticed. If `cargo deny` later flags a genuinely needed crate, the decision to add its licence is a deliberate one, not a config tweak.
 
-- [ ] **Step 5: Run the check**
+- [x] **Step 5: Run the check**
 
 Then set the other two sections CI runs, so `cargo deny check` means the same thing locally and in CI:
 
@@ -886,12 +886,12 @@ unmaintained = "workspace"
 
 `unmaintained = "workspace"` limits the check to crates Riff depends on directly. The alternative, `all`, turns CI red on a transitive crate nobody can act on, and a check you cannot act on is a check you learn to ignore.
 
-- [ ] **Step 5b: Run the check**
+- [x] **Step 5b: Run the check**
 
 Run: `cd src-tauri && cargo deny check`
 Expected: PASS. If a crate is rejected, read its licence before adding anything.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A
@@ -902,7 +902,7 @@ git commit -m "build: deny unwrap in rust and add a cargo-deny licence allow-lis
 
 ### Task 10: Verify every gate together
 
-- [ ] **Step 1: Run the whole suite the way CI will**
+- [x] **Step 1: Run the whole suite the way CI will**
 
 ```bash
 pnpm install --frozen-lockfile
@@ -915,7 +915,7 @@ cd src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings &
 
 Expected: every command exits 0.
 
-- [ ] **Step 2: Commit any lockfile drift**
+- [x] **Step 2: Commit any lockfile drift**
 
 ```bash
 git add -A
