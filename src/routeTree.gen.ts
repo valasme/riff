@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as HistoryRouteImport } from './routes/history'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as PracticeRouteImport } from './routes/practice'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
@@ -26,6 +27,11 @@ const IndexRoute = IndexRouteImport.update({
 const HistoryRoute = HistoryRouteImport.update({
   id: '/history',
   path: '/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PracticeRoute = PracticeRouteImport.update({
@@ -62,6 +68,7 @@ const SettingsGeneralRoute = SettingsGeneralRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/history': typeof HistoryRoute
+  '/onboarding': typeof OnboardingRoute
   '/practice': typeof PracticeRoute
   '/settings': typeof SettingsRouteWithChildren
   '/settings/about': typeof SettingsAboutRoute
@@ -72,6 +79,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/history': typeof HistoryRoute
+  '/onboarding': typeof OnboardingRoute
   '/practice': typeof PracticeRoute
   '/settings/about': typeof SettingsAboutRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
@@ -82,6 +90,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/history': typeof HistoryRoute
+  '/onboarding': typeof OnboardingRoute
   '/practice': typeof PracticeRoute
   '/settings': typeof SettingsRouteWithChildren
   '/settings/about': typeof SettingsAboutRoute
@@ -94,6 +103,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/history'
+    | '/onboarding'
     | '/practice'
     | '/settings'
     | '/settings/about'
@@ -104,6 +114,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/history'
+    | '/onboarding'
     | '/practice'
     | '/settings/about'
     | '/settings/appearance'
@@ -113,6 +124,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/history'
+    | '/onboarding'
     | '/practice'
     | '/settings'
     | '/settings/about'
@@ -124,6 +136,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   HistoryRoute: typeof HistoryRoute
+  OnboardingRoute: typeof OnboardingRoute
   PracticeRoute: typeof PracticeRoute
   SettingsRoute: typeof SettingsRouteWithChildren
 }
@@ -142,6 +155,13 @@ declare module '@tanstack/react-router' {
       path: '/history'
       fullPath: '/history'
       preLoaderRoute: typeof HistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/practice': {
@@ -210,6 +230,7 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   HistoryRoute: HistoryRoute,
+  OnboardingRoute: OnboardingRoute,
   PracticeRoute: PracticeRoute,
   SettingsRoute: SettingsRouteWithChildren,
 }

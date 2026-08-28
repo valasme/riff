@@ -1,6 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { GeneralSection } from "@/features/settings/sections/GeneralSection";
 
-// Task 4 replaces this with the real section.
-export const Route = createFileRoute("/settings/general")({
-  component: () => <div />,
-});
+export const Route = createFileRoute("/settings/general")({ component: GeneralSection });
