@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { RouteError } from "@/components/RouteError";
 import { Sidebar } from "@/components/Sidebar";
+import { QuitConfirmation } from "@/features/window/QuitConfirmation";
 import { TitleBar } from "@/features/window/TitleBar";
 import { reportRecovery, subscribeToBackend, useAppearance, useSettings } from "@/stores/settings";
 
@@ -77,6 +78,8 @@ function RootLayout() {
       <div aria-live="polite" className="sr-only">
         {announcement}
       </div>
+      {/* Plan 09 adds the command palette beside this. */}
+      <QuitConfirmation />
     </div>
   );
 }

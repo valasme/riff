@@ -6,5 +6,6 @@
   "back": "Back",
   "continue": "Continue",
   "openFolder": "Open folder",
-  "copied": "Copied to clipboard"
+  "copied": "Copied to clipboard",
+  "quit": { "title": "Quit Riff?", "body": "Your settings are already saved.", "action": "Quit" }
 }
