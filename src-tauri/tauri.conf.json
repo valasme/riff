@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "riff",
-  "version": "0.1.0",
+  "version": "../package.json",
   "identifier": "io.github.valasme.riff",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -12,24 +12,43 @@
   "app": {
     "windows": [
       {
-        "title": "riff",
-        "width": 800,
-        "height": 600
+        "label": "main",
+        "title": "Riff",
+        "width": 1280,
+        "height": 832,
+        "minWidth": 960,
+        "minHeight": 640,
+        "decorations": false,
+        "visible": false,
+        "backgroundColor": "#242424"
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; media-src 'none'; connect-src ipc: http://ipc.localhost; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'",
+      "devCsp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src ipc: http://ipc.localhost ws://localhost:1421 http://localhost:1420",
+      "freezePrototype": true
     }
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["deb", "rpm", "appimage"],
+    "category": "Music",
+    "shortDescription": "Practise with sheet music, video and audio in one place",
+    "longDescription": "Riff is a local-first practice workspace for musicians. It keeps a PDF score, a video lesson and an audio track side by side on one page. No accounts, no telemetry, no network.",
+    "copyright": "Copyright (c) 2026 valasme",
+    "license": "MIT",
+    "homepage": "https://github.com/valasme/riff",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "linux": {
+      "deb": { "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0"] },
+      "rpm": { "depends": ["webkit2gtk4.1", "gtk3"] },
+      "appimage": { "bundleMediaFramework": false }
+    }
   }
 }
