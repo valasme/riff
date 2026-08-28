@@ -48,7 +48,7 @@
 - Create: `src-tauri/src/diagnostics/mod.rs`, `src-tauri/src/diagnostics/probe.rs`
 - Modify: `src-tauri/src/lib.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `src-tauri/src/diagnostics/probe.rs` containing only:
 
@@ -132,12 +132,12 @@ BUILD_ID=rolling
 }
 ```
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
 Run: `cd src-tauri && cargo test diagnostics::probe`
 Expected: FAIL to compile — `cannot find type SystemInfo`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Insert above the tests:
 
@@ -242,12 +242,12 @@ pub mod probe;
 
 Add `pub mod diagnostics;` to `src-tauri/src/lib.rs`.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `cd src-tauri && cargo test diagnostics::probe`
 Expected: PASS, 6 tests
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -268,7 +268,7 @@ that takes one round trip and one that takes four.
 - Create: `src-tauri/src/diagnostics/banner.rs`
 - Modify: `src-tauri/src/diagnostics/mod.rs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```rust
 #[cfg(test)]
@@ -317,12 +317,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Run and watch it fail**
+- [x] **Step 2: Run and watch it fail**
 
 Run: `cd src-tauri && cargo test diagnostics::banner`
 Expected: FAIL to compile
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```rust
 //! The first lines of every session log.
@@ -382,12 +382,12 @@ pub fn render(b: &Banner) -> String {
 }
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `cd src-tauri && cargo test diagnostics::banner`
 Expected: PASS, 3 tests
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -407,7 +407,7 @@ to describe itself and whether `repair` can fix it.
 **Files:**
 - Create: `src-tauri/src/diagnostics/health.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```rust
 #[cfg(test)]
@@ -486,12 +486,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
 Run: `cd src-tauri && cargo test diagnostics::health`
 Expected: FAIL to compile
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```rust
 //! What is wrong with this installation, and can we fix it.
@@ -624,12 +624,12 @@ fn check_quarantine(paths: &AppPaths) -> Check {
 }
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `cd src-tauri && cargo test diagnostics::health`
 Expected: PASS, 5 tests
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -648,7 +648,7 @@ One file. One format. Both the GUI button and `riff logs export` call this.
 **Files:**
 - Create: `src-tauri/src/diagnostics/bundle.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```rust
 #[cfg(test)]
@@ -684,12 +684,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
 Run: `cd src-tauri && cargo test diagnostics::bundle`
 Expected: FAIL to compile
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```rust
 //! The file a user hands to a developer.
@@ -777,12 +777,12 @@ pub fn sessions_newest_first(log_dir: &Path) -> Vec<std::path::PathBuf> {
 }
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `cd src-tauri && cargo test diagnostics::bundle`
 Expected: PASS, 4 tests
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -800,7 +800,7 @@ git commit -m "feat(diagnostics): assemble a redacted, size-capped export bundle
 - Create: `src-tauri/src/cli.rs`
 - Modify: `src-tauri/src/lib.rs`, `src-tauri/Cargo.toml`
 
-- [ ] **Step 1: Add clap**
+- [x] **Step 1: Add clap**
 
 ```bash
 cd src-tauri && cargo add clap@4 --features derive
@@ -811,7 +811,7 @@ being pleasant to someone who is already annoyed, and that is `--help`
 quality, `did you mean`, and consistent exit codes. The derive macro reuses
 `syn`/`proc-macro2`, already in the tree via serde and tauri.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 ```rust
 #[cfg(test)]
@@ -864,12 +864,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 3: Run and watch them fail**
+- [x] **Step 3: Run and watch them fail**
 
 Run: `cd src-tauri && cargo test cli`
 Expected: FAIL to compile
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 ```rust
 //! Riff's terminal surface.
@@ -1032,7 +1032,7 @@ missing directories, quarantine an unparseable `settings.json` before writing
 defaults over it, and prune quarantine files beyond the newest three. It never
 deletes a file it has not first copied aside.
 
-- [ ] **Step 5: Dispatch it from `run()`**
+- [x] **Step 5: Dispatch it from `run()`**
 
 In `src-tauri/src/lib.rs`, immediately after paths are resolved and logging is
 initialised, and **before** `tauri::Builder::default()`:
@@ -1044,12 +1044,12 @@ if let Some(code) = cli::dispatch(&cli, &paths) {
 }
 ```
 
-- [ ] **Step 6: Run the tests**
+- [x] **Step 6: Run the tests**
 
 Run: `cd src-tauri && cargo test cli`
 Expected: PASS, 5 tests
 
-- [ ] **Step 7: Verify by hand**
+- [x] **Step 7: Verify by hand**
 
 ```bash
 cargo run -- --help
@@ -1061,7 +1061,7 @@ Expected: each prints and exits without opening a window. Then open Riff and
 run `riff --help` again in another terminal — it must still print, proving the
 dispatch happens before single-instance.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add -A
@@ -1076,7 +1076,7 @@ git commit -m "feat(cli): add doctor, repair, logs, config, paths and history"
 - Create: `src-tauri/src/commands/diagnostics.rs`
 - Modify: `src-tauri/src/commands/mod.rs`, `src/lib/ipc/*`, `AboutSection.tsx`, `src/locales/en/settings.json`
 
-- [ ] **Step 1: Write the command**
+- [x] **Step 1: Write the command**
 
 ```rust
 //! Export, from the GUI. Opens the save dialog in Rust and writes the same
@@ -1112,7 +1112,7 @@ pub async fn diagnostics_export(
 Add `$crate::commands::diagnostics::diagnostics_export,` and
 `$crate::commands::diagnostics::log_write,` to `riff_handlers!`.
 
-- [ ] **Step 2: Add it to the facade**
+- [x] **Step 2: Add it to the facade**
 
 In `src/lib/ipc/index.ts`:
 
@@ -1124,7 +1124,7 @@ In `src/lib/ipc/index.ts`:
 
 and `export type LogLevel = "error" | "warn" | "info" | "debug" | "trace";` in `types.ts`.
 
-- [ ] **Step 3: Add the button**
+- [x] **Step 3: Add the button**
 
 In `AboutSection.tsx`, replace the ambiguous second "Copy diagnostics" with:
 
@@ -1159,13 +1159,13 @@ Strings:
 The crash screen's button keeps the name **Copy error details** so the two are
 no longer two different things called the same thing.
 
-- [ ] **Step 4: Update the IPC fixture**
+- [x] **Step 4: Update the IPC fixture**
 
 Run: `cd src-tauri && RIFF_UPDATE_FIXTURES=1 cargo test --test ipc_shapes`
 Then add `SystemInfo`, `Check` and `LogLevel` representatives to `shapes()` so
 the new types are guarded like the rest.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -1183,7 +1183,7 @@ class of failure is the one currently invisible in a bug report.
 - Create: `src/lib/logger.ts`, `src/lib/logger.test.ts`
 - Modify: `src/main.tsx`, `src/components/RouteError.tsx`, `src/stores/settings.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -1216,7 +1216,7 @@ describe("logger", () => {
 });
 ```
 
-- [ ] **Step 2: Implement**
+- [x] **Step 2: Implement**
 
 `src/lib/logger.ts` exports `log.{error,warn,info,debug}`, forwards to
 `ipc.logWrite`, swallows its own failures (a logger that can throw turns a
@@ -1226,7 +1226,7 @@ warning into a crash), mirrors to `console` in development only, and
 Call it as the first statement in `src/main.tsx`, before the render. Wire the
 error boundary's `onError` and `useSettings.patch`'s catch block into it.
 
-- [ ] **Step 3: Run the tests, then commit**
+- [x] **Step 3: Run the tests, then commit**
 
 ```bash
 git add -A
@@ -1240,7 +1240,7 @@ git commit -m "feat(logging): forward frontend errors into the session log"
 **Files:**
 - Modify: `src-tauri/build.rs`, `src-tauri/tauri.conf.json`, `README.md`
 
-- [ ] **Step 1: Generate a man page and completions**
+- [x] **Step 1: Generate a man page and completions**
 
 ```bash
 cd src-tauri && cargo add --build clap_mangen clap_complete
@@ -1250,7 +1250,7 @@ In `build.rs`, generate `riff.1` and bash/zsh/fish completions into `OUT_DIR`,
 then copy them into `src-tauri/dist-extra/`. Packagers expect a man page; its
 absence is a lint failure in both Debian and Fedora review.
 
-- [ ] **Step 2: Install them from the bundle**
+- [x] **Step 2: Install them from the bundle**
 
 ```json
 "deb": {
@@ -1265,7 +1265,7 @@ absence is a lint failure in both Debian and Fedora review.
 
 Same block for `rpm`.
 
-- [ ] **Step 3: Document it**
+- [x] **Step 3: Document it**
 
 Add a **Troubleshooting** section to `README.md`:
 
@@ -1288,7 +1288,7 @@ safe to attach to an issue. Attaching it is the single most useful thing you
 can do in a bug report.
 ````
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A
@@ -1299,14 +1299,14 @@ git commit -m "build: ship a man page, shell completions and troubleshooting doc
 
 ### Task 9: Gate check
 
-- [ ] **Step 1: Run everything**
+- [x] **Step 1: Run everything**
 
 ```bash
 pnpm lint && pnpm typecheck && pnpm test && pnpm build
 cd src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
 ```
 
-- [ ] **Step 2: Prove the diagnostics story end to end**
+- [x] **Step 2: Prove the diagnostics story end to end**
 
 ```bash
 printf 'broken' > ~/.config/riff/settings.json
@@ -1318,13 +1318,13 @@ grep -c "$USER" /tmp/d.txt      # must print 0
 grep -c 'riff session' /tmp/d.txt
 ```
 
-- [ ] **Step 3: Prove the CLI works while the GUI is running**
+- [x] **Step 3: Prove the CLI works while the GUI is running**
 
 Open Riff, then in a terminal: `riff --help` and `riff doctor`.
 Expected: both print immediately. Neither opens a second window, and neither
 is swallowed by single-instance.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A
