@@ -5,6 +5,12 @@ import ReactDOM from "react-dom/client";
 import { Providers } from "@/app/providers";
 import { router } from "@/app/router";
 import { ipc } from "@/lib/ipc";
+import { installGlobalErrorHandlers } from "@/lib/logger";
+
+// First statement, before the render: a crash in React's first paint must
+// still leave a trace, and that trace can only exist if these are wired up
+// before anything has a chance to throw.
+installGlobalErrorHandlers();
 
 const root = document.getElementById("root");
 if (!root) throw new Error("#root is missing from index.html");

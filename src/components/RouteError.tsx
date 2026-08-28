@@ -1,11 +1,19 @@
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { ipc, isRiffError } from "@/lib/ipc";
+import { log } from "@/lib/logger";
 
 export function RouteError({ error }: { error: unknown }) {
   const { t } = useTranslation("errors");
   const code = isRiffError(error) ? error.code : "unknown";
   const detail = error instanceof Error ? error.stack : JSON.stringify(error, null, 2);
+
+  // A route render throwing is exactly the kind of failure a bug report
+  // needs on disk — the boundary catching it is not itself a trace.
+  useEffect(() => {
+    void log.error(error instanceof Error ? error.message : String(error), { code, detail });
+  }, [error, code, detail]);
 
   return (
     <div role="alert" className="flex h-full flex-col items-center justify-center gap-4 p-8">

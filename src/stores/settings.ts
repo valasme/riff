@@ -12,6 +12,7 @@ import {
   type Section,
   type Settings,
 } from "@/lib/ipc";
+import { log } from "@/lib/logger";
 import { mergeDeep } from "@/lib/merge";
 
 interface BootstrapPayload {
@@ -118,6 +119,7 @@ export const useSettings = create<SettingsState>((set, get) => ({
       if (ticket !== sequence) return;
       get().adopt(previous);
       const code = isRiffError(error) ? error.code : "unknown";
+      void log.warn("settings patch rejected", { code, patch });
       toast.error(i18n.t(`errors:code.${code}`, { defaultValue: i18n.t("errors:code.unknown") }));
     }
   },
