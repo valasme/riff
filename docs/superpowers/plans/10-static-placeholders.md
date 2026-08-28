@@ -104,6 +104,7 @@ Expected: FAIL — cannot resolve `./PracticePlaceholder`
 
 ```tsx
 import { PictureInPicture2, X } from "lucide-react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 
@@ -151,7 +152,7 @@ function Pane({ title, className }: { title: string; className?: string }) {
   );
 }
 
-function PaneButton({ label, children }: { label: string; children: React.ReactNode }) {
+function PaneButton({ label, children }: { label: string; children: ReactNode }) {
   return (
     <button
       type="button"

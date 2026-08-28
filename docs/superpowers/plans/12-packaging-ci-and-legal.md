@@ -266,8 +266,10 @@ Expected: a sorted array with `name`, `version`, `license`, `ecosystem`.
 In `src-tauri/tauri.conf.json`, add to `bundle`:
 
 ```json
-    "resources": ["../third-party-licenses.json"],
+    "resources": { "../third-party-licenses.json": "third-party-licenses.json" },
 ```
+
+The **object form is required**, not stylistic. In array notation Tauri rewrites `..` to `_up_`, so the file would ship as `$RESOURCE/_up_/third-party-licenses.json` while `licenses_get` resolves `third-party-licenses.json` — the licence list would be empty in every packaged build and fine in development.
 
 - [ ] **Step 4: Write the command**
 
@@ -788,7 +790,10 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: bundles
-          path: src-tauri/target/release/bundle/**/*.{deb,rpm,AppImage}
+          path: |
+            src-tauri/target/release/bundle/**/*.deb
+            src-tauri/target/release/bundle/**/*.rpm
+            src-tauri/target/release/bundle/**/*.AppImage
 
   # Fedora and Debian are verification environments, never build hosts.
   # "The package built" and "the package installs and its libraries resolve"

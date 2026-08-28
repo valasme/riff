@@ -264,19 +264,19 @@ The generated tree **is committed**: CI type-checks without running Vite, and a 
 
 - [ ] **Step 3: Create the routes**
 
-`src/routes/__root.tsx`:
+`src/routes/__root.tsx` — deliberately self-contained. Tasks 3, 4 and 5 each
+add one piece to it. Building it against components that do not exist yet
+would leave the repository uncompilable at three task boundaries, and every
+task in this plan has to end green:
 
 ```tsx
 import { createRootRoute, Outlet, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { RouteError } from "@/components/RouteError";
-import { Sidebar } from "@/components/Sidebar";
-import { TitleBar } from "@/features/window/TitleBar";
 
 export const Route = createRootRoute({
   component: RootLayout,
-  errorComponent: RouteError,
+  // Task 3 adds `errorComponent: RouteError`.
 });
 
 function RootLayout() {
@@ -299,9 +299,10 @@ function RootLayout() {
       >
         {t("skipToContent")}
       </a>
-      <TitleBar />
+      {/* Task 4 replaces this with <TitleBar />. */}
+      <header className="h-[var(--spacing-titlebar)] shrink-0" data-tauri-drag-region />
       <div className="flex min-h-0 flex-1">
-        <Sidebar />
+        {/* Task 5 replaces this with <Sidebar />. */}
         <main id="main" className="min-w-0 flex-1 overflow-auto">
           <Outlet />
         </main>
@@ -373,7 +374,7 @@ declare module "@tanstack/react-router" {
 }
 ```
 
-- [ ] **Step 5: Verify the tree generates**
+- [ ] **Step 5: Verify the tree generates and the shell compiles**
 
 Run: `pnpm dev` briefly, then stop it.
 Expected: `src/routeTree.gen.ts` exists and lists `/practice`, `/history`, `/settings`.
@@ -501,12 +502,27 @@ requestAnimationFrame(() => {
 });
 ```
 
-- [ ] **Step 5: Verify**
+- [ ] **Step 5: Wire the error component into the root route**
 
-Run: `pnpm app`
+In `src/routes/__root.tsx`, add the import and the option the Task 2 comment
+reserved:
+
+```tsx
+import { RouteError } from "@/components/RouteError";
+```
+```tsx
+export const Route = createRootRoute({
+  component: RootLayout,
+  errorComponent: RouteError,
+});
+```
+
+- [ ] **Step 6: Verify**
+
+Run: `pnpm typecheck && pnpm app`
 Expected: a dark window with an empty shell, no console errors.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -668,12 +684,23 @@ export function TitleBar({
 }
 ```
 
-- [ ] **Step 5: Run the tests**
+- [ ] **Step 5: Replace the placeholder header in the shell**
 
-Run: `pnpm test src/features/window`
+In `src/routes/__root.tsx`, swap the reserved `<header>` for the real bar:
+
+```tsx
+import { TitleBar } from "@/features/window/TitleBar";
+```
+```tsx
+      <TitleBar />
+```
+
+- [ ] **Step 6: Run the tests**
+
+Run: `pnpm test src/features/window && pnpm typecheck`
 Expected: PASS, 4 tests
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -693,12 +720,15 @@ git commit -m "feat(window): add the custom title bar and window controls"
 
 ```tsx
 import { render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/app/i18n";
 
+// `ReactNode` is imported explicitly: `React.*` in a module resolves to a UMD
+// global and fails typecheck under `verbatimModuleSyntax`.
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children, to, ...rest }: { children: React.ReactNode; to: string }) => (
+  Link: ({ children, to, ...rest }: { children: ReactNode; to: string }) => (
     <a href={to} {...rest}>
       {children}
     </a>
@@ -830,9 +860,11 @@ function NavItem({
 }
 ```
 
-- [ ] **Step 4: Wire the collapse state into the root layout**
+- [ ] **Step 4: Wire the sidebar and its collapse state into the root layout**
 
-In `src/routes/__root.tsx`, hold the collapsed flag locally for now — Plan 07 replaces it with the persisted setting:
+In `src/routes/__root.tsx`, replace the `{/* Task 5 replaces this ... */}`
+comment with `<Sidebar collapsed={collapsed} />`, and hold the collapsed flag
+locally for now — Plan 07 replaces it with the persisted setting:
 
 ```tsx
 const [collapsed, setCollapsed] = useState(false);

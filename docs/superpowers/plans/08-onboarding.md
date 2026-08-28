@@ -309,8 +309,10 @@ export function OnboardingFlow() {
   // recommendation rather than describing it.
   useEffect(() => {
     if (STEPS[index] === "theme") void patch({ appearance: { theme } });
-    // Only on entering the step; choosing a card calls choose() directly.
-  }, [index]); // eslint-disable-line react-hooks/exhaustive-deps
+    // biome-ignore lint/correctness/useExhaustiveDependencies: only on entering
+    // the step; choosing a card calls choose() directly. ESLint is not installed,
+    // so an eslint-disable comment here would be inert and the rule would fire.
+  }, [index]);
 
   function choose(next: Theme) {
     setTheme(next);

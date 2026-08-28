@@ -866,7 +866,7 @@ Overwrite `src-tauri/tauri.conf.json`:
   "bundle": {
     "active": true,
     "targets": ["deb", "rpm", "appimage"],
-    "category": "Audio",
+    "category": "Music",
     "shortDescription": "Practise with sheet music, video and audio in one place",
     "longDescription": "Riff is a local-first practice workspace for musicians. It keeps a PDF score, a video lesson and an audio track side by side on one page. No accounts, no telemetry, no network.",
     "copyright": "Copyright (c) 2026 valasme",
@@ -887,6 +887,8 @@ Overwrite `src-tauri/tauri.conf.json`:
   }
 }
 ```
+
+`"category": "Music"` is not a style choice. Tauri validates this against its own `AppCategory` list, which has no `"Audio"` entry — the build fails outright. `Music` is the one that exists, and `tauri-bundler` expands it to the freedesktop `Categories=AudioVideo;Audio;Music;` the desktop entry wants anyway.
 
 `bundleMediaFramework` stays `false` deliberately. It bundles GStreamer into the AppImage and inflates it by well over a hundred megabytes; there is no media in this milestone, so paying that now would be paying for nothing. It is the lever the media work in spec §15 will pull.
 

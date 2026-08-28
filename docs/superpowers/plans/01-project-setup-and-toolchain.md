@@ -49,17 +49,17 @@ Copied from the spec. Every task inherits these.
 
 ---
 
-### Task 1: Commit the template as a baseline
+### Task 1: Ignore build output
 
-The repository currently contains only the spec commits; the entire scaffold is untracked. Commit it unchanged first, so every later diff shows what *we* changed rather than being buried in template noise.
+The `create-tauri-app` scaffold is **already committed** — it landed alongside the docs, so there is no baseline commit to make. What is missing is the ignore rules for output the scaffold does not produce until you first build.
 
 **Files:**
 - Modify: `.gitignore`
 
-- [ ] **Step 1: Confirm the working tree is all untracked template**
+- [ ] **Step 1: Confirm the scaffold is tracked and the tree is clean**
 
-Run: `git status --short`
-Expected: a list of `??` entries including `src/`, `src-tauri/`, `package.json`, and the three `Riff *.png` mockups. No `M` entries.
+Run: `git status --short && git ls-files src-tauri/Cargo.toml`
+Expected: no output from the first command, and `src-tauri/Cargo.toml` from the second. If `git status` shows `??` entries for `src/` or `src-tauri/`, the scaffold is untracked after all — commit it unchanged first so later diffs are not buried in template noise.
 
 - [ ] **Step 2: Ignore Tauri build output**
 
@@ -84,7 +84,7 @@ Expected: `0`
 
 ```bash
 git add -A
-git commit -m "chore: commit create-tauri-app scaffold as baseline"
+git commit -m "chore: ignore tauri build output and coverage"
 ```
 
 ---
