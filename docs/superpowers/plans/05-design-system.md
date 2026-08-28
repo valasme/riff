@@ -16,7 +16,7 @@
 - **There is no accent hue.** Focus is a neutral ring. Do not introduce a brand colour.
 - **Type:** Outfit Variable (UI), Playfair Display Italic 700 (wordmark only), JetBrains Mono Variable (paths, versions). Self-hosted; no runtime font fetch — the CSP forbids it.
 - **Icons:** `lucide-react` only.
-- **Metrics:** title bar 44px; sidebar 224px expanded / 56px rail; settings sub-navigation 240px; nav item 40px tall, 12px radius; content padding 24px; card radius 12px; pane radius 10px; focus ring 2px with 2px offset.
+- **Metrics** (expressed in `rem` so `--ui-scale` carries them; px shown at the 16px default): title bar 2.75rem/44px; sidebar 14rem/224px expanded, 3.5rem/56px rail; settings sub-navigation 15rem/240px; nav item 2.5rem/40px tall, 0.75rem/12px radius; content padding 1.5rem/24px; card radius 0.75rem/12px; pane radius 0.625rem/10px; focus ring 2px with 2px offset.
 - **Every user-visible string** goes through `t()`.
 - **Never install:** `eslint`, `prettier`, any HTTP client.
 - **Commits:** Conventional Commits, one per task.
@@ -116,8 +116,13 @@ Overwrite `src/styles/globals.css`:
   --ring: #e4e4e4;
 
   /* Density-driven spacing. Adjusts space, never font size, so density and
-     UI scale stay orthogonal controls. */
+     UI scale stay orthogonal controls.
+     These three are the ONLY things Compact changes, so every component that
+     has a row, a gap or page padding must read them. A hardcoded `h-10` or
+     `py-4` is a component opting out of the density setting, which is how a
+     control ends up persisting perfectly and doing nothing. */
   --row-height: 2.5rem;
+  --row-gap: 0.25rem;
   --content-padding: 1.5rem;
   --section-gap: 1.5rem;
 
@@ -151,6 +156,7 @@ Overwrite `src/styles/globals.css`:
 
 [data-density="compact"] {
   --row-height: 2.125rem;
+  --row-gap: 0.125rem;
   --content-padding: 1rem;
   --section-gap: 1rem;
 }
@@ -175,14 +181,21 @@ Overwrite `src/styles/globals.css`:
   --font-display: "Playfair Display", ui-serif, Georgia, serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
 
-  --radius-pane: 10px;
-  --radius-card: 12px;
-  --radius-nav: 12px;
+  /* rem, not px, and that is the whole point. `--ui-scale` multiplies the
+     root font size, so a px value here would leave the title bar, sidebar and
+     sub-navigation frozen while the text inside them grew — large type in a
+     fixed frame, which is worse than either extreme. §6.3 requires every
+     dimension in rem; these are the ones it is easiest to get wrong.
+     At the 16px default: 0.625rem = 10px, 2.75rem = 44px, 14rem = 224px,
+     3.5rem = 56px, 15rem = 240px. */
+  --radius-pane: 0.625rem;
+  --radius-card: 0.75rem;
+  --radius-nav: 0.75rem;
 
-  --spacing-titlebar: 44px;
-  --spacing-sidebar: 224px;
-  --spacing-sidebar-rail: 56px;
-  --spacing-subnav: 240px;
+  --spacing-titlebar: 2.75rem;
+  --spacing-sidebar: 14rem;
+  --spacing-sidebar-rail: 3.5rem;
+  --spacing-subnav: 15rem;
 }
 
 /* ---------------------------------------------------------------------------
@@ -525,12 +538,26 @@ pnpm lint && pnpm typecheck && pnpm test && pnpm build
 ```
 Expected: all exit 0.
 
-- [ ] **Step 2: Confirm no accent hue crept in**
+- [ ] **Step 2: Confirm density is actually wired**
+
+Run: `grep -rn 'var(--row-height)\|var(--section-gap)\|var(--content-padding)' src/ | wc -l`
+Expected: at least one consumer per token once Plans 06, 07 and 10 have run. A
+token defined and never read means Compact changes nothing, which is a setting
+that persists perfectly and does nothing — the exact bug this milestone keeps
+finding.
+
+- [ ] **Step 3: Confirm every chrome dimension scales**
+
+Run: `grep -nE '\-\-(spacing|radius)-[a-z-]+: [0-9]+px' src/styles/globals.css || echo "all chrome tokens are in rem"`
+Expected: `all chrome tokens are in rem`. A px value here silently opts that
+dimension out of the UI-scale slider.
+
+- [ ] **Step 4: Confirm no accent hue crept in**
 
 Run: `grep -rEo '#[0-9a-fA-F]{6}' src/styles/ src/components/ui/ | sort -u`
 Expected: only greys — every value has equal red, green and blue components. Any coloured hex is either a mistake or a decision that needs recording in the spec first.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add -A

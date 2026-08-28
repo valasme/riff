@@ -182,16 +182,14 @@ pub fn app_info() -> AppInfo {
 }
 
 fn webkit_version() -> String {
-    // Read from the runtime rather than the build, because the two can differ
-    // after a system upgrade and the runtime one is what a bug report needs.
-    std::process::Command::new("pkg-config")
-        .args(["--modversion", "webkit2gtk-4.1"])
-        .output()
-        .ok()
-        .and_then(|o| String::from_utf8(o.stdout).ok())
-        .map(|s| s.trim().to_owned())
-        .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| "unknown".to_owned())
+    // From the runtime, not the build: the two can differ after a system
+    // upgrade, and the runtime one is what a bug report needs.
+    //
+    // NOT `pkg-config --modversion webkit2gtk-4.1`. pkg-config and the .pc
+    // file both come from libwebkit2gtk-4.1-dev, which users do not install,
+    // so shelling out would print "unknown" on essentially every machine
+    // Riff actually runs on — including every machine that files a bug.
+    tauri::webview_version().unwrap_or_else(|_| "unknown".to_owned())
 }
 
 #[tauri::command]
@@ -359,7 +357,7 @@ use tauri_plugin_dialog::DialogExt;
 
 use crate::error::{RiffError, RiffResult};
 use crate::settings::model::Settings;
-use crate::settings::store::{Section, SettingsStore};
+use crate::settings::store::{FlushScheduler, Section, SettingsStore};
 
 #[tauri::command]
 pub fn settings_get(store: tauri::State<'_, Arc<SettingsStore>>) -> Settings {
@@ -374,31 +372,31 @@ pub fn settings_get(store: tauri::State<'_, Arc<SettingsStore>>) -> Settings {
 #[tauri::command]
 pub fn settings_patch(
     patch: Value,
-    app: tauri::AppHandle,
     store: tauri::State<'_, Arc<SettingsStore>>,
+    scheduler: tauri::State<'_, Arc<FlushScheduler>>,
 ) -> RiffResult<Settings> {
     let next = store.patch(&patch)?;
-    report_write_failure(&app, &store);
+    schedule_write(&scheduler);
     Ok(next)
 }
 
 #[tauri::command]
 pub fn settings_reset(
     section: Option<Section>,
-    app: tauri::AppHandle,
     store: tauri::State<'_, Arc<SettingsStore>>,
+    scheduler: tauri::State<'_, Arc<FlushScheduler>>,
 ) -> RiffResult<Settings> {
     let next = store.reset(section)?;
-    report_write_failure(&app, &store);
+    schedule_write(&scheduler);
     Ok(next)
 }
 
-fn report_write_failure(app: &tauri::AppHandle, store: &SettingsStore) {
-    use tauri::Emitter;
-    if let Err(err) = store.flush_if_dirty() {
-        tracing::error!(%err, "settings could not be written");
-        let _ = app.emit("settings://write-failed", &err);
-    }
+/// Schedules a write instead of performing one. Flushing synchronously here
+/// would defeat the coalescing in Plan 03 Task 8 entirely — a UI-scale drag
+/// is forty patches, and forty `fsync`ed atomic writes is not what §4.4
+/// describes. The scheduler reports its own failures, once per cause.
+fn schedule_write(scheduler: &FlushScheduler) {
+    scheduler.notify();
 }
 
 #[tauri::command]
@@ -711,6 +709,7 @@ mod tests {
                 log_dir: tmp.join("state/logs"),
             },
             app_info: crate::commands::app::app_info(),
+            recovered_from: None,
         }
     }
 
@@ -774,6 +773,11 @@ pub struct Bootstrap {
     pub settings: crate::settings::model::Settings,
     pub paths: crate::paths::AppPaths,
     pub app_info: crate::commands::app::AppInfo,
+    /// Set when `settings.json` could not be parsed and was moved aside. It
+    /// travels in the payload rather than as an event because recovery
+    /// happens before `tauri::Builder` exists — there is nothing to emit to
+    /// yet, and emitting later would race the frontend's first render.
+    pub recovered_from: Option<std::path::PathBuf>,
 }
 
 pub fn render_script(payload: &Bootstrap) -> String {
@@ -1044,6 +1048,10 @@ pub fn run() {
         settings: store.get(),
         paths: paths.clone(),
         app_info: commands::app::app_info(),
+        recovered_from: match &outcome {
+            LoadOutcome::Recovered { quarantined } => quarantined.clone(),
+            _ => None,
+        },
     };
 
     let mut builder = tauri::Builder::default()
@@ -1062,11 +1070,39 @@ pub fn run() {
     // the plugin unconditionally would leave `restoreWindowState` as a switch
     // that persists perfectly and changes nothing.
     if store.get().general.restore_window_state {
-        builder = builder.plugin(tauri_plugin_window_state::Builder::default().build());
+        use tauri_plugin_window_state::StateFlags;
+        builder = builder.plugin(
+            tauri_plugin_window_state::Builder::default()
+                // NOT StateFlags::all(), which is the default. `all()` includes
+                // VISIBLE and DECORATIONS: on restore the plugin would call
+                // show() before React has painted, reintroducing the flash of
+                // unthemed content §3.1 exists to make impossible — on every
+                // launch after the first — and would make the state file a
+                // second owner of `appearance.titleBar`.
+                .with_state_flags(StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED)
+                .build(),
+        );
     }
+
+    // 250 ms of quiet before a write, so a slider drag is one fsync (§4.4).
+    // Failures are reported once per cause, not once per keystroke.
+    let scheduler = Arc::new(settings::store::FlushScheduler::spawn(
+        Arc::clone(&store),
+        Duration::from_millis(250),
+        |err| {
+            use tauri::Emitter;
+            tracing::error!(%err, "settings could not be written");
+            // APP_HANDLE is set in `setup`; a failure before then is still
+            // logged, which is the part that must never be lost.
+            if let Some(app) = APP_HANDLE.get() {
+                let _ = app.emit("settings://write-failed", &err);
+            }
+        },
+    ));
 
     builder
         .manage(Arc::clone(&store))
+        .manage(Arc::clone(&scheduler))
         .manage(QuitApproved(std::sync::atomic::AtomicBool::new(false)))
         // Honours `confirmOnQuit`. Without this the setting is decorative.
         .on_window_event({
@@ -1123,6 +1159,8 @@ pub fn run() {
         .expect("tauri failed to start")
         .run(move |_app, event| {
             if let tauri::RunEvent::ExitRequested { .. } = event {
+                // Synchronous, not scheduled: waiting 250 ms to save on exit
+                // is waiting 250 ms too long.
                 if let Err(err) = store.flush_if_dirty() {
                     tracing::error!(%err, "settings could not be saved on exit");
                 }
@@ -1243,6 +1281,8 @@ export interface AppPaths {
   stateDir: string;
   cacheDir: string;
   logDir: string;
+  /** Carried so the frontend can redact it before anything reaches the clipboard. */
+  homeDir: string;
 }
 
 export interface AppInfo {

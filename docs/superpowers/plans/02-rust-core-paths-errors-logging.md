@@ -66,6 +66,7 @@ mod tests {
             data: Some(PathBuf::from(format!("{base}/.local/share"))),
             state: Some(PathBuf::from(format!("{base}/.local/state"))),
             cache: Some(PathBuf::from(format!("{base}/.cache"))),
+            home: Some(PathBuf::from(base)),
         }
     }
 
@@ -78,6 +79,12 @@ mod tests {
         assert_eq!(p.state_dir, PathBuf::from("/home/u/.local/state/riff"));
         assert_eq!(p.cache_dir, PathBuf::from("/home/u/.cache/riff"));
         assert_eq!(p.log_dir, PathBuf::from("/home/u/.local/state/riff/logs"));
+    }
+
+    #[test]
+    fn the_home_directory_is_carried_so_the_frontend_can_redact_it() {
+        let p = resolve(&roots("/home/u"), &PathOverrides::none()).expect("roots");
+        assert_eq!(p.home_dir, PathBuf::from("/home/u"));
     }
 
     #[test]
@@ -101,7 +108,7 @@ mod tests {
 
     #[test]
     fn missing_roots_and_no_override_is_an_error_not_a_fallback() {
-        let empty = XdgRoots { config: None, data: None, state: None, cache: None };
+        let empty = XdgRoots { config: None, data: None, state: None, cache: None, home: None };
         assert!(resolve(&empty, &PathOverrides::none()).is_err());
     }
 
@@ -151,6 +158,7 @@ pub struct XdgRoots {
     pub data: Option<PathBuf>,
     pub state: Option<PathBuf>,
     pub cache: Option<PathBuf>,
+    pub home: Option<PathBuf>,
 }
 
 impl XdgRoots {
@@ -161,6 +169,7 @@ impl XdgRoots {
                 data: Some(b.data_dir().to_path_buf()),
                 state: b.state_dir().map(Path::to_path_buf),
                 cache: Some(b.cache_dir().to_path_buf()),
+                home: Some(b.home_dir().to_path_buf()),
             },
             None => Self::default(),
         }
@@ -197,6 +206,12 @@ pub struct AppPaths {
     pub state_dir: PathBuf,
     pub cache_dir: PathBuf,
     pub log_dir: PathBuf,
+    /// The user's home directory, carried so the frontend can redact it from
+    /// anything it puts on the clipboard. Deriving it by stripping
+    /// `/.config/riff` from `config_dir` silently fails whenever
+    /// `XDG_CONFIG_HOME` or `RIFF_CONFIG_HOME` is set — and then leaks the
+    /// account name through the one affordance built to protect it.
+    pub home_dir: PathBuf,
 }
 
 impl AppPaths {
@@ -243,7 +258,9 @@ pub fn resolve(
     };
     let log_dir = state_dir.join("logs");
 
-    Ok(AppPaths { config_dir, data_dir, state_dir, cache_dir, log_dir })
+    let home_dir = roots.home.clone().unwrap_or_default();
+
+    Ok(AppPaths { config_dir, data_dir, state_dir, cache_dir, log_dir, home_dir })
 }
 
 pub fn ensure_dirs(paths: &AppPaths) -> std::io::Result<()> {
@@ -271,7 +288,7 @@ pub mod paths;
 - [ ] **Step 6: Run the tests**
 
 Run: `cd src-tauri && cargo test paths`
-Expected: PASS, 6 tests
+Expected: PASS, 7 tests
 
 - [ ] **Step 7: Commit**
 

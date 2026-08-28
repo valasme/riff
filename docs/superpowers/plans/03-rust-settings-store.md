@@ -201,7 +201,7 @@ pub mod storage;
 - [ ] **Step 6: Run the tests**
 
 Run: `cd src-tauri && cargo test atomic`
-Expected: PASS, 6 tests
+Expected: PASS, 7 tests
 
 - [ ] **Step 7: Commit**
 
@@ -275,6 +275,18 @@ mod tests {
         assert_eq!(high.appearance.ui_scale.get(), 1.5);
         let junk: Settings = serde_json::from_str(r#"{"appearance":{"uiScale":"big"}}"#).expect("loads");
         assert_eq!(junk.appearance.ui_scale.get(), 1.0);
+    }
+
+    #[test]
+    fn unknown_keys_inside_a_section_survive_too() {
+        // The case that actually happens: a newer build adds
+        // `appearance.accentColor`, the user downgrades, and the older build
+        // writes the file back. Root-only preservation would destroy it.
+        let original = r#"{"version":1,"appearance":{"theme":"light","accentColor":"#ff0000"}}"#;
+        let s: Settings = serde_json::from_str(original).expect("loads");
+        let round_tripped = serde_json::to_value(&s).expect("serialises");
+        assert_eq!(round_tripped["appearance"]["accentColor"], "#ff0000");
+        assert_eq!(round_tripped["appearance"]["theme"], "light");
     }
 
     #[test]
@@ -370,6 +382,13 @@ impl Default for Settings {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(default, rename_all = "camelCase")]
 pub struct General {
+    /// Keys this build does not recognise. Present on every section, not only
+    /// the root: new settings are added *inside* sections, so root-only
+    /// preservation would protect exactly the case that never happens and
+    /// lose the one that does.
+    #[serde(flatten)]
+    #[schemars(skip)]
+    pub unknown: serde_json::Map<String, serde_json::Value>,
     #[serde(deserialize_with = "lenient")]
     pub startup_route: StartupRoute,
     pub last_route: String,
@@ -386,6 +405,7 @@ impl Default for General {
             restore_window_state: true,
             confirm_on_quit: false,
             language: "en".to_owned(),
+            unknown: serde_json::Map::new(),
         }
     }
 }
@@ -393,6 +413,13 @@ impl Default for General {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Appearance {
+    /// Keys this build does not recognise. Present on every section, not only
+    /// the root: new settings are added *inside* sections, so root-only
+    /// preservation would protect exactly the case that never happens and
+    /// lose the one that does.
+    #[serde(flatten)]
+    #[schemars(skip)]
+    pub unknown: serde_json::Map<String, serde_json::Value>,
     #[serde(deserialize_with = "lenient")]
     pub theme: Theme,
     #[serde(deserialize_with = "lenient")]
@@ -416,6 +443,7 @@ impl Default for Appearance {
             high_contrast: false,
             title_bar: TitleBar::Custom,
             sidebar: Sidebar::default(),
+            unknown: serde_json::Map::new(),
         }
     }
 }
@@ -439,6 +467,9 @@ pub struct Onboarding {
     /// RFC 3339. `None` means first run has not been completed.
     pub completed_at: Option<String>,
     pub version: u32,
+    #[serde(flatten)]
+    #[schemars(skip)]
+    pub unknown: serde_json::Map<String, serde_json::Value>,
 }
 
 macro_rules! kebab_enum {
@@ -996,8 +1027,8 @@ mod tests {
         std::fs::write(&path, b"{ this is not json").expect("write garbage");
 
         let (reloaded, outcome) = SettingsStore::load(s.paths().clone());
-        let LoadOutcome::Recovered { quarantined } = outcome else {
-            panic!("expected Recovered, got {outcome:?}");
+        let LoadOutcome::Recovered { quarantined: Some(quarantined) } = outcome else {
+            panic!("expected Recovered with a quarantine path, got {outcome:?}");
         };
         assert!(quarantined.is_file(), "the user's bad file must be kept");
         assert_eq!(
@@ -1005,7 +1036,75 @@ mod tests {
             b"{ this is not json",
             "quarantined content must be byte-identical"
         );
+        assert!(
+            !path.is_file(),
+            "quarantine must MOVE the file, not copy it — a copy leaves the original \
+             to be overwritten by the next flush, so a failed copy loses it entirely"
+        );
         assert_eq!(reloaded.get().appearance.theme, Theme::Dark);
+    }
+
+    #[test]
+    fn a_file_that_cannot_be_quarantined_is_never_overwritten() {
+        use std::os::unix::fs::PermissionsExt;
+        let (s, _outcome, _tmp) = store();
+        let path = s.paths().settings_file();
+        std::fs::write(&path, b"{ this is not json").expect("write garbage");
+
+        let dir = s.paths().config_dir.clone();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o500)).expect("chmod");
+        let (blocked, outcome) = SettingsStore::load(s.paths().clone());
+        let flushed = blocked.flush_if_dirty();
+        let still_there = std::fs::read(&path).expect("read");
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).expect("restore");
+
+        assert!(matches!(outcome, LoadOutcome::Recovered { quarantined: None }));
+        assert!(flushed.is_err(), "writing must be refused, not attempted");
+        assert_eq!(still_there, b"{ this is not json", "invariant 1: never overwrite what we failed to parse");
+    }
+
+    #[test]
+    fn migrating_leaves_a_versioned_backup_behind() {
+        let (s, _outcome, _tmp) = store();
+        std::fs::write(s.paths().settings_file(), br#"{"version":0,"appearance":{"theme":"light"}}"#)
+            .expect("seed");
+
+        let (_reloaded, _outcome) = SettingsStore::load(s.paths().clone());
+        assert!(
+            s.paths().config_dir.join("settings.json.bak-v0").is_file(),
+            "a migration bug must be recoverable, not terminal"
+        );
+    }
+
+    #[test]
+    fn a_change_landing_during_a_flush_is_not_lost() {
+        use std::sync::Arc;
+        let (s, _outcome, _tmp) = store();
+        let s = Arc::new(s);
+
+        let writer = {
+            let s = Arc::clone(&s);
+            std::thread::spawn(move || {
+                for i in 0..200 {
+                    s.patch(&json!({ "general": { "lastRoute": format!("/r{i}") } }))
+                        .expect("patch");
+                }
+            })
+        };
+        for _ in 0..200 {
+            let _ = s.flush_if_dirty();
+        }
+        writer.join().expect("writer thread");
+        s.flush_if_dirty().expect("final flush");
+
+        let on_disk: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(s.paths().settings_file()).expect("read"))
+                .expect("json");
+        assert_eq!(
+            on_disk["general"]["lastRoute"], s.get().general.last_route,
+            "the last change must reach disk; a plain dirty flag drops the one that \
+             lands between serialising and clearing it"
+        );
     }
 
     #[test]
@@ -1132,7 +1231,7 @@ Insert above the tests:
 //! preferences file is malformed has turned a cosmetic problem into an outage.
 
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Mutex, RwLock};
 
 use serde_json::Value;
@@ -1140,7 +1239,7 @@ use serde_json::Value;
 use crate::error::{RiffError, RiffResult};
 use crate::paths::AppPaths;
 use crate::settings::migrate;
-use crate::settings::model::{Appearance, General, Onboarding, Settings};
+use crate::settings::model::{self, Appearance, General, Onboarding, Settings};
 use crate::storage::atomic::write_atomic;
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -1158,14 +1257,24 @@ pub enum LoadOutcome {
     Loaded,
     Migrated { from: u32 },
     /// The file could not be parsed and was renamed aside.
-    Recovered { quarantined: PathBuf },
+    /// The file could not be parsed. `Some` means it was renamed aside and
+    /// defaults may be written; `None` means it could not be moved, so Riff
+    /// must leave the user's file alone.
+    Recovered { quarantined: Option<PathBuf> },
 }
 
 pub struct SettingsStore {
     paths: AppPaths,
     state: RwLock<Settings>,
     last_written: Mutex<Option<Vec<u8>>>,
-    dirty: AtomicBool,
+    /// Bumped by every mutation. A flush clears the dirty state only if this
+    /// has not moved since it took its snapshot, so a change that lands while
+    /// a write is in flight is not lost — a plain boolean would drop it.
+    revision: AtomicU64,
+    flushed: AtomicU64,
+    /// Set when the file on disk is unreadable AND could not be moved aside.
+    /// Writing would destroy data we failed to preserve.
+    write_blocked: AtomicBool,
     writes: AtomicUsize,
 }
 
@@ -1177,10 +1286,23 @@ impl SettingsStore {
             Ok(bytes) => match serde_json::from_slice::<Value>(&bytes) {
                 Err(err) => {
                     tracing::error!(%err, path = %file.display(), "settings file is unreadable");
-                    let quarantined = quarantine(&file, &bytes);
+                    let quarantined = quarantine(&file);
                     (Settings::default(), LoadOutcome::Recovered { quarantined })
                 }
                 Ok(mut document) => {
+                    let found = document.get("version").and_then(Value::as_u64).unwrap_or(0);
+                    if found < u64::from(model::CURRENT_VERSION) {
+                        backup_before_migration(&file, found as u32);
+                    } else if found > u64::from(model::CURRENT_VERSION) {
+                        // Load it, preserve it, keep writing — but say so once,
+                        // because a downgrade is the likeliest cause and the
+                        // user should know which direction the mismatch runs.
+                        tracing::warn!(
+                            found,
+                            current = model::CURRENT_VERSION,
+                            "settings were written by a newer version of Riff; unknown keys are preserved"
+                        );
+                    }
                     let migrated_from = migrate::run(&mut document);
                     let settings = serde_json::from_value::<Settings>(document)
                         .unwrap_or_else(|err| {
@@ -1195,12 +1317,18 @@ impl SettingsStore {
             },
         };
 
-        let dirty = !matches!(outcome, LoadOutcome::Loaded);
+        // Anything but a clean load leaves something to write. The one
+        // exception is a corrupt file we could not move aside: writing then
+        // would destroy the very bytes quarantine failed to preserve.
+        let blocked = matches!(outcome, LoadOutcome::Recovered { quarantined: None });
+        let dirty = !matches!(outcome, LoadOutcome::Loaded) && !blocked;
         let store = Self {
             paths,
             state: RwLock::new(settings),
             last_written: Mutex::new(None),
-            dirty: AtomicBool::new(dirty),
+            revision: AtomicU64::new(u64::from(dirty)),
+            flushed: AtomicU64::new(0),
+            write_blocked: AtomicBool::new(blocked),
             writes: AtomicUsize::new(0),
         };
         (store, outcome)
@@ -1245,33 +1373,55 @@ impl SettingsStore {
         Ok(next)
     }
 
-    /// Replaces the whole document, used by the file watcher on an external edit.
-    pub fn adopt(&self, settings: Settings) {
+    /// Replaces the whole document, used by the file watcher on an external
+    /// edit. Deliberately does NOT mark the store dirty — the disk already
+    /// holds this content — and records the bytes as ours so the same event
+    /// arriving twice does not reload twice.
+    pub fn adopt(&self, settings: Settings, bytes: Vec<u8>) {
         if let Ok(mut guard) = self.state.write() {
             *guard = settings;
         }
+        if let Ok(mut guard) = self.last_written.lock() {
+            *guard = Some(bytes);
+        }
+    }
+
+    pub fn is_dirty(&self) -> bool {
+        !self.write_blocked.load(Ordering::SeqCst)
+            && self.revision.load(Ordering::SeqCst) != self.flushed.load(Ordering::SeqCst)
     }
 
     pub fn flush_if_dirty(&self) -> RiffResult<()> {
-        if !self.dirty.load(Ordering::SeqCst) {
+        if self.write_blocked.load(Ordering::SeqCst) {
+            return Err(RiffError::Denied {
+                what: "settings.json could not be read or moved aside; refusing to overwrite it".to_owned(),
+            });
+        }
+        if !self.is_dirty() {
             return Ok(());
         }
+
+        // Snapshot the revision BEFORE serialising. A patch that lands while
+        // this write is in flight leaves revision ahead of the snapshot, so
+        // the store stays dirty and the change is written by the next flush
+        // instead of being silently dropped.
+        let snapshot = self.revision.load(Ordering::SeqCst);
         let bytes = serde_json::to_vec_pretty(&self.read()).map_err(|e| RiffError::Validation {
             field: "settings".to_owned(),
             reason: e.to_string(),
         })?;
         let path = self.paths.settings_file();
 
-        // The dirty flag is cleared only on success. A failed write leaves the
-        // store dirty so the next change retries, and leaves memory untouched
-        // so the interface never lies about what the user chose.
+        // Cleared only on success. A failed write leaves the store dirty so
+        // the next change retries, and leaves memory untouched so the
+        // interface never lies about what the user chose.
         write_atomic(&path, &bytes).map_err(|e| RiffError::io(&path, &e))?;
 
         if let Ok(mut guard) = self.last_written.lock() {
             *guard = Some(bytes);
         }
         self.writes.fetch_add(1, Ordering::Relaxed);
-        self.dirty.store(false, Ordering::SeqCst);
+        self.flushed.store(snapshot, Ordering::SeqCst);
         Ok(())
     }
 
@@ -1283,20 +1433,41 @@ impl SettingsStore {
         if let Ok(mut guard) = self.state.write() {
             *guard = next;
         }
-        self.dirty.store(true, Ordering::SeqCst);
+        self.revision.fetch_add(1, Ordering::SeqCst);
     }
 }
 
-fn quarantine(path: &std::path::Path, bytes: &[u8]) -> PathBuf {
-    let stamp = time::OffsetDateTime::now_utc()
+/// Moves the unreadable file aside. Returns `None` if it could not be moved,
+/// which is the signal that Riff must NOT write over it.
+///
+/// `rename` rather than copy-and-overwrite: a copy leaves the original in
+/// place to be overwritten by the next flush, so if the copy silently failed
+/// the user would lose the file entirely. Rename either moves it or does not.
+fn quarantine(path: &std::path::Path) -> Option<PathBuf> {
+    let target = path.with_extension(format!("json.corrupt-{}", stamp()));
+    match std::fs::rename(path, &target) {
+        Ok(()) => Some(target),
+        Err(err) => {
+            tracing::error!(%err, path = %path.display(), "could not quarantine the unreadable settings file; it will be left untouched");
+            None
+        }
+    }
+}
+
+/// Copies the pre-migration document aside before the chain runs, so a
+/// migration bug is recoverable rather than terminal.
+fn backup_before_migration(path: &std::path::Path, from: u32) {
+    let target = path.with_extension(format!("json.bak-v{from}"));
+    if let Err(err) = std::fs::copy(path, &target) {
+        tracing::error!(%err, "could not back up settings before migrating");
+    }
+}
+
+fn stamp() -> String {
+    time::OffsetDateTime::now_utc()
         .format(&time::format_description::well_known::Rfc3339)
         .unwrap_or_else(|_| "unknown".to_owned())
-        .replace(':', "-");
-    let target = path.with_extension(format!("json.corrupt-{stamp}"));
-    if let Err(err) = std::fs::write(&target, bytes) {
-        tracing::error!(%err, "could not quarantine the unreadable settings file");
-    }
-    target
+        .replace(':', "-")
 }
 ```
 
@@ -1315,7 +1486,7 @@ pub mod store;
 - [ ] **Step 6: Run the tests**
 
 Run: `cd src-tauri && cargo test settings::store`
-Expected: PASS, 10 tests
+Expected: PASS, 13 tests
 
 - [ ] **Step 7: Commit**
 
@@ -1455,7 +1626,7 @@ where
             match serde_json::from_slice::<Settings>(&bytes) {
                 Ok(settings) => {
                     tracing::info!("settings changed on disk; reloading");
-                    store.adopt(settings.clone());
+                    store.adopt(settings.clone(), bytes.clone());
                     on_change(settings);
                 }
                 Err(err) => {
@@ -1495,7 +1666,179 @@ git commit -m "feat(settings): reload hand edits without echoing our own writes"
 
 ---
 
-### Task 8: Gate check
+### Task 8: The coalescing flush
+
+Spec §4.4 promises "dragging the UI-scale slider produces one write, not
+forty." Nothing so far delivers it: `flush_if_dirty` writes whenever it is
+called, and Plan 04 calls it on every patch. This is the missing scheduler.
+
+**Interfaces:**
+- Produces: `settings::store::FlushScheduler` with `spawn(Arc<SettingsStore>, Duration, on_error) -> FlushScheduler`, `.notify()`, and `.flush_now()`.
+
+**Files:**
+- Modify: `src-tauri/src/settings/store.rs`
+
+- [ ] **Step 1: Write the failing tests**
+
+Append to the `store.rs` test module:
+
+```rust
+    use std::time::Duration;
+
+    #[test]
+    fn a_burst_of_changes_produces_one_write() {
+        let (s, _outcome, _tmp) = store();
+        let s = std::sync::Arc::new(s);
+        let scheduler = FlushScheduler::spawn(std::sync::Arc::clone(&s), Duration::from_millis(30), |_| {});
+
+        // Forty steps of a slider drag.
+        for i in 0..40 {
+            s.patch(&json!({ "appearance": { "uiScale": 1.0 + (i as f64) * 0.01 } }))
+                .expect("patch");
+            scheduler.notify();
+        }
+        std::thread::sleep(Duration::from_millis(200));
+
+        assert_eq!(s.write_count(), 1, "a drag must coalesce into one write, not forty");
+    }
+
+    #[test]
+    fn a_change_after_the_window_closes_writes_again() {
+        let (s, _outcome, _tmp) = store();
+        let s = std::sync::Arc::new(s);
+        let scheduler = FlushScheduler::spawn(std::sync::Arc::clone(&s), Duration::from_millis(30), |_| {});
+
+        s.patch(&json!({ "appearance": { "theme": "light" } })).expect("one");
+        scheduler.notify();
+        std::thread::sleep(Duration::from_millis(200));
+        s.patch(&json!({ "appearance": { "density": "compact" } })).expect("two");
+        scheduler.notify();
+        std::thread::sleep(Duration::from_millis(200));
+
+        assert_eq!(s.write_count(), 2, "coalescing must not swallow later changes");
+    }
+
+    #[test]
+    fn a_write_failure_is_reported_once_per_flush_not_once_per_change() {
+        use std::os::unix::fs::PermissionsExt;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        static REPORTS: AtomicUsize = AtomicUsize::new(0);
+        REPORTS.store(0, Ordering::SeqCst);
+
+        let (s, _outcome, _tmp) = store();
+        let s = std::sync::Arc::new(s);
+        s.flush_if_dirty().expect("initial write");
+
+        let dir = s.paths().config_dir.clone();
+        let scheduler = FlushScheduler::spawn(std::sync::Arc::clone(&s), Duration::from_millis(30), |_| {
+            REPORTS.fetch_add(1, Ordering::SeqCst);
+        });
+
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o500)).expect("chmod");
+        for _ in 0..10 {
+            s.patch(&json!({ "appearance": { "theme": "light" } })).expect("patch");
+            scheduler.notify();
+        }
+        std::thread::sleep(Duration::from_millis(200));
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).expect("restore");
+
+        assert_eq!(
+            REPORTS.load(Ordering::SeqCst),
+            1,
+            "one toast per failure, not one per keystroke"
+        );
+    }
+```
+
+- [ ] **Step 2: Run and watch them fail**
+
+Run: `cd src-tauri && cargo test settings::store::tests::a_burst`
+Expected: FAIL to compile — `cannot find type FlushScheduler`
+
+- [ ] **Step 3: Implement**
+
+Add to `store.rs`:
+
+```rust
+/// Coalesces writes. Every mutation calls `notify()`; the worker waits for a
+/// quiet period before flushing, so a slider drag is one `fsync` rather than
+/// forty.
+///
+/// The scheduling lives here rather than in the command layer because the
+/// command layer would have to reimplement it per command, and because a
+/// write failure has to be reported from wherever the write actually happens.
+pub struct FlushScheduler {
+    tx: std::sync::mpsc::Sender<Message>,
+}
+
+enum Message {
+    Changed,
+    FlushNow,
+}
+
+impl FlushScheduler {
+    pub fn spawn<F>(store: std::sync::Arc<SettingsStore>, delay: std::time::Duration, on_error: F) -> Self
+    where
+        F: Fn(RiffError) + Send + 'static,
+    {
+        let (tx, rx) = std::sync::mpsc::channel::<Message>();
+        std::thread::Builder::new()
+            .name("riff-settings-flush".into())
+            .spawn(move || {
+                // One error per failure *cause*, not one per attempt: a
+                // read-only config directory would otherwise raise a toast on
+                // every keystroke.
+                let mut reported: Option<String> = None;
+                while let Ok(first) = rx.recv() {
+                    if matches!(first, Message::Changed) {
+                        // Drain the burst: keep resetting the timer while
+                        // changes keep arriving.
+                        while rx.recv_timeout(delay).is_ok() {}
+                    }
+                    match store.flush_if_dirty() {
+                        Ok(()) => reported = None,
+                        Err(err) => {
+                            let cause = err.to_string();
+                            if reported.as_deref() != Some(cause.as_str()) {
+                                reported = Some(cause);
+                                on_error(err);
+                            }
+                        }
+                    }
+                }
+            })
+            .ok();
+        Self { tx }
+    }
+
+    pub fn notify(&self) {
+        let _ = self.tx.send(Message::Changed);
+    }
+
+    /// Skips the quiet period. Used on exit, where waiting 250 ms to save is
+    /// waiting 250 ms too long.
+    pub fn flush_now(&self) {
+        let _ = self.tx.send(Message::FlushNow);
+    }
+}
+```
+
+- [ ] **Step 4: Run the tests**
+
+Run: `cd src-tauri && cargo test settings::store`
+Expected: PASS, 16 tests
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add -A
+git commit -m "feat(settings): coalesce writes so a slider drag is one fsync"
+```
+
+---
+
+### Task 9: Gate check
 
 - [ ] **Step 1: Run everything**
 
@@ -1506,7 +1849,7 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 cargo deny check licenses
 ```
-Expected: all exit 0, roughly 40 tests passing.
+Expected: all exit 0, roughly 50 tests passing.
 
 - [ ] **Step 2: Confirm the four invariants have a test each**
 

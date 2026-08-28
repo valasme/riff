@@ -133,6 +133,7 @@ beforeEach(() => {
       stateDir: "/s",
       cacheDir: "/k",
       logDir: "/s/logs",
+      homeDir: "/home/probe",
     },
     appInfo: {
       version: "0.1.0",
@@ -248,6 +249,8 @@ interface BootstrapPayload {
   settings: Settings;
   paths: AppPaths;
   appInfo: AppInfo;
+  /** Present when settings.json could not be read and was moved aside. */
+  recoveredFrom?: string | null;
 }
 
 declare global {
@@ -292,7 +295,7 @@ function safeBootstrap(): BootstrapPayload {
         },
         onboarding: { completedAt: null, version: 1 },
       },
-      paths: { configDir: "", dataDir: "", stateDir: "", cacheDir: "", logDir: "" },
+      paths: { configDir: "", dataDir: "", stateDir: "", cacheDir: "", logDir: "", homeDir: "" },
       appInfo: {
         version: "unknown",
         tauriVersion: "unknown",
@@ -347,6 +350,17 @@ export const useSettings = create<SettingsState>((set, get) => ({
   },
 }));
 
+/**
+ * Tells the user their settings file was unreadable and has been kept.
+ * Recovery happens before the Tauri builder exists, so it arrives in the
+ * bootstrap payload rather than as an event — there is nothing to emit to
+ * yet, and emitting later would race the first render.
+ */
+export function reportRecovery(): void {
+  const path = window.__RIFF_BOOTSTRAP__?.recoveredFrom;
+  if (path) toast.error(i18n.t("errors:settingsRecovered", { path }));
+}
+
 /** Call once at mount. Returns a function that removes both listeners. */
 export async function subscribeToBackend(): Promise<() => void> {
   const unlistenChanged = await listen<Settings>("settings://changed", (event) => {
@@ -382,6 +396,7 @@ const [transientCollapsed, setTransientCollapsed] = useState(collapsed);
 const effectiveCollapsed = rememberCollapsed ? collapsed : transientCollapsed;
 
 useEffect(() => {
+  reportRecovery();
   const unsubscribe = subscribeToBackend();
   return () => void unsubscribe.then((off) => off());
 }, []);
@@ -394,6 +409,20 @@ const toggleSidebar = () => {
   }
 };
 ```
+
+Then make the custom title bar conditional, replacing the unconditional
+`<TitleBar />` Plan 06 left there:
+
+```tsx
+const titleBar = useAppearance().titleBar;
+```
+```tsx
+{titleBar === "custom" && <TitleBar />}
+```
+
+Choosing System decorations has to hide Riff's own bar, or the window ends up
+with two title bars stacked — §8.1 says the custom bar is hidden *live*, and
+without this the setting only ever adds chrome.
 
 - [ ] **Step 8: Commit**
 
@@ -462,7 +491,24 @@ git commit -m "feat(settings): add the zustand store with optimistic patching"
 }
 ```
 
-- [ ] **Step 2: Write the shared row**
+- [ ] **Step 2: Write the page header**
+
+`src/components/PageHeader.tsx` — named in spec §16.1's component list and, until now, built nowhere:
+
+```tsx
+/** The card's header band. One `<h1>` per screen, which is also what the
+ *  route announcer's live region is describing. */
+export function PageHeader({ title, description }: { title: string; description?: string }) {
+  return (
+    <header className="border-b border-separator px-6 py-4">
+      <h1 className="text-base font-semibold">{title}</h1>
+      {description && <p className="mt-1 text-[0.8125rem] text-muted-foreground">{description}</p>}
+    </header>
+  );
+}
+```
+
+- [ ] **Step 3: Write the shared row**
 
 `src/features/settings/SettingRow.tsx`:
 
@@ -498,7 +544,7 @@ export function SettingRow({
 }
 ```
 
-- [ ] **Step 3: Write the layout**
+- [ ] **Step 4: Write the layout**
 
 `src/routes/settings.tsx`:
 
@@ -508,6 +554,7 @@ import { Info, House, Palette } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
+import { PageHeader } from "@/components/PageHeader";
 
 export const Route = createFileRoute("/settings")({ component: SettingsLayout });
 
@@ -520,14 +567,18 @@ const SECTIONS: { to: string; icon: LucideIcon; key: string }[] = [
 function SettingsLayout() {
   const { t } = useTranslation(["settings", "nav"]);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const current = SECTIONS.find((s) => s.to === pathname)?.key ?? "general";
 
   return (
-    <div className="flex h-full min-h-0">
-      {/* Below 700px of available width this becomes a horizontal strip, so a
-          1.5x interface scale in a minimum-size window stays usable. */}
+    // A real container query, not `max-[700px]:`. A viewport media query
+    // cannot respond to UI scale at all — scaling changes rem, not the
+    // viewport — which is exactly the failure §7.4 designed around. Because
+    // the chrome is rem-sized, raising the scale shrinks this container in
+    // px, and the query fires.
+    <div className="@container/settings flex h-full min-h-0">
       <nav
         aria-label={t("nav:settingsSections")}
-        className="@container flex w-[var(--spacing-subnav)] shrink-0 flex-col gap-1 border-e border-raised p-3 max-[700px]:w-full max-[700px]:flex-row max-[700px]:border-e-0 max-[700px]:border-b"
+        className="flex w-[var(--spacing-subnav)] shrink-0 flex-col gap-[var(--row-gap)] border-e border-border-subtle p-3 @max-[700px]/settings:w-full @max-[700px]/settings:flex-row @max-[700px]/settings:border-e-0 @max-[700px]/settings:border-b"
       >
         {SECTIONS.map(({ to, icon: Icon, key }) => (
           <Link
@@ -535,7 +586,7 @@ function SettingsLayout() {
             to={to}
             aria-current={pathname === to ? "page" : undefined}
             className={cn(
-              "flex h-10 items-center gap-2 rounded-[var(--radius-nav)] px-3 text-[0.9375rem] font-medium transition-colors hover:bg-raised",
+              "flex h-[var(--row-height)] items-center gap-2 rounded-[var(--radius-nav)] px-3 text-[0.9375rem] font-medium transition-colors hover:bg-raised",
               pathname === to && "bg-raised",
             )}
           >
@@ -546,8 +597,14 @@ function SettingsLayout() {
       </nav>
 
       <div className="min-w-0 flex-1 overflow-auto p-[var(--content-padding)]">
-        <div className="mx-auto max-w-3xl rounded-[var(--radius-card)] bg-card px-6">
-          <Outlet />
+        <div className="rounded-[var(--radius-card)] bg-card">
+          {/* The mockup draws a header band with a rule under it. Without it
+              the section name only ever appears in the sub-nav pill and the
+              card opens straight into its first row. */}
+          <PageHeader title={t(`settings:sections.${current}`)} />
+          <div className="px-6">
+            <Outlet />
+          </div>
         </div>
       </div>
     </div>
@@ -567,12 +624,12 @@ export const Route = createFileRoute("/settings/")({
 });
 ```
 
-- [ ] **Step 4: Verify**
+- [ ] **Step 5: Verify**
 
 Run: `pnpm typecheck && pnpm app`
 Expected: `/settings` redirects to `/settings/general`; the sub-navigation renders with three entries.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add -A
@@ -665,6 +722,7 @@ Expected: FAIL — cannot resolve `./AppearanceSection`
 `src/features/settings/sections/AppearanceSection.tsx`:
 
 ```tsx
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { SettingRow } from "@/features/settings/SettingRow";
@@ -680,10 +738,22 @@ export function AppearanceSection() {
   const appearance = useAppearance();
   const patch = useSettings((s) => s.patch);
 
+  // The setting is applied on every launch, not only when it changes.
+  // `decorations: false` is baked into tauri.conf.json, so without this a
+  // user who chose System decorations reopens Riff with no title bar of
+  // either kind and a switch insisting otherwise.
+  useEffect(() => {
+    if (appearance.titleBar === "system") void ipc.windowSetDecorations(true);
+  }, [appearance.titleBar]);
+
   async function setTitleBar(style: TitleBarStyle) {
     // The window manager decides. Under Wayland many compositors, Hyprland
     // among them, simply decline — so ask, then read back what actually
     // happened rather than leaving a switch that claims otherwise.
+    // Best-effort: `is_decorated()` reports GTK's own client-side property,
+    // so a Wayland compositor that ignores the request will not always show
+    // up here. It catches the refusals it can and the description tells the
+    // truth about the rest.
     const decorated = await ipc.windowSetDecorations(style === "system");
     if (style === "system" && !decorated) {
       toast.error(t("errors:decorationsRefused"));
@@ -885,7 +955,7 @@ vi.mock("@/stores/settings", () => ({
     selector({
       patch,
       reset,
-      paths: { configDir: "/c", dataDir: "/d", cacheDir: "/k", logDir: "/l", stateDir: "/s" },
+      paths: { configDir: "/c", dataDir: "/d", cacheDir: "/k", logDir: "/l", stateDir: "/s", homeDir: "/h" },
     }),
 }));
 vi.mock("@/lib/ipc", () => ({
@@ -1206,6 +1276,7 @@ vi.mock("@/stores/settings", () => ({
         cacheDir: "/home/dimitris/.cache/riff",
         logDir: "/home/dimitris/.local/state/riff/logs",
         stateDir: "/home/dimitris/.local/state/riff",
+        homeDir: "/home/dimitris",
       },
     }),
 }));
@@ -1294,9 +1365,11 @@ export function AboutSection() {
   ];
 
   function copyDiagnostics() {
-    // Derive $HOME from a known path rather than an env var the webview has
-    // no access to.
-    const home = paths.configDir.replace(/\/\.config\/riff$/, "");
+    // Rust carries the real home directory. Deriving it by stripping
+    // "/.config/riff" from configDir silently fails under XDG_CONFIG_HOME or
+    // RIFF_CONFIG_HOME, and then dataDir and logDir keep the account name —
+    // a leak in the one affordance whose whole purpose is preventing it.
+    const home = paths.homeDir;
     const report = [
       ...rows.map(([label, value]) => `${label}: ${value}`),
       "",
