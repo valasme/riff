@@ -46,13 +46,13 @@
 **Files:**
 - Create: `src/lib/merge.ts`, `src/stores/settings.ts`, `src/stores/settings.test.ts`
 
-- [ ] **Step 1: Install**
+- [x] **Step 1: Install**
 
 ```bash
 pnpm add zustand@5.0
 ```
 
-- [ ] **Step 2: Write the deep merge**
+- [x] **Step 2: Write the deep merge**
 
 `src/lib/merge.ts`:
 
@@ -77,7 +77,7 @@ export function mergeDeep<T>(base: T, patch: unknown): T {
 }
 ```
 
-- [ ] **Step 3: Write the failing tests**
+- [x] **Step 3: Write the failing tests**
 
 `src/stores/settings.test.ts`:
 
@@ -219,12 +219,12 @@ describe("useSettings", () => {
 });
 ```
 
-- [ ] **Step 4: Run and watch them fail**
+- [x] **Step 4: Run and watch them fail**
 
 Run: `pnpm test src/stores/settings`
 Expected: FAIL — cannot resolve `./settings`
 
-- [ ] **Step 5: Implement**
+- [x] **Step 5: Implement**
 
 `src/stores/settings.ts`:
 
@@ -410,12 +410,12 @@ export const useAppearance = () => useSettings((s) => s.settings.appearance);
 export const useGeneral = () => useSettings((s) => s.settings.general);
 ```
 
-- [ ] **Step 6: Run the tests**
+- [x] **Step 6: Run the tests**
 
 Run: `pnpm test src/stores/settings`
 Expected: PASS, 7 tests
 
-- [ ] **Step 7: Wire it into the shell**
+- [x] **Step 7: Wire it into the shell**
 
 In `src/routes/__root.tsx`, replace the local collapsed state with the persisted setting and subscribe to backend events:
 
@@ -454,7 +454,7 @@ Choosing System decorations has to hide Riff's own bar, or the window ends up
 with two title bars stacked — §8.1 says the custom bar is hidden *live*, and
 without this the setting only ever adds chrome.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add -A
@@ -469,7 +469,7 @@ git commit -m "feat(settings): add the zustand store with optimistic patching"
 - Modify: `src/routes/settings.tsx`
 - Create: `src/routes/settings.index.tsx`, `src/features/settings/SettingRow.tsx`
 
-- [ ] **Step 1: Add the strings**
+- [x] **Step 1: Add the strings**
 
 `src/locales/en/settings.json`:
 
@@ -523,7 +523,7 @@ git commit -m "feat(settings): add the zustand store with optimistic patching"
 }
 ```
 
-- [ ] **Step 2: Write the page header**
+- [x] **Step 2: Write the page header**
 
 `src/components/PageHeader.tsx` — named in spec §16.1's component list and, until now, built nowhere:
 
@@ -540,7 +540,7 @@ export function PageHeader({ title, description }: { title: string; description?
 }
 ```
 
-- [ ] **Step 3: Write the shared row**
+- [x] **Step 3: Write the shared row**
 
 `src/features/settings/SettingRow.tsx`:
 
@@ -582,7 +582,7 @@ export function SettingRow({
 }
 ```
 
-- [ ] **Step 4: Write the layout**
+- [x] **Step 4: Write the layout**
 
 `src/routes/settings.tsx`:
 
@@ -662,12 +662,12 @@ export const Route = createFileRoute("/settings/")({
 });
 ```
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 Run: `pnpm typecheck && pnpm app`
 Expected: `/settings` redirects to `/settings/general`; the sub-navigation renders with three entries.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A
@@ -681,7 +681,7 @@ git commit -m "feat(settings): add the settings layout and sub-navigation"
 **Files:**
 - Create: `src/routes/settings.appearance.tsx`, `src/features/settings/sections/AppearanceSection.tsx`, `src/features/settings/sections/AppearanceSection.test.tsx`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `src/features/settings/sections/AppearanceSection.test.tsx`:
 
@@ -750,12 +750,12 @@ describe("AppearanceSection", () => {
 });
 ```
 
-- [ ] **Step 2: Run and watch it fail**
+- [x] **Step 2: Run and watch it fail**
 
 Run: `pnpm test AppearanceSection`
 Expected: FAIL — cannot resolve `./AppearanceSection`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/features/settings/sections/AppearanceSection.tsx`:
 
@@ -961,17 +961,17 @@ import { AppearanceSection } from "@/features/settings/sections/AppearanceSectio
 export const Route = createFileRoute("/settings/appearance")({ component: AppearanceSection });
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `pnpm test AppearanceSection`
 Expected: PASS, 4 tests
 
-- [ ] **Step 5: Verify by hand**
+- [x] **Step 5: Verify by hand**
 
 Run: `pnpm app`, open Settings → Appearance, switch the theme.
 Expected: the interface retints instantly. Close and reopen Riff — it stays. `cat ~/.config/riff/settings.json` shows `"theme": "light"`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A
@@ -985,7 +985,7 @@ git commit -m "feat(settings): add the appearance section"
 **Files:**
 - Create: `src/routes/settings.general.tsx`, `src/features/settings/sections/GeneralSection.tsx`, `src/features/settings/sections/GeneralSection.test.tsx`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `src/features/settings/sections/GeneralSection.test.tsx`:
 
@@ -1072,12 +1072,12 @@ describe("GeneralSection", () => {
 });
 ```
 
-- [ ] **Step 2: Run and watch it fail**
+- [x] **Step 2: Run and watch it fail**
 
 Run: `pnpm test GeneralSection`
 Expected: FAIL — cannot resolve `./GeneralSection`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/features/settings/sections/GeneralSection.tsx`:
 
@@ -1317,12 +1317,12 @@ import { GeneralSection } from "@/features/settings/sections/GeneralSection";
 export const Route = createFileRoute("/settings/general")({ component: GeneralSection });
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `pnpm test GeneralSection`
 Expected: PASS, 5 tests
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -1338,7 +1338,7 @@ git commit -m "feat(settings): add the general section"
 
 The third-party licence list is added by Plan 11, which generates the data it renders.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `src/features/settings/sections/AboutSection.test.tsx`:
 
@@ -1416,12 +1416,12 @@ describe("AboutSection", () => {
 });
 ```
 
-- [ ] **Step 2: Run and watch it fail**
+- [x] **Step 2: Run and watch it fail**
 
 Run: `pnpm test AboutSection`
 Expected: FAIL — cannot resolve `./AboutSection`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/features/settings/sections/AboutSection.tsx`:
 
@@ -1548,12 +1548,12 @@ import { AboutSection } from "@/features/settings/sections/AboutSection";
 export const Route = createFileRoute("/settings/about")({ component: AboutSection });
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `pnpm test AboutSection`
 Expected: PASS, 4 tests
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -1567,7 +1567,7 @@ git commit -m "feat(settings): add the about section with redacted diagnostics"
 **Files:**
 - Modify: `src/routes/index.tsx`, `src/routes/__root.tsx`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `src/routes/startup-route.test.ts`:
 
@@ -1600,12 +1600,12 @@ describe("resolveStartupRoute", () => {
 });
 ```
 
-- [ ] **Step 2: Run and watch it fail**
+- [x] **Step 2: Run and watch it fail**
 
 Run: `pnpm test startup-route`
 Expected: FAIL — cannot resolve `@/lib/startup-route`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/lib/startup-route.ts`:
 
@@ -1648,7 +1648,7 @@ export const Route = createFileRoute("/")({
 });
 ```
 
-- [ ] **Step 4: Record the last route**
+- [x] **Step 4: Record the last route**
 
 In `src/routes/__root.tsx`, inside the existing route-announcement effect:
 
@@ -1660,12 +1660,12 @@ if (useSettings.getState().settings.general.startupRoute === "last-used") {
 }
 ```
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `pnpm test startup-route`
 Expected: PASS, 5 tests
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A
@@ -1682,7 +1682,7 @@ Rust prevents the close and emits `app://confirm-quit` (Plan 04). Without this t
 - Create: `src/features/window/QuitConfirmation.tsx`, `src/features/window/QuitConfirmation.test.tsx`
 - Modify: `src/routes/__root.tsx`, `src/locales/en/common.json`
 
-- [ ] **Step 1: Add the strings**
+- [x] **Step 1: Add the strings**
 
 Add to `src/locales/en/common.json`:
 
@@ -1690,7 +1690,7 @@ Add to `src/locales/en/common.json`:
   "quit": { "title": "Quit Riff?", "body": "Your settings are already saved.", "action": "Quit" }
 ```
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 `src/features/window/QuitConfirmation.test.tsx`:
 
@@ -1752,12 +1752,12 @@ describe("QuitConfirmation", () => {
 });
 ```
 
-- [ ] **Step 3: Run and watch it fail**
+- [x] **Step 3: Run and watch it fail**
 
 Run: `pnpm test QuitConfirmation`
 Expected: FAIL — cannot resolve `./QuitConfirmation`
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 `src/features/window/QuitConfirmation.tsx`:
 
@@ -1811,17 +1811,17 @@ export function QuitConfirmation() {
 
 Mount `<QuitConfirmation />` in `src/routes/__root.tsx`, beside the palette.
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `pnpm test QuitConfirmation`
 Expected: PASS, 3 tests
 
-- [ ] **Step 6: Verify by hand**
+- [x] **Step 6: Verify by hand**
 
 Run `pnpm app`, enable Confirm before quitting, then close the window.
 Expected: the dialog appears; Cancel keeps the window open; Quit closes it. Disable the setting and confirm the window closes immediately.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -1832,7 +1832,7 @@ git commit -m "feat(settings): honour confirm before quitting"
 
 ### Task 8: Gate check
 
-- [ ] **Step 1: Run everything**
+- [x] **Step 1: Run everything**
 
 ```bash
 pnpm lint && pnpm typecheck && pnpm test && pnpm build
@@ -1840,17 +1840,17 @@ cd src-tauri && cargo clippy --all-targets -- -D warnings && cargo test
 ```
 Expected: all exit 0.
 
-- [ ] **Step 2: Verify persistence end to end**
+- [x] **Step 2: Verify persistence end to end**
 
 Run `pnpm app`. Change the theme, density and scale. Quit. Run `pnpm app` again.
 Expected: every choice survived. `cat ~/.config/riff/settings.json` matches what the interface shows.
 
-- [ ] **Step 3: Verify live external editing**
+- [x] **Step 3: Verify live external editing**
 
 With Riff running: `sed -i 's/"theme": "dark"/"theme": "light"/' ~/.config/riff/settings.json`
 Expected: the interface retints within a second, with no interaction.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A
