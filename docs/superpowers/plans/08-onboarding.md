@@ -40,7 +40,7 @@
 **Files:**
 - Create: `src/features/onboarding/gate.ts`, `src/features/onboarding/gate.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `src/features/onboarding/gate.test.ts`:
 
@@ -92,12 +92,12 @@ describe("preferredTheme", () => {
 });
 ```
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
 Run: `pnpm test onboarding/gate`
 Expected: FAIL — cannot resolve `./gate`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/features/onboarding/gate.ts`:
 
@@ -130,12 +130,12 @@ export function preferredTheme(): Theme {
 }
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `pnpm test onboarding/gate`
 Expected: PASS, 7 tests
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -150,7 +150,7 @@ git commit -m "feat(onboarding): add the gate and theme suggestion"
 - Create: `src/features/onboarding/OnboardingFlow.tsx`, `src/features/onboarding/OnboardingFlow.test.tsx`, `src/routes/onboarding.tsx`
 - Modify: `src/locales/en/onboarding.json`, `src/routes/__root.tsx`
 
-- [ ] **Step 1: Add the strings**
+- [x] **Step 1: Add the strings**
 
 `src/locales/en/onboarding.json`:
 
@@ -177,7 +177,7 @@ git commit -m "feat(onboarding): add the gate and theme suggestion"
 }
 ```
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 `src/features/onboarding/OnboardingFlow.test.tsx`:
 
@@ -276,12 +276,12 @@ describe("OnboardingFlow", () => {
 });
 ```
 
-- [ ] **Step 3: Run and watch it fail**
+- [x] **Step 3: Run and watch it fail**
 
 Run: `pnpm test OnboardingFlow`
 Expected: FAIL — cannot resolve `./OnboardingFlow`
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 `src/features/onboarding/OnboardingFlow.tsx`:
 
@@ -466,7 +466,7 @@ import { OnboardingFlow } from "@/features/onboarding/OnboardingFlow";
 export const Route = createFileRoute("/onboarding")({ component: OnboardingFlow });
 ```
 
-- [ ] **Step 5: Add the guard and hide the shell**
+- [x] **Step 5: Add the guard and hide the shell**
 
 In `src/routes/__root.tsx`:
 
@@ -496,19 +496,19 @@ const onboardingActive = pathname === "/onboarding";
 {!onboardingActive && <Sidebar collapsed={effectiveCollapsed} />}
 ```
 
-- [ ] **Step 6: Run the tests**
+- [x] **Step 6: Run the tests**
 
 Run: `pnpm test OnboardingFlow`
 Expected: PASS, 7 tests
 
-- [ ] **Step 7: Verify by hand**
+- [x] **Step 7: Verify by hand**
 
 ```bash
 rm -rf ~/.config/riff && pnpm app
 ```
 Expected: onboarding appears; picking a theme retints instantly; finishing lands on Practice. Quit and relaunch — onboarding does not reappear. Settings → General → Run setup shows it again.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add -A
@@ -519,14 +519,14 @@ git commit -m "feat(onboarding): add the three-step first run"
 
 ### Task 3: Gate check
 
-- [ ] **Step 1: Run everything**
+- [x] **Step 1: Run everything**
 
 ```bash
 pnpm lint && pnpm typecheck && pnpm test && pnpm build
 ```
 Expected: all exit 0.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add -A
