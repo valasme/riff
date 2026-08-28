@@ -42,7 +42,7 @@
 - Create: `src-tauri/src/paths.rs`
 - Modify: `src-tauri/src/lib.rs`, `src-tauri/Cargo.toml`
 
-- [ ] **Step 1: Add the dependencies**
+- [x] **Step 1: Add the dependencies**
 
 ```bash
 cd src-tauri
@@ -50,7 +50,7 @@ cargo add directories@6.0 thiserror@2.0
 cargo add --dev tempfile@3.27
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Create `src-tauri/src/paths.rs` containing **only** this test module for now:
 
@@ -133,12 +133,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 3: Run them and watch them fail**
+- [x] **Step 3: Run them and watch them fail**
 
 Run: `cd src-tauri && cargo test paths`
 Expected: FAIL to compile — `cannot find type XdgRoots in this scope`
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 Insert above the test module in `src-tauri/src/paths.rs`:
 
@@ -277,7 +277,7 @@ pub fn ensure_dirs(paths: &AppPaths) -> std::io::Result<()> {
 }
 ```
 
-- [ ] **Step 5: Declare the module**
+- [x] **Step 5: Declare the module**
 
 At the top of `src-tauri/src/lib.rs`:
 
@@ -285,12 +285,12 @@ At the top of `src-tauri/src/lib.rs`:
 pub mod paths;
 ```
 
-- [ ] **Step 6: Run the tests**
+- [x] **Step 6: Run the tests**
 
 Run: `cd src-tauri && cargo test paths`
 Expected: PASS, 7 tests
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -308,7 +308,7 @@ git commit -m "feat(paths): resolve xdg directories with riff_* overrides"
 - Create: `src-tauri/src/error.rs`
 - Modify: `src-tauri/src/lib.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `src-tauri/src/error.rs` with only:
 
@@ -357,12 +357,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Run and watch it fail**
+- [x] **Step 2: Run and watch it fail**
 
 Run: `cd src-tauri && cargo test error`
 Expected: FAIL to compile — `cannot find type RiffError`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Insert above the tests in `src-tauri/src/error.rs`:
 
@@ -414,7 +414,7 @@ impl RiffError {
 pub type RiffResult<T> = Result<T, RiffError>;
 ```
 
-- [ ] **Step 4: Declare the module**
+- [x] **Step 4: Declare the module**
 
 In `src-tauri/src/lib.rs`:
 
@@ -422,12 +422,12 @@ In `src-tauri/src/lib.rs`:
 pub mod error;
 ```
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `cd src-tauri && cargo test error`
 Expected: PASS, 4 tests
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A
@@ -452,7 +452,7 @@ would have no answer.
 - Create: `src-tauri/src/logging.rs`
 - Modify: `src-tauri/src/lib.rs`, `src-tauri/Cargo.toml`
 
-- [ ] **Step 1: Add the dependencies**
+- [x] **Step 1: Add the dependencies**
 
 ```bash
 cd src-tauri
@@ -462,7 +462,7 @@ cargo add tracing-appender@0.2
 cargo add time@0.3 --features formatting
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Create `src-tauri/src/logging.rs` with only:
 
@@ -569,12 +569,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 3: Run and watch them fail**
+- [x] **Step 3: Run and watch them fail**
 
 Run: `cd src-tauri && cargo test logging`
 Expected: FAIL to compile — `cannot find function start_session`
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 Insert above the tests:
 
@@ -722,7 +722,7 @@ pub fn install_panic_hook(session_dir: &Path) {
 }
 ```
 
-- [ ] **Step 5: Declare the module**
+- [x] **Step 5: Declare the module**
 
 In `src-tauri/src/lib.rs`:
 
@@ -730,7 +730,7 @@ In `src-tauri/src/lib.rs`:
 pub mod logging;
 ```
 
-- [ ] **Step 6: Run the tests**
+- [x] **Step 6: Run the tests**
 
 Run: `cd src-tauri && cargo test logging -- --test-threads=1`
 Expected: PASS, 7 tests
@@ -739,7 +739,7 @@ Expected: PASS, 7 tests
 once per process; `try_init` tolerates that, but running these serially keeps
 the assertions about directory contents meaningful.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -749,7 +749,7 @@ git commit -m "feat(logging): one log directory per launch, with retention and l
 ---
 ### Task 4: Gate check
 
-- [ ] **Step 1: Run everything**
+- [x] **Step 1: Run everything**
 
 ```bash
 cd src-tauri
@@ -760,7 +760,7 @@ cargo deny check licenses
 ```
 Expected: all exit 0. `clippy` covers test code too via `--all-targets`; `unwrap` inside `#[cfg(test)]` is what `expect` is for, so replace any that trips the lint.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add -A
