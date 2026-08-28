@@ -46,8 +46,24 @@
       "icons/icon.ico"
     ],
     "linux": {
-      "deb": { "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0"] },
-      "rpm": { "depends": ["webkit2gtk4.1", "gtk3"] },
+      "deb": {
+        "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0"],
+        "files": {
+          "/usr/share/man/man1/riff.1": "dist-extra/riff.1",
+          "/usr/share/bash-completion/completions/riff": "dist-extra/riff.bash",
+          "/usr/share/zsh/site-functions/_riff": "dist-extra/_riff",
+          "/usr/share/fish/vendor_completions.d/riff.fish": "dist-extra/riff.fish"
+        }
+      },
+      "rpm": {
+        "depends": ["webkit2gtk4.1", "gtk3"],
+        "files": {
+          "/usr/share/man/man1/riff.1": "dist-extra/riff.1",
+          "/usr/share/bash-completion/completions/riff": "dist-extra/riff.bash",
+          "/usr/share/zsh/site-functions/_riff": "dist-extra/_riff",
+          "/usr/share/fish/vendor_completions.d/riff.fish": "dist-extra/riff.fish"
+        }
+      },
       "appimage": { "bundleMediaFramework": false }
     }
   }

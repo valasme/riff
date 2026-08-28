@@ -16,6 +16,9 @@ name = "riff_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
+clap = { version = "4", features = ["derive"] }
+clap_complete = "4.6.9"
+clap_mangen = "0.3.3"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
