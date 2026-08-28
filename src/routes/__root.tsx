@@ -1,10 +1,11 @@
 import { createRootRoute, Outlet, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { RouteError } from "@/components/RouteError";
 
 export const Route = createRootRoute({
   component: RootLayout,
-  // Task 3 adds `errorComponent: RouteError`.
+  errorComponent: RouteError,
 });
 
 function RootLayout() {

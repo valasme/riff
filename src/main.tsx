@@ -1,14 +1,19 @@
 import "@/styles/globals.css";
-import { invoke } from "@tauri-apps/api/core";
+import { RouterProvider } from "@tanstack/react-router";
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { Providers } from "@/app/providers";
+import { router } from "@/app/router";
+import { ipc } from "@/lib/ipc";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("#root is missing from index.html");
 
 ReactDOM.createRoot(root).render(
   <React.StrictMode>
-    <div id="app-root" className="flex" />
+    <Providers>
+      <RouterProvider router={router} />
+    </Providers>
   </React.StrictMode>,
 );
 
@@ -19,5 +24,5 @@ ReactDOM.createRoot(root).render(
 // exists for. A microtask after the synchronous initial render is the earliest
 // point that does not depend on the window already being visible.
 queueMicrotask(() => {
-  void invoke("app_ready").catch(() => {});
+  void ipc.appReady().catch(() => {});
 });
