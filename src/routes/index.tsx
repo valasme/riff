@@ -1,8 +1,12 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { router } from "@/app/router";
+import { resolveStartupRoute } from "@/lib/startup-route";
+import { useSettings } from "@/stores/settings";
 
 export const Route = createFileRoute("/")({
-  // Plan 07 replaces this constant with the persisted startup route.
   beforeLoad: () => {
-    throw redirect({ to: "/practice" });
+    const { startupRoute, lastRoute } = useSettings.getState().settings.general;
+    const known = Object.keys(router.routesById);
+    throw redirect({ to: resolveStartupRoute(startupRoute, lastRoute, known) });
   },
 });
