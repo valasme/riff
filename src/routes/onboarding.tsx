@@ -1,6 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { OnboardingFlow } from "@/features/onboarding/OnboardingFlow";
 
-// Plan 08 replaces this with the real onboarding wizard.
-export const Route = createFileRoute("/onboarding")({
-  component: () => <div />,
-});
+export const Route = createFileRoute("/onboarding")({ component: OnboardingFlow });

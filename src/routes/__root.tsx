@@ -1,8 +1,9 @@
-import { createRootRoute, Outlet, useRouterState } from "@tanstack/react-router";
+import { createRootRoute, Outlet, redirect, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { RouteError } from "@/components/RouteError";
 import { Sidebar } from "@/components/Sidebar";
+import { ONBOARDING_VERSION, shouldShowOnboarding } from "@/features/onboarding/gate";
 import { QuitConfirmation } from "@/features/window/QuitConfirmation";
 import { TitleBar } from "@/features/window/TitleBar";
 import { reportRecovery, subscribeToBackend, useAppearance, useSettings } from "@/stores/settings";
@@ -10,6 +11,16 @@ import { reportRecovery, subscribeToBackend, useAppearance, useSettings } from "
 export const Route = createRootRoute({
   component: RootLayout,
   errorComponent: RouteError,
+  beforeLoad: ({ location }) => {
+    const { onboarding } = useSettings.getState().settings;
+    const needed = shouldShowOnboarding(onboarding, ONBOARDING_VERSION);
+    if (needed && location.pathname !== "/onboarding") {
+      throw redirect({ to: "/onboarding" });
+    }
+    if (!needed && location.pathname === "/onboarding") {
+      throw redirect({ to: "/practice" });
+    }
+  },
 });
 
 function RootLayout() {
@@ -21,6 +32,7 @@ function RootLayout() {
   const patch = useSettings((s) => s.patch);
   const [transientCollapsed, setTransientCollapsed] = useState(collapsed);
   const effectiveCollapsed = rememberCollapsed ? collapsed : transientCollapsed;
+  const onboardingActive = pathname === "/onboarding";
 
   const toggleSidebar = () => {
     if (rememberCollapsed) {
@@ -70,7 +82,7 @@ function RootLayout() {
           so raising the UI scale shrinks this in px and the query fires —
           which a viewport media query could never do. */}
       <div className="@container/shell flex min-h-0 flex-1">
-        <Sidebar collapsed={effectiveCollapsed} />
+        {!onboardingActive && <Sidebar collapsed={effectiveCollapsed} />}
         <main id="main" className="min-w-0 flex-1 overflow-auto">
           <Outlet />
         </main>

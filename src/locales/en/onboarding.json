@@ -1,1 +1,20 @@
-{}
+{
+  "step": "Step {{current}} of {{total}}",
+  "welcome": {
+    "title": "Practice everything in one place",
+    "body": "Riff keeps your score, your video and your audio side by side, so you stop juggling three windows and start playing.",
+    "status": "This early build has the workspace, the settings and the keyboard shortcuts. Playing a score, a video or a track is still to come."
+  },
+  "theme": {
+    "title": "Pick a look",
+    "body": "You can change this at any time in Settings.",
+    "dark": "Dark",
+    "light": "Light",
+    "preview": "{{name}} theme preview"
+  },
+  "privacy": {
+    "title": "Everything stays here",
+    "body": "Riff has no accounts, no telemetry and makes no network connections at all. Your files never leave this machine. Here is exactly where Riff keeps things:",
+    "done": "Start practising"
+  }
+}
