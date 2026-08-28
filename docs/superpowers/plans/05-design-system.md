@@ -42,13 +42,13 @@
 - Create: `src/styles/fonts.css`
 - Modify: `src/styles/globals.css`
 
-- [ ] **Step 1: Install**
+- [x] **Step 1: Install**
 
 ```bash
 pnpm add @fontsource-variable/outfit@5.3 @fontsource/playfair-display@5.3 @fontsource-variable/jetbrains-mono@5.3
 ```
 
-- [ ] **Step 2: Import exactly what is used**
+- [x] **Step 2: Import exactly what is used**
 
 Create `src/styles/fonts.css`:
 
@@ -70,7 +70,7 @@ Create `src/styles/fonts.css`:
 @import "@fontsource-variable/jetbrains-mono/latin.css";
 ```
 
-- [ ] **Step 3: Verify the faces are emitted and self-hosted**
+- [x] **Step 3: Verify the faces are emitted and self-hosted**
 
 Add `@import "./fonts.css";` as the second line of `src/styles/globals.css` (after the Tailwind import), then:
 
@@ -80,7 +80,7 @@ Expected: woff2 files present in the build output.
 Run: `grep -ro 'https://fonts' dist/ | head -1`
 Expected: no output — nothing points at a remote font host.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A
@@ -94,7 +94,7 @@ git commit -m "feat(design): self-host outfit, playfair display and jetbrains mo
 **Files:**
 - Modify: `src/styles/globals.css`
 
-- [ ] **Step 1: Write the stylesheet**
+- [x] **Step 1: Write the stylesheet**
 
 Overwrite `src/styles/globals.css`:
 
@@ -281,12 +281,12 @@ body {
 }
 ```
 
-- [ ] **Step 2: Verify the theme override actually retints a utility**
+- [x] **Step 2: Verify the theme override actually retints a utility**
 
 Run: `pnpm build && grep -c 'data-theme="light"' dist/assets/*.css`
 Expected: at least `1`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add -A
@@ -303,7 +303,7 @@ git commit -m "feat(design): add the token layer with theme, contrast and densit
 **Files:**
 - Create: `src/lib/appearance.ts`, `src/lib/appearance.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `src/lib/appearance.test.ts`:
 
@@ -377,12 +377,12 @@ describe("applyAppearance", () => {
 });
 ```
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
 Run: `pnpm test src/lib/appearance`
 Expected: FAIL — cannot resolve `./appearance`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `src/lib/appearance.ts`:
 
@@ -424,12 +424,12 @@ export function applyAppearance(root: HTMLElement, appearance: Appearance): void
 }
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `pnpm test src/lib/appearance`
 Expected: PASS, 6 tests
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -443,7 +443,7 @@ git commit -m "feat(design): apply appearance settings as html attributes"
 **Files:**
 - Create: `components.json`, `src/lib/cn.ts`, `src/components/ui/*`
 
-- [ ] **Step 1: Add the class combinator**
+- [x] **Step 1: Add the class combinator**
 
 ```bash
 pnpm add clsx tailwind-merge@3.6 lucide-react@1.34
@@ -460,7 +460,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 ```
 
-- [ ] **Step 2: Initialise shadcn**
+- [x] **Step 2: Initialise shadcn**
 
 ```bash
 pnpm dlx shadcn@4.19.0 init
@@ -474,7 +474,7 @@ If the initialiser rewrites `src/styles/globals.css`, restore it from git and ke
 git diff src/styles/globals.css
 ```
 
-- [ ] **Step 3: Add only the primitives this milestone uses**
+- [x] **Step 3: Add only the primitives this milestone uses**
 
 ```bash
 pnpm dlx shadcn@4.19.0 add button dialog switch slider radio-group tooltip \
@@ -499,7 +499,7 @@ shadcn's Tailwind-v4 components use `animate-in`, `fade-in-0` and
 the file in Step 2 and add the package — otherwise every overlay animation is
 silently a no-op, with no build error to tell you.
 
-- [ ] **Step 4: Retint the primitives to the tokens**
+- [x] **Step 4: Retint the primitives to the tokens**
 
 In every file under `src/components/ui/`, replace shadcn's default token names with Riff's:
 
@@ -516,7 +516,7 @@ In every file under `src/components/ui/`, replace shadcn's default token names w
 
 Delete any `bg-destructive` styling and replace with `bg-raised text-foreground` plus a bold label — the palette has no red, and the destructive action (Reset all settings) is guarded by a confirmation dialog rather than by colour.
 
-- [ ] **Step 5: Write a smoke test**
+- [x] **Step 5: Write a smoke test**
 
 Create `src/components/ui/ui.test.tsx`:
 
@@ -552,12 +552,12 @@ describe("ui primitives", () => {
 });
 ```
 
-- [ ] **Step 6: Run it**
+- [x] **Step 6: Run it**
 
 Run: `pnpm test src/components/ui`
 Expected: PASS, 3 tests
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -568,14 +568,14 @@ git commit -m "feat(design): add shadcn primitives retinted to the riff tokens"
 
 ### Task 5: Gate check
 
-- [ ] **Step 1: Run everything**
+- [x] **Step 1: Run everything**
 
 ```bash
 pnpm lint && pnpm typecheck && pnpm test && pnpm build
 ```
 Expected: all exit 0.
 
-- [ ] **Step 2: Confirm density is actually wired**
+- [x] **Step 2: Confirm density is actually wired**
 
 Run: `grep -rn 'var(--row-height)\|var(--section-gap)\|var(--content-padding)' src/ | wc -l`
 Expected: at least one consumer per token once Plans 06, 07 and 10 have run. A
@@ -583,18 +583,18 @@ token defined and never read means Compact changes nothing, which is a setting
 that persists perfectly and does nothing — the exact bug this milestone keeps
 finding.
 
-- [ ] **Step 3: Confirm every chrome dimension scales**
+- [x] **Step 3: Confirm every chrome dimension scales**
 
 Run: `grep -nE '\-\-(spacing|radius)-[a-z-]+: [0-9]+px' src/styles/globals.css || echo "all chrome tokens are in rem"`
 Expected: `all chrome tokens are in rem`. A px value here silently opts that
 dimension out of the UI-scale slider.
 
-- [ ] **Step 4: Confirm no accent hue crept in**
+- [x] **Step 4: Confirm no accent hue crept in**
 
 Run: `grep -rEo '#[0-9a-fA-F]{6}' src/styles/ src/components/ui/ | sort -u`
 Expected: only greys — every value has equal red, green and blue components. Any coloured hex is either a mistake or a decision that needs recording in the spec first.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
