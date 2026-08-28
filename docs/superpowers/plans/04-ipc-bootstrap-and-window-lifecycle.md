@@ -49,7 +49,7 @@
 - Create: `src-tauri/src/commands/mod.rs`, `src-tauri/src/commands/app.rs`
 - Modify: `src-tauri/src/lib.rs`, `src-tauri/Cargo.toml`
 
-- [ ] **Step 1: Add the plugins**
+- [x] **Step 1: Add the plugins**
 
 ```bash
 cd src-tauri
@@ -60,7 +60,7 @@ cargo add rfd@0.15 --no-default-features --features gtk3
 `tauri-plugin-opener` is already a Rust dependency from the template. Its
 JavaScript package was removed in Plan 01 Task 2 — the webview never calls it.
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 Create `src-tauri/src/commands/app.rs` with only:
 
@@ -101,12 +101,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 3: Run and watch it fail**
+- [x] **Step 3: Run and watch it fail**
 
 Run: `cd src-tauri && cargo test commands::app`
 Expected: FAIL to compile
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 Insert above the tests:
 
@@ -229,7 +229,7 @@ pub fn app_ready(window: tauri::WebviewWindow) -> RiffResult<()> {
 }
 ```
 
-- [ ] **Step 5: Declare the modules**
+- [x] **Step 5: Declare the modules**
 
 Create `src-tauri/src/commands/mod.rs`:
 
@@ -243,12 +243,12 @@ Add to `src-tauri/src/lib.rs`:
 pub mod commands;
 ```
 
-- [ ] **Step 6: Run the tests**
+- [x] **Step 6: Run the tests**
 
 Run: `cd src-tauri && cargo test commands::app`
 Expected: PASS, 3 tests
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -266,7 +266,7 @@ git commit -m "feat(ipc): add application info and enum-scoped open commands"
 - Create: `src-tauri/src/commands/settings.rs`
 - Modify: `src-tauri/src/commands/mod.rs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src-tauri/src/commands/settings.rs` with only:
 
@@ -334,12 +334,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Run and watch it fail**
+- [x] **Step 2: Run and watch it fail**
 
 Run: `cd src-tauri && cargo test commands::settings`
 Expected: FAIL to compile
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Insert above the tests:
 
@@ -466,7 +466,7 @@ pub fn import_from(store: &SettingsStore, source: &Path) -> RiffResult<Settings>
 }
 ```
 
-- [ ] **Step 4: Declare it**
+- [x] **Step 4: Declare it**
 
 In `src-tauri/src/commands/mod.rs`:
 
@@ -474,14 +474,14 @@ In `src-tauri/src/commands/mod.rs`:
 pub mod settings;
 ```
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `cd src-tauri && cargo test commands::settings`
 Expected: PASS, 3 tests
 
 If `into_path()` does not exist on the dialog's returned type in the installed plugin version, run `cargo doc --open -p tauri-plugin-dialog` and use the equivalent accessor. Do not fall back to accepting a path from the frontend.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A
@@ -499,7 +499,7 @@ git commit -m "feat(ipc): add settings commands with rust-side file pickers"
 - Create: `src-tauri/src/commands/window.rs`
 - Modify: `src-tauri/src/commands/mod.rs`
 
-- [ ] **Step 1: Implement**
+- [x] **Step 1: Implement**
 
 Create `src-tauri/src/commands/window.rs`:
 
@@ -557,7 +557,7 @@ pub fn window_set_decorations(enabled: bool, window: tauri::WebviewWindow) -> Ri
 }
 ```
 
-- [ ] **Step 2: Declare it**
+- [x] **Step 2: Declare it**
 
 In `src-tauri/src/commands/mod.rs`:
 
@@ -565,12 +565,12 @@ In `src-tauri/src/commands/mod.rs`:
 pub mod window;
 ```
 
-- [ ] **Step 3: Verify it compiles**
+- [x] **Step 3: Verify it compiles**
 
 Run: `cd src-tauri && cargo clippy --all-targets -- -D warnings`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A
@@ -586,7 +586,7 @@ This is what replaces code generation. A change to any Rust type that crosses th
 **Files:**
 - Create: `src-tauri/tests/ipc_shapes.rs`, `src-tauri/tests/fixtures/ipc-shapes.json`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src-tauri/tests/ipc_shapes.rs`:
 
@@ -666,17 +666,17 @@ fn ipc_shapes_match_the_committed_fixture() {
 }
 ```
 
-- [ ] **Step 2: Run and watch it fail**
+- [x] **Step 2: Run and watch it fail**
 
 Run: `cd src-tauri && cargo test --test ipc_shapes`
 Expected: FAIL — `missing fixture; run RIFF_UPDATE_FIXTURES=1 …`
 
-- [ ] **Step 3: Generate the fixture**
+- [x] **Step 3: Generate the fixture**
 
 Run: `cd src-tauri && RIFF_UPDATE_FIXTURES=1 cargo test --test ipc_shapes`
 Expected: PASS
 
-- [ ] **Step 4: Confirm it now guards**
+- [x] **Step 4: Confirm it now guards**
 
 Run: `cd src-tauri && cargo test --test ipc_shapes`
 Expected: PASS
@@ -684,7 +684,7 @@ Expected: PASS
 Then temporarily rename `AppInfo.git_sha` to `git_hash` and re-run.
 Expected: FAIL with the diff. Revert the rename.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -702,7 +702,7 @@ git commit -m "test(ipc): pin payload shapes with a committed fixture"
 - Create: `src-tauri/src/bootstrap.rs`
 - Modify: `src-tauri/src/lib.rs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src-tauri/src/bootstrap.rs` with only:
 
@@ -757,12 +757,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Run and watch it fail**
+- [x] **Step 2: Run and watch it fail**
 
 Run: `cd src-tauri && cargo test bootstrap`
 Expected: FAIL to compile
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Insert above the tests:
 
@@ -825,7 +825,7 @@ pub fn init(payload: &Bootstrap) -> TauriPlugin<Wry> {
 }
 ```
 
-- [ ] **Step 4: Declare it**
+- [x] **Step 4: Declare it**
 
 In `src-tauri/src/lib.rs`:
 
@@ -833,12 +833,12 @@ In `src-tauri/src/lib.rs`:
 pub mod bootstrap;
 ```
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `cd src-tauri && cargo test bootstrap`
 Expected: PASS, 3 tests
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A
@@ -852,7 +852,7 @@ git commit -m "feat(bootstrap): inject settings and theme before the first page 
 **Files:**
 - Modify: `src-tauri/tauri.conf.json`, `src-tauri/capabilities/default.json`
 
-- [ ] **Step 1: Rewrite the configuration**
+- [x] **Step 1: Rewrite the configuration**
 
 Overwrite `src-tauri/tauri.conf.json`:
 
@@ -917,7 +917,7 @@ Overwrite `src-tauri/tauri.conf.json`:
 
 `bundleMediaFramework` stays `false` deliberately. It bundles GStreamer into the AppImage and inflates it by well over a hundred megabytes; there is no media in this milestone, so paying that now would be paying for nothing. It is the lever the media work in spec §15 will pull.
 
-- [ ] **Step 2: Trim capabilities to the two that are actually used**
+- [x] **Step 2: Trim capabilities to the two that are actually used**
 
 Overwrite `src-tauri/capabilities/default.json`:
 
@@ -931,17 +931,17 @@ Overwrite `src-tauri/capabilities/default.json`:
 }
 ```
 
-- [ ] **Step 3: Verify the configuration parses**
+- [x] **Step 3: Verify the configuration parses**
 
 Run: `cd src-tauri && cargo build`
 Expected: succeeds. A malformed `tauri.conf.json` fails at build time with the offending JSON pointer.
 
-- [ ] **Step 4: Verify the version is read from package.json**
+- [x] **Step 4: Verify the version is read from package.json**
 
 Run: `grep -c '"version": "../package.json"' src-tauri/tauri.conf.json`
 Expected: `1`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -955,7 +955,7 @@ git commit -m "build(tauri): strict csp, hidden themed window, three bundle targ
 **Files:**
 - Modify: `src-tauri/src/lib.rs`, `src-tauri/src/commands/mod.rs`
 
-- [ ] **Step 1: Collect the command handlers**
+- [x] **Step 1: Collect the command handlers**
 
 Append to `src-tauri/src/commands/mod.rs`:
 
@@ -986,7 +986,7 @@ macro_rules! riff_handlers {
 }
 ```
 
-- [ ] **Step 2: Write the entry point**
+- [x] **Step 2: Write the entry point**
 
 Overwrite the `run` function in `src-tauri/src/lib.rs`, keeping the `pub mod` declarations above it:
 
@@ -1206,7 +1206,7 @@ pub fn run() {
 }
 ```
 
-- [ ] **Step 3: Signal readiness from the frontend**
+- [x] **Step 3: Signal readiness from the frontend**
 
 In `src/main.tsx`, replace the render call:
 
@@ -1227,22 +1227,22 @@ requestAnimationFrame(() => {
 });
 ```
 
-- [ ] **Step 4: Run the application**
+- [x] **Step 4: Run the application**
 
 Run: `pnpm app`
 Expected: a dark, undecorated 1280×832 window appears. Check `~/.config/riff/settings.json` and `~/.config/riff/settings.schema.json` both exist, and `~/.local/state/riff/logs/` contains a log.
 
-- [ ] **Step 5: Verify the reveal watchdog**
+- [x] **Step 5: Verify the reveal watchdog**
 
 Temporarily comment out the `requestAnimationFrame` block in `src/main.tsx` and run `pnpm app` again.
 Expected: the window still appears, after roughly three seconds, with `frontend never signalled readiness` in the log. Restore the block.
 
-- [ ] **Step 6: Verify zero network**
+- [x] **Step 6: Verify zero network**
 
 With the application running: `ss -tup | grep -i riff`
 Expected: no output.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -1259,7 +1259,7 @@ git commit -m "feat(app): wire the store, bootstrap, watcher and reveal watchdog
 **Files:**
 - Create: `src/lib/ipc/types.ts`, `src/lib/ipc/index.ts`, `src/lib/ipc/ipc.test.ts`
 
-- [ ] **Step 1: Write the types**
+- [x] **Step 1: Write the types**
 
 Create `src/lib/ipc/types.ts`. These mirror `src-tauri/tests/fixtures/ipc-shapes.json` exactly; that fixture is what fails when they drift.
 
@@ -1340,7 +1340,7 @@ export type DeepPartial<T> = {
 };
 ```
 
-- [ ] **Step 2: Write the facade**
+- [x] **Step 2: Write the facade**
 
 Create `src/lib/ipc/index.ts`:
 
@@ -1393,7 +1393,7 @@ export const ipc = {
 } as const;
 ```
 
-- [ ] **Step 3: Write the test**
+- [x] **Step 3: Write the test**
 
 Create `src/lib/ipc/ipc.test.ts`:
 
@@ -1430,12 +1430,12 @@ describe("ipc facade", () => {
 });
 ```
 
-- [ ] **Step 4: Run it**
+- [x] **Step 4: Run it**
 
 Run: `pnpm test src/lib/ipc`
 Expected: PASS, 3 tests
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -1446,7 +1446,7 @@ git commit -m "feat(ipc): add the hand-written typed command facade"
 
 ### Task 9: Gate check
 
-- [ ] **Step 1: Run everything**
+- [x] **Step 1: Run everything**
 
 ```bash
 pnpm lint && pnpm typecheck && pnpm test && pnpm build
@@ -1454,12 +1454,12 @@ cd src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings &
 ```
 Expected: all exit 0.
 
-- [ ] **Step 2: Confirm the capability surface has not grown**
+- [x] **Step 2: Confirm the capability surface has not grown**
 
 Run: `python3 -c "import json;print(json.load(open('src-tauri/capabilities/default.json'))['permissions'])"`
 Expected: exactly `['core:default']`. If anything else appears, a plugin is being called from JavaScript that should be called from Rust.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add -A
