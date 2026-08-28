@@ -49,7 +49,7 @@
 **Files:**
 - Create: `src/app/i18n.ts`, `src/locales/en/*.json`, `src/app/i18n.test.ts`
 
-- [ ] **Step 1: Install**
+- [x] **Step 1: Install**
 
 ```bash
 pnpm add i18next@26.4 react-i18next@17.0
@@ -80,7 +80,7 @@ Add to `package.json` scripts:
     "i18n:extract": "i18next -c i18next-parser.config.mjs",
 ```
 
-- [ ] **Step 2: Create the locale files**
+- [x] **Step 2: Create the locale files**
 
 `src/locales/en/common.json`:
 
@@ -140,7 +140,7 @@ Add to `package.json` scripts:
 
 Create `src/locales/en/settings.json`, `src/locales/en/onboarding.json` and `src/locales/en/palette.json` as `{}` for now; Plans 07, 08 and 09 populate them.
 
-- [ ] **Step 3: Write the failing test**
+- [x] **Step 3: Write the failing test**
 
 Create `src/app/i18n.test.ts`:
 
@@ -170,12 +170,12 @@ describe("i18n", () => {
 });
 ```
 
-- [ ] **Step 4: Run and watch it fail**
+- [x] **Step 4: Run and watch it fail**
 
 Run: `pnpm test src/app/i18n`
 Expected: FAIL — cannot resolve `./i18n`
 
-- [ ] **Step 5: Implement**
+- [x] **Step 5: Implement**
 
 Create `src/app/i18n.ts`:
 
@@ -207,12 +207,12 @@ void i18n.use(initReactI18next).init({
 export default i18n;
 ```
 
-- [ ] **Step 6: Run the tests**
+- [x] **Step 6: Run the tests**
 
 Run: `pnpm test src/app/i18n`
 Expected: PASS, 4 tests
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -230,7 +230,7 @@ git commit -m "feat(i18n): initialise i18next with the english namespaces"
 - Create: `src/app/router.tsx`, `src/routes/__root.tsx`, `src/routes/index.tsx`, `src/routes/{practice,history,settings}.tsx`
 - Modify: `vite.config.ts`, `.gitignore`
 
-- [ ] **Step 1: Install, pinning both to the same version**
+- [x] **Step 1: Install, pinning both to the same version**
 
 ```bash
 pnpm add @tanstack/react-router@1.170.32
@@ -239,7 +239,7 @@ pnpm add -D @tanstack/router-plugin@1.170.32
 
 If that exact plugin version does not exist, install the newest matching **minor** of both and record the pair in the commit message. A skew here produces route-generation bugs that look like application bugs.
 
-- [ ] **Step 2: Add the plugin to Vite**
+- [x] **Step 2: Add the plugin to Vite**
 
 In `vite.config.ts`, import and place it **before** the React plugin — it generates the route tree the React plugin then compiles:
 
@@ -262,7 +262,7 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 
 The generated tree **is committed**: CI type-checks without running Vite, and a stale tree should show up as a reviewable diff rather than a mystery build failure.
 
-- [ ] **Step 3: Create the routes**
+- [x] **Step 3: Create the routes**
 
 `src/routes/__root.tsx` — deliberately self-contained. Tasks 3, 4 and 5 each
 add one piece to it. Building it against components that do not exist yet
@@ -360,7 +360,7 @@ export const Route = createFileRoute("/settings")({
 });
 ```
 
-- [ ] **Step 4: Create the router instance**
+- [x] **Step 4: Create the router instance**
 
 `src/app/router.tsx`:
 
@@ -386,7 +386,7 @@ declare module "@tanstack/react-router" {
 }
 ```
 
-- [ ] **Step 5: Verify the tree generates and the shell compiles**
+- [x] **Step 5: Verify the tree generates and the shell compiles**
 
 Run: `pnpm dev` briefly, then stop it.
 Expected: `src/routeTree.gen.ts` exists and lists `/practice`, `/history`, `/settings`.
@@ -394,7 +394,7 @@ Expected: `src/routeTree.gen.ts` exists and lists `/practice`, `/history`, `/set
 Run: `pnpm typecheck`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A
@@ -409,13 +409,13 @@ git commit -m "feat(router): add tanstack router on hash history with file route
 - Create: `src/app/providers.tsx`, `src/components/RouteError.tsx`
 - Modify: `src/main.tsx`
 
-- [ ] **Step 1: Install**
+- [x] **Step 1: Install**
 
 ```bash
 pnpm add react-error-boundary@6.1 sonner@2.0
 ```
 
-- [ ] **Step 2: Write the error screen**
+- [x] **Step 2: Write the error screen**
 
 `src/components/RouteError.tsx`:
 
@@ -458,7 +458,7 @@ export function RouteError({ error }: { error: unknown }) {
 }
 ```
 
-- [ ] **Step 3: Write the providers**
+- [x] **Step 3: Write the providers**
 
 `src/app/providers.tsx`:
 
@@ -486,7 +486,7 @@ export function Providers({ children }: { children: ReactNode }) {
 }
 ```
 
-- [ ] **Step 4: Mount**
+- [x] **Step 4: Mount**
 
 Overwrite `src/main.tsx`:
 
@@ -517,7 +517,7 @@ requestAnimationFrame(() => {
 });
 ```
 
-- [ ] **Step 5: Wire the error component into the root route**
+- [x] **Step 5: Wire the error component into the root route**
 
 In `src/routes/__root.tsx`, add the import and the option the Task 2 comment
 reserved:
@@ -532,12 +532,12 @@ export const Route = createRootRoute({
 });
 ```
 
-- [ ] **Step 6: Verify**
+- [x] **Step 6: Verify**
 
 Run: `pnpm typecheck && pnpm app`
 Expected: a dark window with an empty shell, no console errors.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -554,7 +554,7 @@ git commit -m "feat(app): add providers, toasts and per-route error containment"
 **Files:**
 - Create: `src/features/window/TitleBar.tsx`, `src/features/window/WindowControls.tsx`, `src/features/window/TitleBar.test.tsx`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `src/features/window/TitleBar.test.tsx`:
 
@@ -620,12 +620,12 @@ Add to `src/locales/en/nav.json`:
   "openPalette": "Search or jump to"
 ```
 
-- [ ] **Step 2: Run and watch it fail**
+- [x] **Step 2: Run and watch it fail**
 
 Run: `pnpm test src/features/window`
 Expected: FAIL — cannot resolve `./TitleBar`
 
-- [ ] **Step 3: Implement the controls**
+- [x] **Step 3: Implement the controls**
 
 `src/features/window/WindowControls.tsx`:
 
@@ -662,7 +662,7 @@ export function WindowControls({ maximized = false }: { maximized?: boolean }) {
 }
 ```
 
-- [ ] **Step 4: Implement the bar**
+- [x] **Step 4: Implement the bar**
 
 `src/features/window/TitleBar.tsx`:
 
@@ -707,7 +707,7 @@ export function TitleBar({
 }
 ```
 
-- [ ] **Step 5: Replace the placeholder header in the shell**
+- [x] **Step 5: Replace the placeholder header in the shell**
 
 In `src/routes/__root.tsx`, swap the reserved `<header>` for the real bar:
 
@@ -718,12 +718,12 @@ import { TitleBar } from "@/features/window/TitleBar";
       <TitleBar />
 ```
 
-- [ ] **Step 6: Run the tests**
+- [x] **Step 6: Run the tests**
 
 Run: `pnpm test src/features/window && pnpm typecheck`
 Expected: PASS, 4 tests
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -737,7 +737,7 @@ git commit -m "feat(window): add the custom title bar and window controls"
 **Files:**
 - Create: `src/components/Sidebar.tsx`, `src/components/Sidebar.test.tsx`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `src/components/Sidebar.test.tsx`:
 
@@ -794,12 +794,12 @@ describe("Sidebar", () => {
 });
 ```
 
-- [ ] **Step 2: Run and watch it fail**
+- [x] **Step 2: Run and watch it fail**
 
 Run: `pnpm test src/components/Sidebar`
 Expected: FAIL — cannot resolve `./Sidebar`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/components/Sidebar.tsx`:
 
@@ -890,7 +890,7 @@ function NavItem({
 }
 ```
 
-- [ ] **Step 4: Wire the sidebar and its collapse state into the root layout**
+- [x] **Step 4: Wire the sidebar and its collapse state into the root layout**
 
 In `src/routes/__root.tsx`, replace the `{/* Task 5 replaces this ... */}`
 comment with `<Sidebar collapsed={collapsed} />`, and hold the collapsed flag
@@ -902,17 +902,17 @@ const [collapsed, setCollapsed] = useState(false);
 
 Pass `onToggleSidebar={() => setCollapsed((v) => !v)}` to `<TitleBar />` and `collapsed={collapsed}` to `<Sidebar />`.
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `pnpm test src/components/Sidebar`
 Expected: PASS, 4 tests
 
-- [ ] **Step 6: Verify in the application**
+- [x] **Step 6: Verify in the application**
 
 Run: `pnpm app`
 Expected: the sidebar matches the mockup; clicking the panel icon collapses it to a rail; Practice and History navigate.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -923,24 +923,24 @@ git commit -m "feat(shell): add the primary sidebar with a collapsible rail"
 
 ### Task 6: Gate check
 
-- [ ] **Step 1: Run everything**
+- [x] **Step 1: Run everything**
 
 ```bash
 pnpm lint && pnpm typecheck && pnpm test && pnpm build
 ```
 Expected: all exit 0.
 
-- [ ] **Step 2: Confirm no physical-direction utilities crept in**
+- [x] **Step 2: Confirm no physical-direction utilities crept in**
 
 Run: `grep -rEn '\b(ml|mr|pl|pr|left|right)-[0-9]' src/components src/features src/routes || echo "logical properties only"`
 Expected: `logical properties only`. Physical direction classes make RTL a rewrite instead of a translation.
 
-- [ ] **Step 3: Confirm no untranslated user-visible strings**
+- [x] **Step 3: Confirm no untranslated user-visible strings**
 
 Run: `grep -rEn '>[A-Z][a-z]{3,}' src/components src/features --include='*.tsx' | grep -v 't(' || echo "all strings translated"`
 Expected: `all strings translated`, ignoring any hit that is a component name rather than copy.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A
