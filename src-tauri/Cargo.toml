@@ -29,6 +29,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 tracing-appender = "0.2"
 time = { version = "0.3", features = ["formatting"] }
+tempfile = "3.27"
 
 [lints.clippy]
 unwrap_used = "deny"
@@ -42,7 +43,4 @@ dbg_macro = "deny"
 # `deny`, not `forbid`: forbid cannot be lifted by an #[allow], which is a
 # known way to break proc-macro-generated code. Same protection, no trap.
 unsafe_code = "deny"
-
-[dev-dependencies]
-tempfile = "3.27"
 
