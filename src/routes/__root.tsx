@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { RouteError } from "@/components/RouteError";
 import { Sidebar } from "@/components/Sidebar";
 import { TitleBar } from "@/features/window/TitleBar";
+import { reportRecovery, subscribeToBackend, useAppearance, useSettings } from "@/stores/settings";
 
 export const Route = createRootRoute({
   component: RootLayout,
@@ -14,8 +15,25 @@ function RootLayout() {
   const { t, i18n } = useTranslation("nav");
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [announcement, setAnnouncement] = useState("");
-  // Plan 07 replaces this with the persisted setting.
-  const [collapsed, setCollapsed] = useState(false);
+  const { collapsed, rememberCollapsed } = useAppearance().sidebar;
+  const titleBar = useAppearance().titleBar;
+  const patch = useSettings((s) => s.patch);
+  const [transientCollapsed, setTransientCollapsed] = useState(collapsed);
+  const effectiveCollapsed = rememberCollapsed ? collapsed : transientCollapsed;
+
+  const toggleSidebar = () => {
+    if (rememberCollapsed) {
+      void patch({ appearance: { sidebar: { collapsed: !collapsed } } });
+    } else {
+      setTransientCollapsed((v) => !v);
+    }
+  };
+
+  useEffect(() => {
+    reportRecovery();
+    const unsubscribe = subscribeToBackend();
+    return () => void unsubscribe.then((off) => off());
+  }, []);
 
   // A client-side route change is silent to a screen reader. This is the
   // only thing that tells one the destination changed.
@@ -29,6 +47,11 @@ function RootLayout() {
   useEffect(() => {
     const name = pathname.split("/").filter(Boolean)[0] ?? "practice";
     setAnnouncement(t("routeAnnouncement", { name: t(name, { defaultValue: name }) }));
+    // Only tracked when the user asked for it, so a setting nobody uses costs
+    // nothing in writes.
+    if (useSettings.getState().settings.general.startupRoute === "last-used") {
+      void useSettings.getState().patch({ general: { lastRoute: pathname } });
+    }
   }, [pathname, t]);
 
   return (
@@ -39,15 +62,14 @@ function RootLayout() {
       >
         {t("skipToContent")}
       </a>
-      {/* Plan 07 makes this conditional on `appearance.titleBar`, because
-          "System decorations" has to hide Riff's own bar or the window ends
-          up with two. */}
-      <TitleBar onToggleSidebar={() => setCollapsed((v) => !v)} />
+      {/* Choosing System decorations has to hide Riff's own bar live, or the
+          window ends up with two title bars stacked. */}
+      {titleBar === "custom" && <TitleBar onToggleSidebar={toggleSidebar} />}
       {/* The container the sidebar's breakpoint measures. Chrome is rem-sized,
           so raising the UI scale shrinks this in px and the query fires —
           which a viewport media query could never do. */}
       <div className="@container/shell flex min-h-0 flex-1">
-        <Sidebar collapsed={collapsed} />
+        <Sidebar collapsed={effectiveCollapsed} />
         <main id="main" className="min-w-0 flex-1 overflow-auto">
           <Outlet />
         </main>
