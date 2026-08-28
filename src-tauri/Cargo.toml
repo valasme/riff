@@ -23,6 +23,8 @@ tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+directories = "6.0"
+thiserror = "2.0"
 
 [lints.clippy]
 unwrap_used = "deny"
@@ -36,4 +38,7 @@ dbg_macro = "deny"
 # `deny`, not `forbid`: forbid cannot be lifted by an #[allow], which is a
 # known way to break proc-macro-generated code. Same protection, no trap.
 unsafe_code = "deny"
+
+[dev-dependencies]
+tempfile = "3.27"
 
