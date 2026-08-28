@@ -32,6 +32,10 @@ time = { version = "0.3", features = ["formatting"] }
 tempfile = "3.27"
 schemars = "1.2"
 notify = "8.2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-window-state = "2"
+tauri-plugin-dialog = "2"
+rfd = { version = "0.15", default-features = false, features = ["gtk3"] }
 
 [lints.clippy]
 unwrap_used = "deny"
