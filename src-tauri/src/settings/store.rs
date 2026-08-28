@@ -252,6 +252,72 @@ fn stamp() -> String {
         .replace(':', "-")
 }
 
+/// Coalesces writes. Every mutation calls `notify()`; the worker waits for a
+/// quiet period before flushing, so a slider drag is one `fsync` rather than
+/// forty.
+///
+/// The scheduling lives here rather than in the command layer because the
+/// command layer would have to reimplement it per command, and because a
+/// write failure has to be reported from wherever the write actually happens.
+pub struct FlushScheduler {
+    tx: std::sync::mpsc::Sender<Message>,
+}
+
+enum Message {
+    Changed,
+    FlushNow,
+}
+
+impl FlushScheduler {
+    pub fn spawn<F>(
+        store: std::sync::Arc<SettingsStore>,
+        delay: std::time::Duration,
+        on_error: F,
+    ) -> Self
+    where
+        F: Fn(RiffError) + Send + 'static,
+    {
+        let (tx, rx) = std::sync::mpsc::channel::<Message>();
+        std::thread::Builder::new()
+            .name("riff-settings-flush".into())
+            .spawn(move || {
+                // One error per failure *cause*, not one per attempt: a
+                // read-only config directory would otherwise raise a toast on
+                // every keystroke.
+                let mut reported: Option<String> = None;
+                while let Ok(first) = rx.recv() {
+                    if matches!(first, Message::Changed) {
+                        // Drain the burst: keep resetting the timer while
+                        // changes keep arriving.
+                        while rx.recv_timeout(delay).is_ok() {}
+                    }
+                    match store.flush_if_dirty() {
+                        Ok(()) => reported = None,
+                        Err(err) => {
+                            let cause = err.to_string();
+                            if reported.as_deref() != Some(cause.as_str()) {
+                                reported = Some(cause);
+                                on_error(err);
+                            }
+                        }
+                    }
+                }
+            })
+            .ok();
+        Self { tx }
+    }
+
+    pub fn notify(&self) {
+        let _ = self.tx.send(Message::Changed);
+    }
+
+    /// Skips the quiet period. Used on exit, where waiting 250 ms to save is
+    /// waiting 250 ms too long.
+    pub fn flush_now(&self) {
+        let _ = self.tx.send(Message::FlushNow);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -504,5 +570,86 @@ mod tests {
         s.flush_if_dirty().expect("flush");
         let on_disk = std::fs::read(s.paths().settings_file()).expect("read");
         assert_eq!(s.last_written_bytes().as_deref(), Some(on_disk.as_slice()));
+    }
+
+    use std::time::Duration;
+
+    #[test]
+    fn a_burst_of_changes_produces_one_write() {
+        let (s, _outcome, _tmp) = store();
+        let s = std::sync::Arc::new(s);
+        let scheduler =
+            FlushScheduler::spawn(std::sync::Arc::clone(&s), Duration::from_millis(30), |_| {});
+
+        // Forty steps of a slider drag.
+        for i in 0..40 {
+            s.patch(&json!({ "appearance": { "uiScale": 1.0 + (i as f64) * 0.01 } }))
+                .expect("patch");
+            scheduler.notify();
+        }
+        std::thread::sleep(Duration::from_millis(200));
+
+        assert_eq!(
+            s.write_count(),
+            1,
+            "a drag must coalesce into one write, not forty"
+        );
+    }
+
+    #[test]
+    fn a_change_after_the_window_closes_writes_again() {
+        let (s, _outcome, _tmp) = store();
+        let s = std::sync::Arc::new(s);
+        let scheduler =
+            FlushScheduler::spawn(std::sync::Arc::clone(&s), Duration::from_millis(30), |_| {});
+
+        s.patch(&json!({ "appearance": { "theme": "light" } }))
+            .expect("one");
+        scheduler.notify();
+        std::thread::sleep(Duration::from_millis(200));
+        s.patch(&json!({ "appearance": { "density": "compact" } }))
+            .expect("two");
+        scheduler.notify();
+        std::thread::sleep(Duration::from_millis(200));
+
+        assert_eq!(
+            s.write_count(),
+            2,
+            "coalescing must not swallow later changes"
+        );
+    }
+
+    #[test]
+    fn a_write_failure_is_reported_once_per_flush_not_once_per_change() {
+        use std::os::unix::fs::PermissionsExt;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        static REPORTS: AtomicUsize = AtomicUsize::new(0);
+        REPORTS.store(0, Ordering::SeqCst);
+
+        let (s, _outcome, _tmp) = store();
+        let s = std::sync::Arc::new(s);
+        s.flush_if_dirty().expect("initial write");
+
+        let dir = s.paths().config_dir.clone();
+        let scheduler =
+            FlushScheduler::spawn(std::sync::Arc::clone(&s), Duration::from_millis(30), |_| {
+                REPORTS.fetch_add(1, Ordering::SeqCst);
+            });
+
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o500)).expect("chmod");
+        for _ in 0..10 {
+            s.patch(&json!({ "appearance": { "theme": "light" } }))
+                .expect("patch");
+            scheduler.notify();
+        }
+        std::thread::sleep(Duration::from_millis(200));
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).expect("restore");
+
+        assert_eq!(
+            REPORTS.load(Ordering::SeqCst),
+            1,
+            "one toast per failure, not one per keystroke"
+        );
     }
 }
