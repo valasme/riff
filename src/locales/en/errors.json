@@ -1,0 +1,19 @@
+{
+  "title": "Something went wrong",
+  "description": "Riff hit an unexpected problem. Your settings are safe.",
+  "reload": "Reload",
+  "openLogs": "Open log folder",
+  "copyDiagnostics": "Copy diagnostics",
+  "technicalDetails": "Technical details",
+  "code": {
+    "io": "Riff could not read or write a file.",
+    "parse": "A file on disk is not valid JSON.",
+    "validation": "That value is not allowed.",
+    "not-found": "Riff could not find what it needed.",
+    "denied": "Your system refused that action.",
+    "unknown": "An unexpected error occurred."
+  },
+  "settingsRecovered": "Your settings file could not be read. Riff started from defaults and kept the original at {{path}}.",
+  "settingsWriteFailed": "Riff could not save your settings. Your choices are still applied, and it will try again on the next change.",
+  "decorationsRefused": "Your window manager refused to draw system decorations, so Riff kept its own title bar."
+}

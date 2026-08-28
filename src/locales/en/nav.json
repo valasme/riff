@@ -1,0 +1,12 @@
+{
+  "practice": "Practice",
+  "history": "History",
+  "settings": "Settings",
+  "toggleSidebar": "Toggle sidebar",
+  "expandSidebar": "Expand sidebar",
+  "collapseSidebar": "Collapse sidebar",
+  "skipToContent": "Skip to content",
+  "primary": "Primary",
+  "settingsSections": "Settings sections",
+  "routeAnnouncement": "Navigated to {{name}}"
+}
