@@ -44,7 +44,7 @@
 - Create: `src-tauri/riff.desktop`, `src-tauri/io.github.valasme.riff.metainfo.xml`
 - Modify: `src-tauri/tauri.conf.json`, `src-tauri/icons/*`
 
-- [ ] **Step 0: Fix the package identity the scaffold left behind**
+- [x] **Step 0: Fix the package identity the scaffold left behind**
 
 In `src-tauri/Cargo.toml`:
 
@@ -63,7 +63,7 @@ and in `tauri.conf.json`, inside `bundle`:
 
 `publisher` is not cosmetic. Tauri defaults it to **the second element of the identifier**, so `io.github.valasme.riff` would ship a deb whose `Maintainer` field reads `github`. `authors = ["you"]` and `description = "A Tauri App"` are the template's, and both reach the package metadata.
 
-- [ ] **Step 1: Generate the icon set from the supplied artwork**
+- [x] **Step 1: Generate the icon set from the supplied artwork**
 
 ```bash
 pnpm tauri icon icon.png
@@ -71,7 +71,7 @@ pnpm tauri icon icon.png
 
 This replaces the template placeholders in `src-tauri/icons/`. The generated set is committed so a clean checkout builds without running the generator.
 
-- [ ] **Step 2: Write the desktop entry template**
+- [x] **Step 2: Write the desktop entry template**
 
 Create `src-tauri/riff.desktop`:
 
@@ -95,7 +95,7 @@ StartupWMClass=riff
 
 There is deliberately no `MimeType=` key. Riff does not want to be anyone's default video player.
 
-- [ ] **Step 3: Write the AppStream metadata**
+- [x] **Step 3: Write the AppStream metadata**
 
 Create `src-tauri/io.github.valasme.riff.metainfo.xml`:
 
@@ -145,7 +145,7 @@ Create `src-tauri/io.github.valasme.riff.metainfo.xml`:
 </component>
 ```
 
-- [ ] **Step 4: Reference both from the bundle**
+- [x] **Step 4: Reference both from the bundle**
 
 In `src-tauri/tauri.conf.json`, extend `bundle.linux`:
 
@@ -169,7 +169,7 @@ In `src-tauri/tauri.conf.json`, extend `bundle.linux`:
     }
 ```
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 ```bash
 pnpm tauri build --bundles deb
@@ -182,7 +182,7 @@ dpkg-deb --fsys-tarfile src-tauri/target/release/bundle/deb/*.deb | tar xO ./usr
 ```
 Expected: `StartupWMClass=riff`
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A
@@ -200,7 +200,7 @@ git commit -m "build: add icons, desktop entry and appstream metadata"
 - Create: `scripts/generate-licenses.mjs`, `src-tauri/src/commands/licenses.rs`
 - Modify: `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/src/commands/mod.rs`, `src/lib/ipc/*`, `AboutSection.tsx`
 
-- [ ] **Step 1: Write the generator**
+- [x] **Step 1: Write the generator**
 
 Create `scripts/generate-licenses.mjs`:
 
@@ -310,7 +310,7 @@ Add to `package.json` scripts:
     "licenses:generate": "node scripts/generate-licenses.mjs",
 ```
 
-- [ ] **Step 2: Generate and inspect**
+- [x] **Step 2: Generate and inspect**
 
 ```bash
 pnpm licenses:generate
@@ -318,7 +318,7 @@ head -20 third-party-licenses.json
 ```
 Expected: a sorted array with `name`, `version`, `license`, `ecosystem`.
 
-- [ ] **Step 3: Ship it as a resource**
+- [x] **Step 3: Ship it as a resource**
 
 In `src-tauri/tauri.conf.json`, add to `bundle`:
 
@@ -328,7 +328,7 @@ In `src-tauri/tauri.conf.json`, add to `bundle`:
 
 The **object form is required**, not stylistic. In array notation Tauri rewrites `..` to `_up_`, so the file would ship as `$RESOURCE/_up_/third-party-licenses.json` while `licenses_get` resolves `third-party-licenses.json` — the licence list would be empty in every packaged build and fine in development.
 
-- [ ] **Step 4: Write the command**
+- [x] **Step 4: Write the command**
 
 Create `src-tauri/src/commands/licenses.rs`:
 
@@ -365,7 +365,7 @@ pub fn licenses_get(app: tauri::AppHandle) -> RiffResult<Vec<LicenseEntry>> {
 
 Declare it in `src-tauri/src/commands/mod.rs` and add `$crate::commands::licenses::licenses_get,` to `riff_handlers!`.
 
-- [ ] **Step 5: Render it**
+- [x] **Step 5: Render it**
 
 Add to `src/lib/ipc/types.ts`:
 
@@ -408,13 +408,13 @@ const [licenses, setLicenses] = useState<LicenseEntry[] | null>(null);
 
 Add `"thirdParty": "Third-party licences"` to `settings.about` in the locale file.
 
-- [ ] **Step 6: Verify**
+- [x] **Step 6: Verify**
 
 Run: `cd src-tauri && RIFF_UPDATE_FIXTURES=1 cargo test --test ipc_shapes && cargo test`
 Then `pnpm app`, open Settings → About, expand the list.
 Expected: packages listed with their licences.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -428,7 +428,7 @@ git commit -m "feat(about): generate and ship third-party licence notices"
 **Files:**
 - Create: `LICENSE`, `README.md`, `SECURITY.md`, `CHANGELOG.md`, `cliff.toml`, `.github/PULL_REQUEST_TEMPLATE.md`, `.github/ISSUE_TEMPLATE/{bug_report.yml,config.yml}`, `.github/dependabot.yml`
 
-- [ ] **Step 1: Licence**
+- [x] **Step 1: Licence**
 
 Create `LICENSE` with the standard MIT text and the line:
 
@@ -436,7 +436,7 @@ Create `LICENSE` with the standard MIT text and the line:
 Copyright (c) 2026 valasme
 ```
 
-- [ ] **Step 2: README**
+- [x] **Step 2: README**
 
 Overwrite `README.md`:
 
@@ -512,7 +512,7 @@ It is MIT licensed, so forking it and taking it wherever you like is explicitly 
 MIT — see [LICENSE](LICENSE). Third-party notices are in [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md) and inside the application under Settings → About.
 ````
 
-- [ ] **Step 3: Security policy**
+- [x] **Step 3: Security policy**
 
 Create `SECURITY.md`:
 
@@ -536,7 +536,7 @@ Riff is a local desktop application with no network access whatsoever and no HTT
 The interesting attack surface is therefore malformed local files: a hand-edited or corrupted `settings.json`, and eventually media files opened for playback.
 ```
 
-- [ ] **Step 4: Repository policy files**
+- [x] **Step 4: Repository policy files**
 
 `.github/PULL_REQUEST_TEMPLATE.md`:
 
@@ -637,7 +637,7 @@ updates:
     schedule: { interval: monthly }
 ```
 
-- [ ] **Step 5: Changelog generation**
+- [x] **Step 5: Changelog generation**
 
 ```bash
 cargo install git-cliff --locked
@@ -648,7 +648,7 @@ Then in `cliff.toml`, set the repository URL to `https://github.com/valasme/riff
 
 Run: `git cliff --unreleased --output CHANGELOG.md`
 
-- [ ] **Step 6: Write `CLAUDE.md`**
+- [x] **Step 6: Write `CLAUDE.md`**
 
 Named in spec §19 and built nowhere. It is the map a future session — human or
 agent — gets instead of reading twelve plans: what Riff is, the four
@@ -656,7 +656,7 @@ invariants from Plan 03, the no-caller-supplied-paths rule, the single
 capability, the zero-network constraint, where the spec lives, and the gate
 commands. Short. It is a pointer, not a duplicate.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -670,7 +670,7 @@ git commit -m "docs: add licence, readme, security policy and repository templat
 **Files:**
 - Create: `.github/workflows/ci.yml`
 
-- [ ] **Step 1: Write the workflow**
+- [x] **Step 1: Write the workflow**
 
 ```yaml
 name: CI
@@ -813,7 +813,7 @@ jobs:
 
 There is deliberately **no newer-runner canary job.** The development machine runs Arch, with glibc and WebKitGTK newer than any Ubuntu image, so it already exercises the newest toolchain daily. A CI job asserting the same thing would be a permanently-ignorable check, and ignorable checks train you to ignore checks.
 
-- [ ] **Step 2: Verify locally with `act` or by pushing a branch**
+- [x] **Step 2: Verify locally with `act` or by pushing a branch**
 
 Run every step by hand first:
 
@@ -822,7 +822,7 @@ pnpm install --frozen-lockfile && pnpm lint && pnpm typecheck && pnpm test:cover
 ```
 Expected: all pass.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add -A
@@ -832,6 +832,12 @@ git commit -m "ci: add lint, typecheck, test and build workflow"
 ---
 
 ### Task 5: Release
+
+> **Skipped by explicit direction.** This project's releases are built and
+> published by hand — each distro's bundle is built and the release posted
+> with notes manually — not automated in CI. The checkboxes below are left
+> unchecked rather than marked done to reflect that no `release.yml` exists
+> in this repository by design.
 
 **Files:**
 - Create: `.github/workflows/release.yml`
@@ -1009,7 +1015,7 @@ git commit -m "ci: add the release workflow with glibc and install verification"
 
 ### Task 6: Final verification
 
-- [ ] **Step 1: Run every gate**
+- [x] **Step 1: Run every gate**
 
 ```bash
 pnpm install --frozen-lockfile
@@ -1018,7 +1024,7 @@ cd src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings &
 ```
 Expected: all exit 0.
 
-- [ ] **Step 2: Walk the definition of done from the spec, §22**
+- [x] **Step 2: Walk the definition of done from the spec, §22**
 
 Check each by hand and record the result in the commit message:
 
@@ -1037,7 +1043,7 @@ pnpm app
 - The whole application is operable by keyboard alone
 - `ss -tup | grep -i riff` prints nothing
 
-- [ ] **Step 3: Confirm the version is consistent across all three manifests**
+- [x] **Step 3: Confirm the version is consistent across all three manifests**
 
 ```bash
 node -p "require('./package.json').version"
@@ -1046,7 +1052,7 @@ grep '"version"' src-tauri/tauri.conf.json
 ```
 Expected: `package.json` and `Cargo.toml` agree; `tauri.conf.json` reads `"../package.json"`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A
