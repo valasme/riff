@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { PracticePlaceholder } from "@/features/practice/PracticePlaceholder";
 
-export const Route = createFileRoute("/practice")({
-  component: () => <div className="p-[var(--content-padding)]" />,
-});
+export const Route = createFileRoute("/practice")({ component: PracticePlaceholder });

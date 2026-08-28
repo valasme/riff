@@ -7,5 +7,8 @@
   "continue": "Continue",
   "openFolder": "Open folder",
   "copied": "Copied to clipboard",
-  "quit": { "title": "Quit Riff?", "body": "Your settings are already saved.", "action": "Quit" }
+  "quit": { "title": "Quit Riff?", "body": "Your settings are already saved.", "action": "Quit" },
+  "inDevelopment": "In development",
+  "panes": { "score": "Score", "video": "Video", "audio": "Audio" },
+  "paneActions": { "popOut": "Pop out", "closePane": "Close pane" }
 }
