@@ -53,7 +53,7 @@
 - Create: `src-tauri/src/storage/mod.rs`, `src-tauri/src/storage/atomic.rs`
 - Modify: `src-tauri/src/lib.rs`, `src-tauri/Cargo.toml`
 
-- [ ] **Step 1: Move `tempfile` to a real dependency**
+- [x] **Step 1: Move `tempfile` to a real dependency**
 
 It is currently dev-only. The atomic writer needs it at runtime.
 
@@ -61,7 +61,7 @@ It is currently dev-only. The atomic writer needs it at runtime.
 cd src-tauri && cargo add tempfile@3.27
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Create `src-tauri/src/storage/atomic.rs` with only:
 
@@ -130,12 +130,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 3: Run and watch them fail**
+- [x] **Step 3: Run and watch them fail**
 
 Run: `cd src-tauri && cargo test atomic`
 Expected: FAIL to compile — `cannot find function write_atomic`
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 Insert above the tests:
 
@@ -184,7 +184,7 @@ pub fn write_if_changed(path: &Path, bytes: &[u8]) -> std::io::Result<bool> {
 }
 ```
 
-- [ ] **Step 5: Declare the modules**
+- [x] **Step 5: Declare the modules**
 
 Create `src-tauri/src/storage/mod.rs`:
 
@@ -198,12 +198,12 @@ Add to `src-tauri/src/lib.rs`:
 pub mod storage;
 ```
 
-- [ ] **Step 6: Run the tests**
+- [x] **Step 6: Run the tests**
 
 Run: `cd src-tauri && cargo test atomic`
 Expected: PASS, 7 tests
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -221,13 +221,13 @@ git commit -m "feat(storage): add atomic file replacement with parent fsync"
 - Create: `src-tauri/src/settings/mod.rs`, `src-tauri/src/settings/model.rs`
 - Modify: `src-tauri/src/lib.rs`, `src-tauri/Cargo.toml`
 
-- [ ] **Step 1: Add `schemars`**
+- [x] **Step 1: Add `schemars`**
 
 ```bash
 cd src-tauri && cargo add schemars@1.2
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Create `src-tauri/src/settings/model.rs` with only:
 
@@ -310,12 +310,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 3: Run and watch them fail**
+- [x] **Step 3: Run and watch them fail**
 
 Run: `cd src-tauri && cargo test settings::model`
 Expected: FAIL to compile
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 Insert above the tests:
 
@@ -530,7 +530,7 @@ impl<'de> Deserialize<'de> for UiScale {
 > lower than `CURRENT_ONBOARDING_VERSION`. That is deliberate: a settings file
 > written before onboarding existed should present onboarding.
 
-- [ ] **Step 5: Declare the modules**
+- [x] **Step 5: Declare the modules**
 
 Create `src-tauri/src/settings/mod.rs`:
 
@@ -544,14 +544,14 @@ Add to `src-tauri/src/lib.rs`:
 pub mod settings;
 ```
 
-- [ ] **Step 6: Run the tests**
+- [x] **Step 6: Run the tests**
 
 Run: `cd src-tauri && cargo test settings::model`
 Expected: PASS, 6 tests
 
 If `#[schemars(skip)]` on the flattened map fails to compile, remove that attribute — `schemars` represents a flattened map as `additionalProperties`, which is also correct.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -569,7 +569,7 @@ git commit -m "feat(settings): add the settings model with lenient deserialisati
 - Create: `src-tauri/src/settings/patch.rs`
 - Modify: `src-tauri/src/settings/mod.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `src-tauri/src/settings/patch.rs` with only:
 
@@ -623,12 +623,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
 Run: `cd src-tauri && cargo test settings::patch`
 Expected: FAIL to compile — `cannot find function apply`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Insert above the tests:
 
@@ -685,7 +685,7 @@ fn merge(target: &mut Value, patch: &Value) {
 }
 ```
 
-- [ ] **Step 4: Declare it**
+- [x] **Step 4: Declare it**
 
 In `src-tauri/src/settings/mod.rs`:
 
@@ -693,12 +693,12 @@ In `src-tauri/src/settings/mod.rs`:
 pub mod patch;
 ```
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `cd src-tauri && cargo test settings::patch`
 Expected: PASS, 5 tests
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A
@@ -716,7 +716,7 @@ git commit -m "feat(settings): apply typed changes as a merge patch"
 - Create: `src-tauri/src/settings/migrate.rs`
 - Modify: `src-tauri/src/settings/mod.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `src-tauri/src/settings/migrate.rs` with only:
 
@@ -794,12 +794,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
 Run: `cd src-tauri && cargo test settings::migrate`
 Expected: FAIL to compile
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Insert above the tests:
 
@@ -859,7 +859,7 @@ pub fn run_with(document: &mut Value, steps: &[MigrationStep]) -> Option<u32> {
 }
 ```
 
-- [ ] **Step 4: Declare it**
+- [x] **Step 4: Declare it**
 
 In `src-tauri/src/settings/mod.rs`:
 
@@ -867,12 +867,12 @@ In `src-tauri/src/settings/mod.rs`:
 pub mod migrate;
 ```
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `cd src-tauri && cargo test settings::migrate`
 Expected: PASS, 7 tests
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A
@@ -890,7 +890,7 @@ git commit -m "feat(settings): add a forward-only schema migration runner"
 - Create: `src-tauri/src/settings/schema.rs`
 - Modify: `src-tauri/src/settings/mod.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `src-tauri/src/settings/schema.rs` with only:
 
@@ -928,12 +928,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Run and watch it fail**
+- [x] **Step 2: Run and watch it fail**
 
 Run: `cd src-tauri && cargo test settings::schema`
 Expected: FAIL to compile
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Insert above the tests:
 
@@ -961,7 +961,7 @@ pub fn write(paths: &AppPaths) -> std::io::Result<bool> {
 }
 ```
 
-- [ ] **Step 4: Declare it**
+- [x] **Step 4: Declare it**
 
 In `src-tauri/src/settings/mod.rs`:
 
@@ -969,12 +969,12 @@ In `src-tauri/src/settings/mod.rs`:
 pub mod schema;
 ```
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `cd src-tauri && cargo test settings::schema`
 Expected: PASS, 2 tests
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A
@@ -996,13 +996,13 @@ git commit -m "feat(settings): generate the json schema beside settings.json"
 - Create: `src-tauri/src/settings/store.rs`
 - Modify: `src-tauri/src/settings/mod.rs`, `src-tauri/Cargo.toml`
 
-- [ ] **Step 1: Add `time` for quarantine timestamps**
+- [x] **Step 1: Add `time` for quarantine timestamps**
 
 ```bash
 cd src-tauri && cargo add time@0.3 --features formatting
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Create `src-tauri/src/settings/store.rs` with only:
 
@@ -1231,12 +1231,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 3: Run and watch them fail**
+- [x] **Step 3: Run and watch them fail**
 
 Run: `cd src-tauri && cargo test settings::store`
 Expected: FAIL to compile — `cannot find type SettingsStore`
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 Insert above the tests:
 
@@ -1492,7 +1492,7 @@ fn stamp() -> String {
 > A previous panic while holding the settings lock must not make every
 > subsequent read fail — the data itself is still valid.
 
-- [ ] **Step 5: Declare it**
+- [x] **Step 5: Declare it**
 
 In `src-tauri/src/settings/mod.rs`:
 
@@ -1500,12 +1500,12 @@ In `src-tauri/src/settings/mod.rs`:
 pub mod store;
 ```
 
-- [ ] **Step 6: Run the tests**
+- [x] **Step 6: Run the tests**
 
 Run: `cd src-tauri && cargo test settings::store`
 Expected: PASS, 13 tests
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -1523,13 +1523,13 @@ git commit -m "feat(settings): add the store with quarantine, coalescing and res
 - Create: `src-tauri/src/settings/watcher.rs`
 - Modify: `src-tauri/src/settings/mod.rs`, `src-tauri/Cargo.toml`
 
-- [ ] **Step 1: Add `notify`**
+- [x] **Step 1: Add `notify`**
 
 ```bash
 cd src-tauri && cargo add notify@8.2
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Create `src-tauri/src/settings/watcher.rs` with only:
 
@@ -1584,12 +1584,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 3: Run and watch them fail**
+- [x] **Step 3: Run and watch them fail**
 
 Run: `cd src-tauri && cargo test settings::watcher`
 Expected: FAIL to compile
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 Insert above the tests:
 
@@ -1661,7 +1661,7 @@ where
 }
 ```
 
-- [ ] **Step 5: Declare it**
+- [x] **Step 5: Declare it**
 
 In `src-tauri/src/settings/mod.rs`:
 
@@ -1669,12 +1669,12 @@ In `src-tauri/src/settings/mod.rs`:
 pub mod watcher;
 ```
 
-- [ ] **Step 6: Run the tests**
+- [x] **Step 6: Run the tests**
 
 Run: `cd src-tauri && cargo test settings::watcher`
 Expected: PASS, 5 tests
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -1695,7 +1695,7 @@ called, and Plan 04 calls it on every patch. This is the missing scheduler.
 **Files:**
 - Modify: `src-tauri/src/settings/store.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to the `store.rs` test module:
 
@@ -1768,12 +1768,12 @@ Append to the `store.rs` test module:
     }
 ```
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
 Run: `cd src-tauri && cargo test settings::store::tests::a_burst`
 Expected: FAIL to compile — `cannot find type FlushScheduler`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Add to `store.rs`:
 
@@ -1841,12 +1841,12 @@ impl FlushScheduler {
 }
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `cd src-tauri && cargo test settings::store`
 Expected: PASS, 16 tests
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -1857,7 +1857,7 @@ git commit -m "feat(settings): coalesce writes so a slider drag is one fsync"
 
 ### Task 9: Gate check
 
-- [ ] **Step 1: Run everything**
+- [x] **Step 1: Run everything**
 
 ```bash
 cd src-tauri
@@ -1868,12 +1868,12 @@ cargo deny check licenses
 ```
 Expected: all exit 0, roughly 50 tests passing.
 
-- [ ] **Step 2: Confirm the four invariants have a test each**
+- [x] **Step 2: Confirm the four invariants have a test each**
 
 Run: `cd src-tauri && cargo test settings -- --list | grep -E 'quarantin|failed_write|unknown_keys|missing_file'`
 Expected: four or more test names printed. If any invariant from the top of this plan has no test, add it now rather than in a later plan.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add -A
