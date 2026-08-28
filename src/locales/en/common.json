@@ -10,5 +10,14 @@
   "quit": { "title": "Quit Riff?", "body": "Your settings are already saved.", "action": "Quit" },
   "inDevelopment": "In development",
   "panes": { "score": "Score", "video": "Video", "audio": "Audio" },
-  "paneActions": { "popOut": "Pop out", "closePane": "Close pane" }
+  "paneActions": { "popOut": "Pop out", "closePane": "Close pane" },
+  "search": "Search",
+  "filter": "Filter",
+  "history": {
+    "name": "Name",
+    "lastPractised": "Last practised",
+    "rowActions": "Row actions",
+    "rowMenu": "Row menu",
+    "sessions": "Practice sessions"
+  }
 }

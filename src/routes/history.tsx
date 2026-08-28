@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { HistoryPlaceholder } from "@/features/history/HistoryPlaceholder";
 
-export const Route = createFileRoute("/history")({
-  component: () => <div className="p-[var(--content-padding)]" />,
-});
+export const Route = createFileRoute("/history")({ component: HistoryPlaceholder });
