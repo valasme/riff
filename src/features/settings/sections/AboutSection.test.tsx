@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { I18nextProvider } from "react-i18next";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/app/i18n";
 
 const openExternal = vi.fn().mockResolvedValue(undefined);
@@ -45,11 +45,25 @@ function renderSection() {
 }
 
 describe("AboutSection", () => {
+  beforeEach(() => {
+    openExternal.mockClear();
+    writeText.mockClear();
+    diagnosticsExport.mockClear();
+    licensesGet.mockClear();
+  });
+
   it("shows the build identity", () => {
     renderSection();
     expect(screen.getByText("0.1.0")).toBeInTheDocument();
     expect(screen.getByText("2.52.6")).toBeInTheDocument();
     expect(screen.getByText("abc1234")).toBeInTheDocument();
+  });
+
+  it("copies a value to the clipboard", async () => {
+    const user = userEvent.setup();
+    renderSection();
+    await user.click(screen.getByRole("button", { name: /copy version/i }));
+    expect(writeText).toHaveBeenCalledWith("0.1.0");
   });
 
   it("opens links through the enum command, never a url", async () => {

@@ -1,11 +1,13 @@
+import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Settings } from "@/lib/ipc";
 
 const settingsPatch = vi.fn();
 const settingsReset = vi.fn();
+const settingsGet = vi.fn().mockResolvedValue(undefined);
 vi.mock("@/lib/ipc", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/ipc")>()),
-  ipc: { settingsPatch, settingsReset },
+  ipc: { settingsPatch, settingsReset, settingsGet },
 }));
 
 const listen = vi.fn().mockResolvedValue(() => {});
@@ -41,6 +43,7 @@ beforeEach(() => {
   settingsPatch.mockReset();
   settingsReset.mockReset();
   toastError.mockReset();
+  listen.mockClear();
   window.__RIFF_BOOTSTRAP__ = {
     settings: structuredClone(DEFAULTS),
     paths: {
@@ -131,5 +134,138 @@ describe("useSettings", () => {
     const events = listen.mock.calls.map((c) => c[0]);
     expect(events).toContain("settings://changed");
     expect(events).toContain("settings://write-failed");
+  });
+
+  it("adopts a settings replacement pushed from outside the process", async () => {
+    const { useSettings, subscribeToBackend } = await import("./settings");
+    await subscribeToBackend();
+    const onChanged = listen.mock.calls.find((c) => c[0] === "settings://changed")?.[1] as (e: {
+      payload: Settings;
+    }) => void;
+
+    const external = structuredClone(DEFAULTS);
+    external.appearance.theme = "light";
+    onChanged({ payload: external });
+
+    expect(useSettings.getState().settings.appearance.theme).toBe("light");
+  });
+
+  it("reports a write failure raised by the backend after a value was already applied", async () => {
+    const { subscribeToBackend } = await import("./settings");
+    await subscribeToBackend();
+    const onWriteFailed = listen.mock.calls.find(
+      (c) => c[0] === "settings://write-failed",
+    )?.[1] as () => void;
+
+    onWriteFailed();
+    expect(toastError).toHaveBeenCalledOnce();
+  });
+
+  it("stops listening for both events once unsubscribed", async () => {
+    const unlistenChanged = vi.fn();
+    const unlistenWriteFailed = vi.fn();
+    listen.mockResolvedValueOnce(unlistenChanged).mockResolvedValueOnce(unlistenWriteFailed);
+
+    const { subscribeToBackend } = await import("./settings");
+    const unsubscribe = await subscribeToBackend();
+    unsubscribe();
+
+    expect(unlistenChanged).toHaveBeenCalledOnce();
+    expect(unlistenWriteFailed).toHaveBeenCalledOnce();
+  });
+
+  it("resets a section and adopts what rust actually stored", async () => {
+    const { useSettings } = await import("./settings");
+    const reset = structuredClone(DEFAULTS);
+    reset.general.confirmOnQuit = true;
+    settingsReset.mockResolvedValue(reset);
+
+    await useSettings.getState().reset("general");
+    expect(settingsReset).toHaveBeenCalledWith("general");
+    expect(useSettings.getState().settings.general.confirmOnQuit).toBe(true);
+  });
+
+  it("rolls back and reports when a reset fails", async () => {
+    const { useSettings } = await import("./settings");
+    settingsReset.mockRejectedValue(new Error("boom"));
+
+    await useSettings.getState().reset();
+    expect(useSettings.getState().settings.appearance.theme).toBe("dark");
+    expect(toastError).toHaveBeenCalledOnce();
+  });
+
+  it("reports an unknown error code when the rejection is not a structured RiffError", async () => {
+    const { useSettings } = await import("./settings");
+    settingsPatch.mockRejectedValue(new Error("network gremlin"));
+
+    await useSettings.getState().patch({ appearance: { theme: "light" } });
+    expect(toastError).toHaveBeenCalledOnce();
+  });
+
+  it("falls back to synchronous defaults when the bootstrap payload never arrived, then adopts the async read", async () => {
+    // biome-ignore lint/performance/noDelete: simulating a missing global, not a hot path.
+    delete window.__RIFF_BOOTSTRAP__;
+    const fetched = structuredClone(DEFAULTS);
+    fetched.appearance.theme = "light";
+    settingsGet.mockResolvedValueOnce(fetched);
+
+    const { useSettings } = await import("./settings");
+    expect(useSettings.getState().appInfo.version).toBe("unknown");
+
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(settingsGet).toHaveBeenCalled();
+    expect(useSettings.getState().settings.appearance.theme).toBe("light");
+  });
+
+  it("shows a toast when settings.json was quarantined and defaults were used instead", async () => {
+    window.__RIFF_BOOTSTRAP__ = {
+      settings: structuredClone(DEFAULTS),
+      paths: {
+        configDir: "/c",
+        dataDir: "/d",
+        stateDir: "/s",
+        cacheDir: "/k",
+        logDir: "/s/logs",
+        homeDir: "/home/probe",
+      },
+      appInfo: {
+        version: "0.1.0",
+        tauriVersion: "2.11.5",
+        webkitVersion: "2.52.6",
+        buildDate: "2026-08-28",
+        gitSha: "abc1234",
+      },
+      recoveredFrom: "/c/settings.json.corrupt-2026-08-28",
+    };
+    const { reportRecovery } = await import("./settings");
+    reportRecovery();
+    expect(toastError).toHaveBeenCalledOnce();
+  });
+
+  it("says nothing when there was nothing to recover", async () => {
+    const { reportRecovery } = await import("./settings");
+    reportRecovery();
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it("exposes a narrow selector hook per field, each returning the live value", async () => {
+    const settings = await import("./settings");
+    const hooks = [
+      [settings.useTheme, "dark"],
+      [settings.useDensity, "comfortable"],
+      [settings.useUiScale, 1],
+      [settings.useHighContrast, false],
+      [settings.useTitleBarStyle, "custom"],
+      [settings.useStartupRoute, "practice"],
+      [settings.useSidebarCollapsed, false],
+      [settings.useRememberCollapsed, true],
+    ] as const;
+    for (const [hook, expected] of hooks) {
+      const { result } = renderHook(() => hook());
+      expect(result.current).toBe(expected);
+    }
+    expect(renderHook(() => settings.useAppearance()).result.current.theme).toBe("dark");
+    expect(renderHook(() => settings.useGeneral()).result.current.startupRoute).toBe("practice");
   });
 });

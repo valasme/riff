@@ -1,0 +1,145 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: read
+
+jobs:
+  # ubuntu-24.04, not 26.04: Tauri v2 needs webkit2gtk 4.1, whose earliest
+  # Ubuntu series is 24.04, and building on a newer image would raise the
+  # glibc floor of the release artifacts for no benefit.
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev patchelf
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Route tree is current
+        run: |
+          pnpm exec vite build >/dev/null
+          git diff --exit-code src/routeTree.gen.ts
+
+      - name: Licence data is current
+        run: |
+          pnpm licenses:generate
+          git diff --exit-code third-party-licenses.json THIRD-PARTY-LICENSES.md
+
+      # Deliberately NOT `git diff --exit-code src/locales`. The catalogues are
+      # hand-written, i18next-parser reformats and reorders them, and it cannot
+      # see composed keys like t(`settings:appearance.themeOptions.${v}`) — so
+      # a byte-identical gate fails on its first run for reasons nobody can
+      # act on. What matters is that no key a component asks for is missing.
+      - name: Translations cover every extracted key
+        run: |
+          pnpm i18n:extract --output "/tmp/extracted/\$LOCALE/\$NAMESPACE.json"
+          node -e '
+            const fs = require("node:fs");
+            const flat = (o, p = "") => Object.entries(o).flatMap(([k, v]) =>
+              v && typeof v === "object" ? flat(v, p + k + ".") : [p + k]);
+            let missing = 0;
+            for (const file of fs.readdirSync("/tmp/extracted/en")) {
+              const want = flat(JSON.parse(fs.readFileSync(`/tmp/extracted/en/${file}`)));
+              const have = new Set(flat(JSON.parse(fs.readFileSync(`src/locales/en/${file}`))));
+              for (const key of want) if (!have.has(key)) { console.error(`missing ${file}:${key}`); missing++; }
+            }
+            process.exit(missing ? 1 : 0);
+          '"
+
+      - name: No untranslated keys
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            let missing = 0;
+            for (const file of fs.readdirSync("src/locales/en")) {
+              const walk = (o, path) => {
+                for (const [k, v] of Object.entries(o)) {
+                  if (typeof v === "object" && v !== null) walk(v, path + "." + k);
+                  else if (v === "") { console.error("empty: " + path + "." + k); missing++; }
+                }
+              };
+              walk(JSON.parse(fs.readFileSync("src/locales/en/" + file)), file);
+            }
+            process.exit(missing ? 1 : 0);
+          '
+
+      - name: Frontend tests
+        run: pnpm test:coverage
+
+      - name: Rust format
+        run: cargo fmt --check --manifest-path src-tauri/Cargo.toml
+
+      - name: Clippy
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+
+      - name: Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Dependency review
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v4
+        with:
+          deny-licenses: GPL-2.0, GPL-3.0, AGPL-3.0
+
+      - name: Licence compliance
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: src-tauri/Cargo.toml
+          command: check
+
+      - name: Build
+        run: pnpm tauri build --no-bundle
+
+      - name: Bundle size budget
+        run: |
+          # The ENTRY chunk, not every chunk concatenated. With
+          # autoCodeSplitting the route chunks are lazy, so summing them
+          # measures a number no user ever downloads at once. The entry is
+          # read from index.html's script tag, not guessed by filename glob:
+          # a lazy route named "index" (the `/` redirect) also produces a
+          # file matching `index-*.js`, and picking the wrong one silently
+          # measures a few hundred bytes instead of the real bundle.
+          ENTRY=$(node -e "
+            const html = require('fs').readFileSync('dist/index.html', 'utf8');
+            const m = html.match(/<script[^>]+src=\"\/(assets\/index-[^\"]+\.js)\"/);
+            if (!m) { console.error('no entry script tag found'); process.exit(1); }
+            console.log('dist/' + m[1]);
+          ")
+          BYTES=$(gzip -c "$ENTRY" | wc -c)
+          echo "entry chunk ${ENTRY}: ${BYTES} bytes gzipped"
+          test "$BYTES" -lt 256000 || { echo "::error::bundle exceeds the 250 KB gzipped budget"; exit 1; }

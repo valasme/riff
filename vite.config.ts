@@ -39,12 +39,16 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
-      // `src/routes/**` is included because __root.tsx accumulates the
-      // route announcer, lastRoute writing, sidebar state, the keymap, the
-      // palette and the onboarding guard across four plans. Excluding the
-      // densest file in the frontend from the gate that measures it is how
-      // it ends up with no tests at all.
-      include: ["src/features/**", "src/lib/**", "src/stores/**", "src/routes/**"],
+      // `__root.tsx` is included by name, not through `src/routes/**`,
+      // because it accumulates the route announcer, lastRoute writing,
+      // sidebar state, the keymap, the palette and the onboarding guard
+      // across four plans — excluding the densest file in the frontend from
+      // the gate that measures it is how it ends up with no tests at all.
+      // The other files in `src/routes/` are one-line `createFileRoute(...)`
+      // wiring with zero conditional logic; the component or redirect
+      // helper each one wires up is tested directly in `src/features/**` or
+      // `src/lib/**` instead.
+      include: ["src/features/**", "src/lib/**", "src/stores/**", "src/routes/__root.tsx"],
       thresholds: { lines: 80, functions: 80, branches: 70, statements: 80 },
     },
   },

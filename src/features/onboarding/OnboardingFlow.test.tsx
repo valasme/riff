@@ -26,7 +26,8 @@ function useSettingsMock(selector: (s: typeof state) => unknown) {
 }
 useSettingsMock.getState = () => state;
 vi.mock("@/stores/settings", () => ({ useSettings: useSettingsMock }));
-vi.mock("@/lib/ipc", () => ({ ipc: { openPath: vi.fn() } }));
+const openPath = vi.fn();
+vi.mock("@/lib/ipc", () => ({ ipc: { openPath } }));
 
 const { OnboardingFlow } = await import("./OnboardingFlow");
 
@@ -80,6 +81,18 @@ describe("OnboardingFlow", () => {
     patch.mockClear();
     await user.click(screen.getByRole("radio", { name: /^Dark/ }));
     expect(patch).toHaveBeenCalledWith({ appearance: { theme: "dark" } });
+  });
+
+  it("opens a data location from the privacy step", async () => {
+    const user = userEvent.setup();
+    renderFlow();
+    await user.click(screen.getByRole("button", { name: /continue/i })); // → theme
+    await user.click(screen.getByRole("button", { name: /continue/i })); // → privacy
+
+    const [firstOpenFolder] = screen.getAllByRole("button", { name: /open folder/i });
+    if (!firstOpenFolder) throw new Error("expected at least one data location row");
+    await user.click(firstOpenFolder);
+    expect(openPath).toHaveBeenCalled();
   });
 
   it("can go back", async () => {

@@ -13,6 +13,31 @@ describe("logger", () => {
     expect(logWrite).toHaveBeenCalledWith("error", "boom", { where: "test" });
   });
 
+  it("forwards info and debug too", async () => {
+    await log.info("fyi");
+    await log.debug("trace me");
+    expect(logWrite).toHaveBeenCalledWith("info", "fyi", undefined);
+    expect(logWrite).toHaveBeenCalledWith("debug", "trace me", undefined);
+  });
+
+  it("captures a global error event", async () => {
+    installGlobalErrorHandlers();
+    window.dispatchEvent(
+      Object.assign(new Event("error"), {
+        message: "boom",
+        filename: "app.js",
+        lineno: 1,
+        colno: 2,
+        error: new Error("boom"),
+      }),
+    );
+    expect(logWrite).toHaveBeenCalledWith(
+      "error",
+      "boom",
+      expect.objectContaining({ filename: "app.js" }),
+    );
+  });
+
   it("captures an unhandled rejection", async () => {
     installGlobalErrorHandlers();
     window.dispatchEvent(

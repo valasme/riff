@@ -1,6 +1,9 @@
 export default {
   locales: ["en"],
-  input: ["src/**/*.{ts,tsx}"],
+  // Test files are excluded: i18n.test.ts deliberately calls
+  // `t("common:doesNotExist")` to assert the missing-key fallback, and the
+  // parser cannot tell that apart from a real usage.
+  input: ["src/**/*.{ts,tsx}", "!src/**/*.test.{ts,tsx}"],
   output: "src/locales/$LOCALE/$NAMESPACE.json",
   defaultNamespace: "common",
   keySeparator: ".",
