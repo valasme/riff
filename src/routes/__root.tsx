@@ -1,11 +1,21 @@
-import { createRootRoute, Outlet, redirect, useRouterState } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import {
+  createRootRoute,
+  Outlet,
+  redirect,
+  useNavigate,
+  useRouterState,
+} from "@tanstack/react-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { RouteError } from "@/components/RouteError";
 import { Sidebar } from "@/components/Sidebar";
+import { createKeymap } from "@/features/keybindings/keymap";
+import { useKeybindings } from "@/features/keybindings/useKeybindings";
 import { ONBOARDING_VERSION, shouldShowOnboarding } from "@/features/onboarding/gate";
+import { CommandPalette } from "@/features/palette/CommandPalette";
 import { QuitConfirmation } from "@/features/window/QuitConfirmation";
 import { TitleBar } from "@/features/window/TitleBar";
+import { ipc } from "@/lib/ipc";
 import { reportRecovery, subscribeToBackend, useAppearance, useSettings } from "@/stores/settings";
 
 export const Route = createRootRoute({
@@ -29,18 +39,38 @@ function RootLayout() {
   const [announcement, setAnnouncement] = useState("");
   const { collapsed, rememberCollapsed } = useAppearance().sidebar;
   const titleBar = useAppearance().titleBar;
+  const settings = useSettings((s) => s.settings);
   const patch = useSettings((s) => s.patch);
   const [transientCollapsed, setTransientCollapsed] = useState(collapsed);
   const effectiveCollapsed = rememberCollapsed ? collapsed : transientCollapsed;
   const onboardingActive = pathname === "/onboarding";
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const navigate = useNavigate();
 
-  const toggleSidebar = () => {
+  const toggleSidebar = useCallback(() => {
     if (rememberCollapsed) {
       void patch({ appearance: { sidebar: { collapsed: !collapsed } } });
     } else {
       setTransientCollapsed((v) => !v);
     }
-  };
+  }, [rememberCollapsed, collapsed, patch]);
+
+  const bindings = useMemo(
+    () =>
+      createKeymap({
+        navigate,
+        togglePalette: () => setPaletteOpen((v) => !v),
+        toggleSidebar,
+        patch: (p) => void patch(p),
+        settings,
+        openPath: (kind) => void ipc.openPath(kind),
+        quit: () => void ipc.windowClose(),
+        closeOverlay: () => setPaletteOpen(false),
+      }),
+    [navigate, toggleSidebar, patch, settings],
+  );
+
+  useKeybindings(bindings);
 
   useEffect(() => {
     reportRecovery();
@@ -77,7 +107,9 @@ function RootLayout() {
       </a>
       {/* Choosing System decorations has to hide Riff's own bar live, or the
           window ends up with two title bars stacked. */}
-      {titleBar === "custom" && <TitleBar onToggleSidebar={toggleSidebar} />}
+      {titleBar === "custom" && (
+        <TitleBar onToggleSidebar={toggleSidebar} onOpenPalette={() => setPaletteOpen(true)} />
+      )}
       {/* The container the sidebar's breakpoint measures. Chrome is rem-sized,
           so raising the UI scale shrinks this in px and the query fires —
           which a viewport media query could never do. */}
@@ -90,7 +122,7 @@ function RootLayout() {
       <div aria-live="polite" className="sr-only">
         {announcement}
       </div>
-      {/* Plan 09 adds the command palette beside this. */}
+      <CommandPalette open={paletteOpen} bindings={bindings} onOpenChange={setPaletteOpen} />
       <QuitConfirmation />
     </div>
   );

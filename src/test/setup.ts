@@ -13,6 +13,10 @@ class ResizeObserverStub {
 }
 globalThis.ResizeObserver ??= ResizeObserverStub;
 
+// jsdom does no layout, so it has no scrollIntoView either. cmdk calls it on
+// the selected item whenever the filtered list changes.
+HTMLElement.prototype.scrollIntoView ??= () => {};
+
 // jsdom never implemented `isContentEditable` (it stays `undefined`
 // regardless of the attribute) — there is no open issue asking for it, just
 // silence. Real browsers walk the element and its ancestors for the nearest
