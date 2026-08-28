@@ -8,5 +8,10 @@
   "skipToContent": "Skip to content",
   "primary": "Primary",
   "settingsSections": "Settings sections",
-  "routeAnnouncement": "Navigated to {{name}}"
+  "routeAnnouncement": "Navigated to {{name}}",
+  "minimize": "Minimize",
+  "maximize": "Maximize",
+  "restore": "Restore",
+  "closeWindow": "Close window",
+  "openPalette": "Search or jump to"
 }

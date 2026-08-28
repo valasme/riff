@@ -2,6 +2,7 @@ import { createRootRoute, Outlet, useRouterState } from "@tanstack/react-router"
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { RouteError } from "@/components/RouteError";
+import { TitleBar } from "@/features/window/TitleBar";
 
 export const Route = createRootRoute({
   component: RootLayout,
@@ -35,10 +36,10 @@ function RootLayout() {
       >
         {t("skipToContent")}
       </a>
-      {/* Task 4 replaces this with <TitleBar />; Plan 07 makes it conditional
-          on `appearance.titleBar`, because "System decorations" has to hide
-          Riff's own bar or the window ends up with two. */}
-      <header className="h-[var(--spacing-titlebar)] shrink-0" data-tauri-drag-region />
+      {/* Plan 07 makes this conditional on `appearance.titleBar`, because
+          "System decorations" has to hide Riff's own bar or the window ends
+          up with two. */}
+      <TitleBar />
       {/* The container the sidebar's breakpoint measures. Chrome is rem-sized,
           so raising the UI scale shrinks this in px and the query fires —
           which a viewport media query could never do. */}
