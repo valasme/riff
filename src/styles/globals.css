@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./fonts.css";
+@import "tw-animate-css";
 
 /* ---------------------------------------------------------------------------
    Raw values. Four independent axes vary these: theme, contrast, density and
