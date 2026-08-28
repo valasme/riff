@@ -1,4 +1,4 @@
-# 11 — Packaging, CI and Legal Implementation Plan
+# 12 — Packaging, CI and Legal Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -8,7 +8,7 @@
 
 **Tech Stack:** GitHub Actions, `tauri-action@v1`, `git-cliff`, Dependabot.
 
-**Spec:** `docs/superpowers/specs/2026-08-28-riff-foundation-design.md` (§17, §18)
+**Spec:** `docs/superpowers/specs/2026-08-28-riff-foundation-design.md` (§17, §19)
 
 ## Global Constraints
 
@@ -472,7 +472,7 @@ Expect an acknowledgement within seven days.
 
 ## Threat model
 
-Riff is a local desktop application with no network access whatsoever and no HTTP client compiled into it. Its webview holds exactly two capabilities, `core:default` and `log:default`, and no filesystem permission at all — every file operation goes through a Rust command that takes an enum rather than a path.
+Riff is a local desktop application with no network access whatsoever and no HTTP client compiled into it. Its webview holds exactly one capability, `core:default`, and no filesystem permission at all — every file operation goes through a Rust command that takes an enum rather than a path.
 
 The interesting attack surface is therefore malformed local files: a hand-edited or corrupted `settings.json`, and eventually media files opened for playback.
 ```
@@ -874,7 +874,7 @@ cd src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings &
 ```
 Expected: all exit 0.
 
-- [ ] **Step 2: Walk the definition of done from the spec, §21**
+- [ ] **Step 2: Walk the definition of done from the spec, §22**
 
 Check each by hand and record the result in the commit message:
 

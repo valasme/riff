@@ -17,7 +17,7 @@ Copied from the spec. Every task inherits these.
 - **Platform:** Linux only. Requires webkit2gtk **4.1** (libsoup3) and **glibc ≥ 2.39**. Build and CI target is `ubuntu-24.04`.
 - **Versions:** Tauri 2.11, React 19.1, Vite 7, TypeScript 5.8, Tailwind 4.3, pnpm 11, Node 26, Rust 1.98.
 - **Zero network at runtime.** No HTTP client in either language. If a task appears to need one, the task is wrong.
-- **Rust owns the filesystem.** The webview's capabilities are exactly `core:default` and `log:default`.
+- **Rust owns the filesystem.** The webview's only capability is `core:default`.
 - **No caller-supplied paths across IPC.** Commands take enums; native pickers open in Rust.
 - **Rust lints:** `clippy::unwrap_used` denied outside tests, `expect_used` allowed with a message. `cargo clippy -- -D warnings` must pass.
 - **Every user-visible string** goes through `t()`, including `aria-label`, tooltips, toasts and errors. English only.

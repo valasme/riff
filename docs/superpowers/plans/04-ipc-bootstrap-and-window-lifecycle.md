@@ -6,7 +6,7 @@
 
 **Architecture:** Settings are read *before* `tauri::Builder` exists and injected as `window.__RIFF_BOOTSTRAP__` by an initialisation script, which also applies the theme attributes to `<html>`. The window is created hidden and revealed either when the frontend signals readiness or by a three-second watchdog, whichever comes first. Because the window is hidden until then, unstyled content is impossible by construction rather than by timing.
 
-**Tech Stack:** Tauri 2.11, `tauri-plugin-single-instance`, `tauri-plugin-window-state`, `tauri-plugin-log`, `tauri-plugin-dialog`, `tauri-plugin-opener`.
+**Tech Stack:** Tauri 2.11, `tauri-plugin-single-instance`, `tauri-plugin-window-state`, `tauri-plugin-dialog`, `tauri-plugin-opener`.
 
 **Spec:** `docs/superpowers/specs/2026-08-28-riff-foundation-design.md` (§3.1, §5, §12)
 
@@ -14,7 +14,7 @@
 
 - **Platform:** Linux only. webkit2gtk **4.1**, **glibc ≥ 2.39**, build target `ubuntu-24.04`.
 - **Zero network.** CSP `connect-src` admits the IPC origins and nothing else.
-- **Webview capabilities are exactly `core:default` and `log:default`.** The `opener`, `dialog` and `window-state` plugins are driven only from Rust and therefore need no JS permission.
+- **The webview's only capability is `core:default`.** The `opener`, `dialog` and `window-state` plugins are driven only from Rust and therefore need no JS permission. `tauri-plugin-log` is deliberately **not** installed: it writes to its own directory, separate from the session logs, and Plan 11's `log_write` command carries frontend diagnostics into the one file that matters.
 - **No caller-supplied paths across IPC.** Commands take enums; native pickers open in Rust.
 - **Rust lints:** `clippy::unwrap_used` denied outside tests.
 - **Never install:** `tauri-specta`, `specta`, any HTTP client.
@@ -53,7 +53,7 @@
 
 ```bash
 cd src-tauri
-cargo add tauri-plugin-single-instance@2 tauri-plugin-window-state@2 tauri-plugin-log@2 tauri-plugin-dialog@2
+cargo add tauri-plugin-single-instance@2 tauri-plugin-window-state@2 tauri-plugin-dialog@2
 ```
 
 `tauri-plugin-opener` is already a dependency from the template.
@@ -222,6 +222,9 @@ pub fn open_external(link: ExternalLink, app: tauri::AppHandle) -> RiffResult<()
 
 #[tauri::command]
 pub fn app_ready(window: tauri::WebviewWindow) -> RiffResult<()> {
+    // The last boot phase. Together with the earlier marks this makes the
+    // 400 ms startup target from spec §13 falsifiable instead of aspirational.
+    tracing::info!(phase = "first-paint", "boot");
     window.show().map_err(|e| RiffError::Denied { what: e.to_string() })
 }
 ```
@@ -895,9 +898,9 @@ Overwrite `src-tauri/capabilities/default.json`:
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Riff's main window. The opener, dialog and window-state plugins are driven only from Rust and therefore need no JS permission.",
+  "description": "Riff's main window. The opener, dialog and window-state plugins are driven only from Rust and therefore need no JS permission, and there is no log plugin — frontend diagnostics go through our own log_write command.",
   "windows": ["main"],
-  "permissions": ["core:default", "log:default"]
+  "permissions": ["core:default"]
 }
 ```
 
@@ -997,9 +1000,12 @@ pub fn run() {
         std::process::exit(1);
     }
 
-    // 2. Logging, so a startup failure still leaves a trail.
-    let _log_guard = logging::init(&paths.log_dir);
-    logging::install_panic_hook();
+    // 2. Logging, so a startup failure still leaves a trail. One directory
+    //    per launch; `latest` points at it.
+    let boot = std::time::Instant::now();
+    let session = logging::start_session(&paths, "info");
+    logging::install_panic_hook(&session.dir);
+    tracing::info!(phase = "paths", elapsed_ms = boot.elapsed().as_millis() as u64, "boot");
     // The best-effort notification Plan 02 deferred to here. Non-blocking on
     // purpose: a blocking dialog raised from a panic on the GTK main thread
     // can deadlock, turning a crash report into a hang. The hook already
@@ -1030,6 +1036,8 @@ pub fn run() {
         tracing::warn!(%err, "could not write settings.schema.json");
     }
 
+    tracing::info!(phase = "settings", elapsed_ms = boot.elapsed().as_millis() as u64, "boot");
+
     let payload = bootstrap::Bootstrap {
         settings: store.get(),
         paths: paths.clone(),
@@ -1046,8 +1054,7 @@ pub fn run() {
         }))
         .plugin(bootstrap::init(&payload))
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_log::Builder::default().build());
+        .plugin(tauri_plugin_dialog::init());
 
     // The setting decides whether geometry is remembered at all. Registering
     // the plugin unconditionally would leave `restoreWindowState` as a switch
@@ -1090,6 +1097,11 @@ pub fn run() {
                 }
 
                 let _ = APP_HANDLE.set(app.handle().clone());
+                tracing::info!(
+                    phase = "setup",
+                    elapsed_ms = boot.elapsed().as_millis() as u64,
+                    "boot"
+                );
 
                 let handle = app.handle().clone();
                 std::thread::spawn(move || {
@@ -1112,6 +1124,9 @@ pub fn run() {
                 if let Err(err) = store.flush_if_dirty() {
                     tracing::error!(%err, "settings could not be saved on exit");
                 }
+                // The last line of a healthy session. If it is absent, the
+                // run crashed — which makes triage a single `tail -1`.
+                tracing::info!("shutdown complete");
             }
         });
 }
@@ -1366,7 +1381,7 @@ Expected: all exit 0.
 - [ ] **Step 2: Confirm the capability surface has not grown**
 
 Run: `python3 -c "import json;print(json.load(open('src-tauri/capabilities/default.json'))['permissions'])"`
-Expected: exactly `['core:default', 'log:default']`. If anything else appears, a plugin is being called from JavaScript that should be called from Rust.
+Expected: exactly `['core:default']`. If anything else appears, a plugin is being called from JavaScript that should be called from Rust.
 
 - [ ] **Step 3: Commit**
 

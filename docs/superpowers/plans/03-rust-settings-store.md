@@ -14,7 +14,7 @@
 
 - **Platform:** Linux only. webkit2gtk **4.1**, **glibc ≥ 2.39**, build target `ubuntu-24.04`.
 - **Zero network.** No HTTP client in either language.
-- **Rust owns the filesystem.** Webview capabilities are exactly `core:default` and `log:default`.
+- **Rust owns the filesystem.** The webview's only capability is `core:default`.
 - **Rust lints:** `clippy::unwrap_used` denied outside tests, `expect_used` allowed with a message.
 - **Never install:** any HTTP client, `tauri-specta`, `specta`.
 - **Commits:** Conventional Commits, one per task.

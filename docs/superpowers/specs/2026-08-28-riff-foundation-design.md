@@ -80,12 +80,14 @@ Two, both deliberate.
                     typed commands │ events
 ┌───────────────────────────────┴──────────────────────────────────────┐
 │                          Rust (Tauri 2.11)                            │
-│  commands/     settings · paths · app · window · licenses             │
+│  commands/     settings · paths · app · window · licenses · diagnostics│
 │  settings/     model · defaults · store · migrate · watcher           │
 │  storage/      atomic write · quarantine · backup rotation            │
 │  paths.rs      XDG resolution + env overrides                         │
 │  error.rs      RiffError → { code, details }                          │
-│  logging.rs    tracing → rolling file + frontend bridge               │
+│  logging.rs    tracing → per-launch session dir + frontend bridge      │
+│  diagnostics/  probe · banner · health · bundle                        │
+│  cli.rs        doctor · repair · logs · config · paths · history       │
 └───────────────────────────────┬──────────────────────────────────────┘
                                 │
               ~/.config/riff · ~/.local/share/riff · ~/.local/state/riff
@@ -127,7 +129,8 @@ XDG Base Directory specification, using the plain name `riff` rather than the re
 | `$XDG_CONFIG_HOME/riff/settings.schema.json` | JSON Schema generated from the Rust types via `schemars`. Written at launch **only when its content differs** from what is already there, so an unchanged launch touches no file. |
 | `$XDG_DATA_HOME/riff/history.jsonl` | Practice sessions, one JSON object per line. Created empty; unused this milestone. |
 | `$XDG_DATA_HOME/riff/window-state.json` | Managed by `tauri-plugin-window-state`. |
-| `$XDG_STATE_HOME/riff/logs/riff.log` | Rolling daily, seven retained. |
+| `$XDG_STATE_HOME/riff/logs/<timestamp>-<pid>/riff.log` | **One directory per launch**, ten retained. `panic.txt` lands beside it. |
+| `$XDG_STATE_HOME/riff/logs/latest` | Symlink to the current session, so `tail -f .../latest/riff.log` needs no lookup. |
 | `$XDG_CACHE_HOME/riff/` | Created for future thumbnails and waveform peaks. |
 
 Defaults follow the specification: `~/.config`, `~/.local/share`, `~/.local/state`, `~/.cache`. `RIFF_CONFIG_HOME` and `RIFF_DATA_HOME` override both, for tests and portable installations.
@@ -237,6 +240,8 @@ The guarantee that would have been lost — Rust and TypeScript agreeing — is 
 | `app_info` | `() -> AppInfo` | App, Tauri and WebKitGTK versions, build date, git SHA. |
 | `licenses_get` | `() -> Vec<LicenseEntry>` | Reads the bundled third-party notices resource. |
 | `app_ready` | `() -> ()` | Reveals the window. |
+| `diagnostics_export` | `() -> Option<PathBuf>` | Opens the save dialog in Rust and writes the redacted bundle (§18). Same output as `riff logs export`. |
+| `log_write` | `(LogLevel, String, Option<Value>) -> ()` | Frontend diagnostics into the session log. Without it a React crash leaves no trace on disk. |
 | `window_minimize` / `window_toggle_maximize` / `window_close` | `() -> ()` | Custom title bar controls. |
 
 Neither import nor export accepts a path. The picker is opened by Rust, so no filesystem path is ever chosen by, passed through, or visible to the webview — the same rule `open_path` and `open_external` follow. An earlier draft had these two taking `PathBuf` from the frontend, which quietly contradicted that rule and would have been the one hole in it.
@@ -257,7 +262,7 @@ pub enum RiffError {
 
 `code` selects a localised message on the frontend; `details` populates a collapsible technical panel. Raw Rust error strings are never shown as primary UI text.
 
-Events: `settings://changed`, `settings://recovered`.
+Events: `settings://changed`, `settings://recovered`, `settings://write-failed`, `app://confirm-quit`.
 
 ---
 
@@ -493,9 +498,9 @@ Radix supplies keyboard behaviour and ARIA for every primitive; the work is not 
 
 **Rust.** `thiserror` for typed errors, no `unwrap` outside tests — enforced by `clippy::unwrap_used` at deny level. `expect_used` is deliberately *not* denied: a genuine invariant should be stated with a message explaining why it holds, and banning that only pushes people back to `unwrap`. A panic hook writes the payload and backtrace to the log unconditionally, then attempts a native dialog on a best-effort, non-blocking basis — a blocking dialog raised from a panic on the GTK main thread can deadlock, turning a crash report into a hang. Logging always succeeds; the dialog is a courtesy, because an application that vanishes silently is indistinguishable from one the user broke.
 
-**Frontend.** `react-error-boundary` at the root plus a TanStack Router `errorComponent` per route, so one broken screen does not take down the shell. The crash screen shows the error code, a Copy diagnostics button, Open logs, and Reload. `window.onerror` and `unhandledrejection` forward to the log file through `tauri-plugin-log`. Recoverable problems use `sonner` toasts and never block.
+**Frontend.** `react-error-boundary` at the root plus a TanStack Router `errorComponent` per route, so one broken screen does not take down the shell. The crash screen shows the error code, a **Copy error details** button, Open logs, and Reload — named distinctly from About's **Export diagnostics** (§18.2), because two buttons sharing a label while doing different things is its own bug. `window.onerror`, `unhandledrejection` and every error-boundary catch forward to the session log through `log_write`, so a frontend crash leaves a trace on disk rather than only on a console the user cannot open. Recoverable problems use `sonner` toasts and never block.
 
-**Logging.** `tracing` with `tracing-appender`, daily rotation, seven files retained. Default level `info`, overridable with `RIFF_LOG`. File paths are logged; file contents never are.
+**Logging.** `tracing` with `tracing-appender`, **one directory per launch** rather than one file per day — rotating by date interleaves several runs into one file, and "which run was this?" is the first question every bug report has to answer. Ten sessions are retained and `latest` symlinks to the current one. Every session opens with a banner recording version, git SHA, build date, Tauri and WebKitGTK versions, distribution, kernel, architecture, session type, desktop, compositor, locale, resolved paths with their writability, and the settings load outcome. Boot phases are timed, so the 400 ms target in §13 is falsifiable rather than aspirational. A clean shutdown writes `shutdown complete` as its last line, which makes "did it crash?" a single `tail -1`. Default level `info`, overridable by `RIFF_LOG`, by `riff --log-level`, or live from a `tracing_subscriber::reload` handle. File paths are logged; file contents never are, and the environment is read from an allow-list rather than dumped.
 
 **Security.** Content Security Policy, replacing the scaffold's `null`:
 
@@ -514,7 +519,7 @@ object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none';
 
 `media-src 'none'` is accurate rather than anticipatory: no media exists this milestone. When §15 lands it becomes `media-src asset: http://asset.localhost`, and that one line is the whole change. Granting a permission now for a feature that does not exist is dead permission, and "we would have had to add it later anyway" is not a security argument.
 
-Capabilities are `core:default` and `log:default`. That is the entire list. The `opener`, `dialog` and `window-state` plugins are used **only from Rust**, so the webview needs no capability for any of them — a plugin's JS permission is required only if JavaScript calls it, and none of ours does. No `fs`, no `shell`, no `http`. `open_path` and `open_external` accept enums, never caller-supplied strings, so there is no path or URL a compromised frontend could pass that we would open.
+The webview holds exactly one capability: `core:default`. That is the entire list — `tauri-plugin-log` is not installed, because it writes to a directory of its own and `log_write` carries frontend diagnostics into the session log instead. The `opener`, `dialog` and `window-state` plugins are used **only from Rust**, so the webview needs no capability for any of them — a plugin's JS permission is required only if JavaScript calls it, and none of ours does. No `fs`, no `shell`, no `http`. `open_path` and `open_external` accept enums, never caller-supplied strings, so there is no path or URL a compromised frontend could pass that we would open.
 
 ---
 
@@ -525,7 +530,7 @@ Capabilities are `core:default` and `log:default`. That is the entire list. The 
 - Vite `build.target: "safari16"` — Riff requires **webkit2gtk 4.1** (libsoup3) and **glibc ≥ 2.39**. The 4.1 ABI, not a version number, is the binding constraint: it is what excludes Ubuntu 22.04 and Debian 12 no matter how Riff is built. Stated in the README, declared by the deb and rpm packages, asserted by `glibc-floor`
 - Selector-based Zustand subscriptions; no component subscribes to the whole settings object
 - Debounced writes (§4.4) so slider drags produce one write
-- Fonts subset, preloaded, self-hosted; no runtime font fetch is even possible under the CSP
+- Fonts self-hosted and latin-subset only; no `<link rel="preload">` (§7.2), and no runtime font fetch is even possible under the CSP
 - `rollup-plugin-visualizer` on demand, with a CI budget failing the build if the initial chunk exceeds 250 KB gzipped — the projected dependency set lands near 140 KB, so the ceiling is a real constraint with headroom rather than a number nothing will ever approach
 - Blocking filesystem work runs on `spawn_blocking`, never on the async runtime's threads
 
@@ -629,9 +634,10 @@ src/
   locales/en/     common · settings · onboarding · errors · palette
   styles/         globals.css, theme.css
 src-tauri/src/
-  lib.rs  bootstrap.rs  error.rs  logging.rs  paths.rs
-  commands/{settings,paths,app,window,licenses}.rs
+  lib.rs  bootstrap.rs  cli.rs  error.rs  logging.rs  paths.rs
+  commands/{settings,paths,app,window,licenses,diagnostics}.rs
   settings/{model,defaults,store,migrate,watcher}.rs
+  diagnostics/{probe,banner,health,bundle}.rs
   storage/atomic.rs
 ```
 
@@ -689,10 +695,91 @@ Desktop integration: a `.desktop` entry in the Audio/Music categories that delib
 
 ---
 
-## 18. Legal and repository hygiene
+## 18. Diagnostics, log export and the command line
+
+Riff updates manually and has no telemetry, so the only way a problem reaches
+the developer is a user describing it. Everything here exists to make that
+description complete on the first attempt.
+
+### 18.1 What is logged
+
+One directory per launch (§4.1), opening with a banner that answers the
+questions a bug report otherwise takes four round trips to establish: Riff
+version, git SHA, build date and profile; Tauri and WebKitGTK versions, the
+latter read from the runtime via `tauri::webview_version()` rather than
+`pkg-config`, which is a build tool users do not have installed; distribution,
+kernel and architecture; session type, desktop and compositor; locale; every
+resolved path with whether it is writable; and the settings load outcome.
+
+Beyond the banner: boot phase timings, every IPC call with its duration and
+result at `debug`, every settings write with its byte count, watcher decisions
+including suppressed ones, window lifecycle events, appearance changes, and —
+through `log_write` — `window.onerror`, unhandled rejections, error-boundary
+catches and every caught `RiffError`. A panic writes `panic.txt` beside the
+log. A clean exit writes `shutdown complete`; its absence is how you know the
+run crashed.
+
+Environment variables are read from an **allow-list**, never dumped. A full
+environment routinely contains credentials, and this file is designed to be
+pasted in public.
+
+### 18.2 Export
+
+Settings → About → **Export diagnostics** opens the save dialog in Rust and
+writes one plain-text file: banner, current `settings.json`, then every
+retained session newest-first. `$HOME` and the username are rewritten, and the
+whole thing is capped at 5 MB, truncating the oldest sessions first because
+the newest is the one that explains the bug. `riff logs export` produces the
+identical file from a terminal — one format, one code path.
+
+Plain text rather than an archive: it opens with no tool, pastes into an
+issue, and costs no compression dependency.
+
+Redaction happens at export, not at write. The on-disk log keeps real paths so
+the user can grep their own machine.
+
+### 18.3 The command line
+
+`riff` with no arguments opens the window. Everything else is a subcommand,
+dispatched **before `tauri::Builder` is constructed** for two reasons:
+`tauri-plugin-single-instance` forwards a second process's arguments to the
+running window and exits, so `riff --help` typed while Riff is open would
+otherwise print nothing; and nothing here needs GTK, a webview or a display,
+so `riff doctor` works over SSH on a machine whose window will not open —
+which is exactly when somebody runs it.
+
+| Command | Does |
+|---|---|
+| `riff --help` / `--version` | Usage; version with git SHA and build date |
+| `riff doctor` | Checks directories, permissions, `settings.json` and quarantine build-up. Exit 3 if anything is broken |
+| `riff repair` | Fixes what `doctor` found. Never deletes a file it has not first copied aside |
+| `riff logs --path\|--list\|--tail N` | Locate, enumerate or follow sessions |
+| `riff logs export [-o PATH]` | The bundle from §18.2 |
+| `riff config --path\|--show\|--validate` | Inspect `settings.json` |
+| `riff paths` | Every directory Riff uses |
+| `riff history --path\|--count` | The history file. Thin this milestone, because history is not written yet (D8) — reporting zero honestly beats reporting fiction |
+
+`--json` is global, so `riff doctor --json` is a support instruction that
+produces something parseable. Exit codes are 0 success, 1 failure, 2 usage,
+3 unhealthy.
+
+Accepting `--output <path>` here does **not** contradict the rule that no
+caller-supplied path crosses IPC (§5). That rule constrains a compromised
+webview; this is the user's own shell, already able to write any file they
+can write.
+
+`clap` 4 rather than a hand-rolled parser: the entire value of a support CLI
+is being pleasant to somebody already annoyed, which is `--help` quality,
+"did you mean", and consistent exit codes. It also generates the man page and
+shell completions the deb and rpm ship, whose absence is a packaging lint
+failure in both Debian and Fedora.
+
+---
+
+## 19. Legal and repository hygiene
 
 - `LICENSE` — MIT, © 2026 valasme
-- `THIRD-PARTY-LICENSES.md` plus a machine-readable `third-party-licenses.json`, generated from `pnpm licenses list` and `cargo about`. Both are **committed**, not generated at build time: they are declared in `bundle.resources`, so a build that generates them on the fly would fail on a clean checkout before the generator had run, and would make release artifacts depend on network access to resolve licence metadata. A CI job regenerates them and fails if the committed copies are stale — the same freshness pattern used for the specta bindings and the route tree
+- `THIRD-PARTY-LICENSES.md` plus a machine-readable `third-party-licenses.json`, generated from `pnpm licenses list` and `cargo about`, **including each dependency's full licence text and copyright line** — a table of SPDX identifiers does not satisfy MIT's requirement that the notice travel with every copy. Both are **committed**, not generated at build time: they are declared in `bundle.resources`, so a build that generates them on the fly would fail on a clean checkout before the generator had run, and would make release artifacts depend on network access to resolve licence metadata. A CI job regenerates them and fails if the committed copies are stale — the same freshness pattern used for the route tree
 - `README.md` — screenshots, what Riff is, install instructions for all three package formats, required runtime packages including the GStreamer plugin sets, build-from-source steps, the privacy statement, and the contribution policy
 - `SECURITY.md` — private disclosure route and supported-version statement
 - `CHANGELOG.md` — Keep a Changelog, generated by `git-cliff`
@@ -703,21 +790,21 @@ Desktop integration: a `.desktop` entry in the Audio/Music categories that delib
 
 ---
 
-## 19. Dependency manifest
+## 20. Dependency manifest
 
 Every package is pinned to the version verified current on 2026-08-28. Nothing is listed that this milestone does not use.
 
-**Runtime (npm)** — `react` 19.1, `react-dom` 19.1, `@tanstack/react-router` 1.170, `zustand` 5.0, `i18next` 26.4, `react-i18next` 17.0, `lucide-react` 1.34, `cmdk` 1.1, `sonner` 2.0, `radix-ui` 1.6, `class-variance-authority` 0.7, `clsx`, `tailwind-merge` 3.6, `react-error-boundary` 6.1, `@fontsource-variable/outfit` 5.3, `@fontsource/playfair-display` 5.3, `@fontsource-variable/jetbrains-mono` 5.3, `@tauri-apps/api` 2, `@tauri-apps/plugin-log` 2 — and no other plugin's JS package, because the `opener`, `dialog` and `window-state` plugins are driven entirely from Rust (§12).
+**Runtime (npm)** — `react` 19.1, `react-dom` 19.1, `@tanstack/react-router` 1.170, `zustand` 5.0, `i18next` 26.4, `react-i18next` 17.0, `lucide-react` 1.34, `cmdk` 1.1, `sonner` 2.0, `radix-ui` 1.6, `class-variance-authority` 0.7, `clsx`, `tailwind-merge` 3.6, `react-error-boundary` 6.1, `@fontsource-variable/outfit` 5.3, `@fontsource/playfair-display` 5.3, `@fontsource-variable/jetbrains-mono` 5.3, `@tauri-apps/api` 2 — and no plugin JS package at all, because `opener`, `dialog` and `window-state` are driven entirely from Rust and logging goes through our own `log_write` command (§12).
 
 **Development (npm)** — `vite` 7, `@vitejs/plugin-react` 4.6, `babel-plugin-react-compiler` 1.0, `tailwindcss` 4.3, `@tailwindcss/vite` 4.3, `@tanstack/router-plugin` pinned to the **exact same version** as `@tanstack/react-router` — the plugin generates the route tree the runtime consumes, and a version skew between them produces generation bugs that look like application bugs, `@tanstack/router-devtools`, `typescript` 5.8, `@biomejs/biome` 2.5, `vitest` 4.1, `@vitest/coverage-v8`, `jsdom`, `@testing-library/react` 16.3, `@testing-library/user-event`, `@testing-library/jest-dom`, `axe-core` 4.13, `lefthook` 2.1, `@commitlint/{cli,config-conventional}`, `i18next-parser`, `rollup-plugin-visualizer`, `@tauri-apps/cli` 2.11, `shadcn` 4.19.
 
-**Rust** — `tauri` 2.11, `tauri-plugin-{opener,dialog,log,window-state,single-instance}` 2, `serde` 1, `serde_json` 1, `thiserror` 2.0, `tracing` 0.1, `tracing-subscriber` 0.3, `tracing-appender` 0.2, `notify` 8.2, `schemars` 1.2, `directories` 6.0, `tempfile` 3.27, `time` 0.3.
+**Rust** — `tauri` 2.11, `tauri-plugin-{opener,dialog,window-state,single-instance}` 2, `clap` 4 (derive) with `clap_mangen` and `clap_complete` as build dependencies, `serde` 1, `serde_json` 1, `thiserror` 2.0, `tracing` 0.1, `tracing-subscriber` 0.3, `tracing-appender` 0.2, `notify` 8.2, `schemars` 1.2, `directories` 6.0, `tempfile` 3.27, `time` 0.3.
 
 **Explicitly not installed** — `@tanstack/react-query`, `@tanstack/react-table`, `@tanstack/react-virtual`, `react-resizable-panels`, `pdfjs-dist`, `eslint`, `prettier`, `vitest-axe`, `tauri-specta`, `specta`, any HTTP client in either language. Each is either deferred with the feature that needs it (D11, D12) or forbidden outright (D7).
 
 ---
 
-## 20. Risks
+## 21. Risks
 
 | Risk | Handling |
 |---|---|
@@ -731,7 +818,7 @@ Every package is pinned to the version verified current on 2026-08-28. Nothing i
 
 ---
 
-## 21. Definition of done
+## 22. Definition of done
 
 - Launching with no configuration presents onboarding; completing it writes `completedAt` and never shows it again
 - Every Settings control persists, survives a restart, and reflects an external edit to `settings.json` live
@@ -746,3 +833,8 @@ Every package is pinned to the version verified current on 2026-08-28. Nothing i
 - Killing the frontend before `app_ready()` still results in a visible window
 - A second launch focuses the existing window rather than starting a second process
 - The running application opens no network connection — verifiable with `ss -tup`
+- Every launch writes its own log directory, opening with a banner naming the version, distribution, desktop and session type, and `latest` points at it
+- A frontend crash appears in that log, not only on a console the user cannot open
+- `riff doctor` runs with no display, reports a deliberately corrupted `settings.json`, and exits 3; `riff repair` quarantines it and the next `doctor` exits 0
+- `riff --help` prints while the window is open, proving CLI dispatch precedes single-instance
+- `riff logs export` and Settings → About → Export diagnostics produce the same file, and `grep -c "$USER"` on it prints 0

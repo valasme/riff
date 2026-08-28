@@ -4,9 +4,9 @@
 
 **Goal:** The three primitives every later Rust module depends on — where files live, how failures cross the IPC boundary, and where diagnostics go.
 
-**Architecture:** Path resolution is a **pure function** over explicit XDG roots, so it is fully unit-testable without ever calling `std::env::set_var` — which is racy under Rust's parallel test runner and `unsafe` in the 2024 edition. `RiffError` is adjacently tagged so the frontend can localise by code instead of displaying Rust prose. Logging writes to a rolling file from the first line of `main`, before anything can fail.
+**Architecture:** Path resolution is a **pure function** over explicit XDG roots, so it is fully unit-testable without ever calling `std::env::set_var` — which is racy under Rust's parallel test runner and `unsafe` in the 2024 edition. `RiffError` is adjacently tagged so the frontend can localise by code instead of displaying Rust prose. Logging opens a **new directory per launch** from the first line of `main`, before anything can fail, so "which run was this?" always has an answer.
 
-**Tech Stack:** `directories` 6.0, `thiserror` 2.0, `tracing` 0.1, `tracing-subscriber` 0.3, `tracing-appender` 0.2, `tempfile` 3.27.
+**Tech Stack:** `directories` 6.0, `thiserror` 2.0, `tracing` 0.1, `tracing-subscriber` 0.3, `tracing-appender` 0.2, `time` 0.3, `tempfile` 3.27.
 
 **Spec:** `docs/superpowers/specs/2026-08-28-riff-foundation-design.md` (§4.1, §5, §12)
 
@@ -14,7 +14,7 @@
 
 - **Platform:** Linux only. webkit2gtk **4.1**, **glibc ≥ 2.39**, build target `ubuntu-24.04`.
 - **Zero network.** No HTTP client in either language.
-- **Rust owns the filesystem.** Webview capabilities are exactly `core:default` and `log:default`.
+- **Rust owns the filesystem.** The webview's only capability is `core:default`.
 - **No caller-supplied paths across IPC.** Commands take enums; native pickers open in Rust.
 - **Rust lints:** `clippy::unwrap_used` denied outside tests, `expect_used` allowed with a message.
 - **Never install:** any HTTP client, `tauri-specta`, `specta`.
@@ -28,7 +28,7 @@
 |---|---|
 | `src-tauri/src/paths.rs` | `AppPaths`, XDG resolution, `RIFF_*` overrides, directory creation |
 | `src-tauri/src/error.rs` | `RiffError`, its serialised shape, conversion helpers |
-| `src-tauri/src/logging.rs` | `tracing` subscriber, daily rolling file, panic hook |
+| `src-tauri/src/logging.rs` | `tracing` subscriber, per-launch session directory, retention, live level, panic hook |
 | `src-tauri/src/lib.rs` | Declares the modules |
 
 ---
@@ -419,10 +419,17 @@ git commit -m "feat(error): add the adjacently tagged RiffError type"
 
 ---
 
-### Task 3: Logging and the panic hook
+### Task 3: Session logging and the panic hook
+
+Riff writes **one directory per launch**, not one file per day. Three launches
+in a day would otherwise interleave into a single file with no session
+boundary, and the first question of any bug report — "which run was this?" —
+would have no answer.
 
 **Interfaces:**
-- Produces: `logging::init(&Path) -> tracing_appender::non_blocking::WorkerGuard` (the guard must be held for the process lifetime or buffered lines are lost at exit) and `logging::install_panic_hook()`.
+- Produces: `logging::{Session, start_session, set_level, set_panic_notifier, install_panic_hook}`.
+  - `start_session(&AppPaths, default_level) -> Session` creates `<log_dir>/<RFC3339>-<pid>/riff.log`, points `<log_dir>/latest` at it, and prunes older sessions.
+  - `Session { dir, guard, level }` — the guard must be held for the process lifetime; `level` is a `tracing_subscriber::reload::Handle` so the level changes live.
 
 **Files:**
 - Create: `src-tauri/src/logging.rs`
@@ -435,9 +442,10 @@ cd src-tauri
 cargo add tracing@0.1
 cargo add tracing-subscriber@0.3 --features env-filter,fmt
 cargo add tracing-appender@0.2
+cargo add time@0.3 --features formatting
 ```
 
-- [ ] **Step 2: Write the failing test**
+- [ ] **Step 2: Write the failing tests**
 
 Create `src-tauri/src/logging.rs` with only:
 
@@ -446,33 +454,108 @@ Create `src-tauri/src/logging.rs` with only:
 mod tests {
     use super::*;
 
+    fn paths(tmp: &std::path::Path) -> crate::paths::AppPaths {
+        let p = crate::paths::resolve(
+            &crate::paths::XdgRoots::default(),
+            &crate::paths::PathOverrides {
+                config: Some(tmp.join("config")),
+                data: Some(tmp.join("data")),
+            },
+        )
+        .expect("overrides supply both roots");
+        crate::paths::ensure_dirs(&p).expect("dirs");
+        p
+    }
+
     #[test]
-    fn writes_a_rolling_log_file_into_the_given_directory() {
+    fn each_launch_gets_its_own_directory() {
         let tmp = tempfile::tempdir().expect("tempdir");
-        {
-            let _guard = init(tmp.path());
+        let p = paths(tmp.path());
+
+        let first = session_dir(&p.log_dir, "2026-08-28T10-00-00Z", 111);
+        let second = session_dir(&p.log_dir, "2026-08-28T10-00-00Z", 222);
+        assert_ne!(first, second, "two launches in the same second must not collide");
+        assert!(first.starts_with(&p.log_dir));
+    }
+
+    #[test]
+    fn session_directories_sort_chronologically_by_name() {
+        // Lexical order is chronological order, so listing them needs no
+        // mtime and survives clock skew and file copying.
+        let dir = std::path::Path::new("/logs");
+        let older = session_dir(dir, "2026-08-28T09-00-00Z", 1);
+        let newer = session_dir(dir, "2026-08-28T10-00-00Z", 1);
+        assert!(older < newer);
+    }
+
+    #[test]
+    fn writes_the_log_inside_the_session_directory() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let p = paths(tmp.path());
+        let dir = {
+            let session = start_session(&p, "info");
             tracing::error!("probe line");
-            // `_guard` drops here, flushing the non-blocking writer.
-        }
-        let entries: Vec<_> = std::fs::read_dir(tmp.path())
-            .expect("log dir readable")
-            .filter_map(Result::ok)
-            .collect();
-        assert_eq!(entries.len(), 1, "exactly one log file expected");
-
-        let name = entries[0].file_name().to_string_lossy().into_owned();
-        assert!(name.starts_with("riff."), "unexpected log filename: {name}");
-
-        let body = std::fs::read_to_string(entries[0].path()).expect("log readable");
+            let dir = session.dir.clone();
+            drop(session); // flushes the non-blocking writer
+            dir
+        };
+        let body = std::fs::read_to_string(dir.join("riff.log")).expect("log readable");
         assert!(body.contains("probe line"), "log did not capture the event: {body}");
+    }
+
+    #[test]
+    fn latest_points_at_the_current_session() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let p = paths(tmp.path());
+        let session = start_session(&p, "info");
+        let latest = p.log_dir.join("latest");
+        assert!(latest.exists(), "`latest` is what makes `tail -f` usable");
+        assert_eq!(
+            std::fs::canonicalize(&latest).expect("resolves"),
+            std::fs::canonicalize(&session.dir).expect("resolves"),
+        );
+    }
+
+    #[test]
+    fn pruning_keeps_the_newest_sessions_and_removes_the_rest() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let p = paths(tmp.path());
+        for hour in 0..8 {
+            std::fs::create_dir_all(p.log_dir.join(format!("2026-08-28T0{hour}-00-00Z-1")))
+                .expect("seed");
+        }
+        prune_sessions(&p.log_dir, 3);
+
+        let mut remaining: Vec<_> = std::fs::read_dir(&p.log_dir)
+            .expect("readdir")
+            .filter_map(Result::ok)
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|n| n != "latest")
+            .collect();
+        remaining.sort();
+        assert_eq!(remaining.len(), 3, "retention must bound growth");
+        assert!(remaining[0].starts_with("2026-08-28T05"), "the newest must survive: {remaining:?}");
+    }
+
+    #[test]
+    fn pruning_a_missing_directory_is_not_an_error() {
+        prune_sessions(std::path::Path::new("/nonexistent/logs"), 3);
+    }
+
+    #[test]
+    fn a_panic_is_written_beside_the_log_so_it_is_findable() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        write_panic_file(tmp.path(), "thread panicked at 'boom'");
+        let body = std::fs::read_to_string(tmp.path().join("panic.txt")).expect("panic file");
+        assert!(body.contains("boom"));
     }
 }
 ```
 
-- [ ] **Step 3: Run and watch it fail**
+- [ ] **Step 3: Run and watch them fail**
 
 Run: `cd src-tauri && cargo test logging`
-Expected: FAIL to compile — `cannot find function init`
+Expected: FAIL to compile — `cannot find function start_session`
 
 - [ ] **Step 4: Implement**
 
@@ -482,49 +565,118 @@ Insert above the tests:
 //! Diagnostics. Initialised before anything that can fail, so a startup
 //! failure still leaves a trail.
 //!
-//! File paths are logged; file *contents* never are. Riff is a local-first
-//! application and its log must stay safe to paste into a public issue.
+//! One directory per launch rather than one file per day. Rotation by date
+//! interleaves several runs into one file, and "which run was this?" is the
+//! first question every bug report has to answer. A session directory also
+//! gives panics somewhere obvious to land.
+//!
+//! File paths are logged; file *contents* never are. Redaction happens at
+//! export (Plan 11), not here, so the on-disk log keeps real paths the user
+//! can grep on their own machine.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
 use tracing_appender::non_blocking::WorkerGuard;
-use tracing_appender::rolling::{RollingFileAppender, Rotation};
-use tracing_subscriber::EnvFilter;
+use tracing_subscriber::filter::LevelFilter;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{reload, EnvFilter, Registry};
 
-/// Returns a guard that MUST be held for the lifetime of the process.
-/// Dropping it flushes the non-blocking writer; losing it early silently
-/// truncates the log.
+/// How many launches to keep. Ten is enough to cover "it broke sometime this
+/// week" without letting a debug-level session fill a home directory.
+pub const RETAIN_SESSIONS: usize = 10;
+
+pub struct Session {
+    pub dir: PathBuf,
+    /// MUST be held for the process lifetime; dropping it flushes the
+    /// non-blocking writer. Losing it early silently truncates the log.
+    guard: WorkerGuard,
+    level: reload::Handle<EnvFilter, Registry>,
+}
+
+impl Session {
+    /// Changes the level of the running process, so "reproduce it with debug
+    /// logging" is a toggle rather than a terminal instruction.
+    pub fn set_level(&self, level: &str) -> bool {
+        let Ok(filter) = EnvFilter::try_new(level) else { return false };
+        self.level.reload(filter).is_ok()
+    }
+}
+
+pub fn session_dir(log_dir: &Path, stamp: &str, pid: u32) -> PathBuf {
+    log_dir.join(format!("{stamp}-{pid}"))
+}
+
+pub fn now_stamp() -> String {
+    time::OffsetDateTime::now_utc()
+        .format(&time::format_description::well_known::Rfc3339)
+        .unwrap_or_else(|_| "unknown".to_owned())
+        .replace(':', "-")
+}
+
 #[must_use]
-pub fn init(log_dir: &Path) -> WorkerGuard {
-    let appender = RollingFileAppender::builder()
-        .rotation(Rotation::DAILY)
-        .filename_prefix("riff")
-        .filename_suffix("log")
-        .max_log_files(7)
-        .build(log_dir)
-        .unwrap_or_else(|_| {
-            // A broken log directory must never stop the application, so fall
-            // back to a non-rotating appender in the same place.
-            RollingFileAppender::new(Rotation::NEVER, log_dir, "riff.log")
-        });
+pub fn start_session(paths: &crate::paths::AppPaths, default_level: &str) -> Session {
+    let dir = session_dir(&paths.log_dir, &now_stamp(), std::process::id());
+    let _ = std::fs::create_dir_all(&dir);
 
+    // `latest` is what makes `tail -f ~/.local/state/riff/logs/latest/riff.log`
+    // work without looking anything up first.
+    let latest = paths.log_dir.join("latest");
+    let _ = std::fs::remove_file(&latest);
+    let _ = std::os::unix::fs::symlink(&dir, &latest);
+
+    let appender = tracing_appender::rolling::never(&dir, "riff.log");
     let (writer, guard) = tracing_appender::non_blocking(appender);
 
-    let filter = EnvFilter::try_from_env("RIFF_LOG")
-        .unwrap_or_else(|_| EnvFilter::new("info"));
+    // RIFF_LOG wins over the persisted setting, which wins over the default.
+    let base = EnvFilter::try_from_env("RIFF_LOG")
+        .or_else(|_| EnvFilter::try_new(default_level))
+        .unwrap_or_else(|_| EnvFilter::default().add_directive(LevelFilter::INFO.into()));
+    let (filter, level) = reload::Layer::new(base);
 
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        .with_writer(writer)
-        .with_ansi(false)
-        .with_target(true)
+    let _ = tracing_subscriber::registry()
+        .with(filter)
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_writer(writer)
+                .with_ansi(false)
+                .with_target(true)
+                .with_thread_ids(true)
+                .with_line_number(true),
+        )
         .try_init();
 
-    guard
+    prune_sessions(&paths.log_dir, RETAIN_SESSIONS);
+
+    Session { dir, guard, level }
+}
+
+/// Keeps the newest `keep` session directories. Names are RFC 3339 stamps, so
+/// lexical order is chronological order — no mtime, no clock skew.
+pub fn prune_sessions(log_dir: &Path, keep: usize) {
+    let Ok(entries) = std::fs::read_dir(log_dir) else { return };
+    let mut dirs: Vec<PathBuf> = entries
+        .filter_map(Result::ok)
+        .map(|e| e.path())
+        .filter(|p| p.is_dir() && p.file_name().is_some_and(|n| n != "latest"))
+        .collect();
+    dirs.sort();
+    if dirs.len() <= keep {
+        return;
+    }
+    for old in &dirs[..dirs.len() - keep] {
+        let _ = std::fs::remove_dir_all(old);
+    }
+}
+
+pub fn write_panic_file(session_dir: &Path, body: &str) {
+    let _ = std::fs::write(session_dir.join("panic.txt"), body);
 }
 
 /// Optional notifier, installed by Plan 04 once a window exists. Behind a
 /// `OnceLock` so this module needs no dependency on Tauri.
 static PANIC_NOTIFIER: std::sync::OnceLock<fn(&str)> = std::sync::OnceLock::new();
+static PANIC_DIR: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
 
 /// Registers a best-effort, NON-BLOCKING way to tell the user about a panic.
 /// A blocking dialog raised from a panic on the GTK main thread can deadlock,
@@ -533,13 +685,18 @@ pub fn set_panic_notifier(notifier: fn(&str)) {
     let _ = PANIC_NOTIFIER.set(notifier);
 }
 
-/// Logs panics with a backtrace before the default hook runs. Logging always
-/// succeeds; notifying is a courtesy that may not be available yet.
-pub fn install_panic_hook() {
+/// Logs panics with a backtrace, writes `panic.txt` into the session
+/// directory, then runs the previous hook. Logging always succeeds;
+/// notifying is a courtesy that may not be available yet.
+pub fn install_panic_hook(session_dir: &Path) {
+    let _ = PANIC_DIR.set(session_dir.to_path_buf());
     let previous = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         let backtrace = std::backtrace::Backtrace::force_capture();
         tracing::error!(panic = %info, backtrace = %backtrace, "panic");
+        if let Some(dir) = PANIC_DIR.get() {
+            write_panic_file(dir, &format!("{info}\n\n{backtrace}"));
+        }
         if let Some(notify) = PANIC_NOTIFIER.get() {
             notify(&info.to_string());
         }
@@ -559,19 +716,20 @@ pub mod logging;
 - [ ] **Step 6: Run the tests**
 
 Run: `cd src-tauri && cargo test logging -- --test-threads=1`
-Expected: PASS
+Expected: PASS, 7 tests
 
-`--test-threads=1` because `tracing`'s global subscriber can only be installed once per process; `try_init` tolerates that, but running this test serially keeps the assertion about file count meaningful.
+`--test-threads=1` because `tracing`'s global subscriber can only be installed
+once per process; `try_init` tolerates that, but running these serially keeps
+the assertions about directory contents meaningful.
 
 - [ ] **Step 7: Commit**
 
 ```bash
 git add -A
-git commit -m "feat(logging): add rolling file logging and a panic hook"
+git commit -m "feat(logging): one log directory per launch, with retention and live level"
 ```
 
 ---
-
 ### Task 4: Gate check
 
 - [ ] **Step 1: Run everything**

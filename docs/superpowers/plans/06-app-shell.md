@@ -16,7 +16,7 @@
 - **Layout uses CSS logical properties** — `ps-*`, `pe-*`, `ms-*`, `me-*`, `border-s`, never `left`/`right`. Adding an RTL language later must be a translation task, not a rewrite.
 - **Metrics:** title bar 44px; sidebar 224px expanded / 56px rail; nav item 40px tall, 12px radius; content padding 24px.
 - **Icons:** `lucide-react` only.
-- **Webview capabilities are exactly `core:default` and `log:default`.**
+- **The webview's only capability is `core:default`.**
 - **Never install:** `eslint`, `prettier`, any HTTP client, `@tanstack/react-query`.
 - `@tanstack/router-plugin` must be pinned to the **exact same version** as `@tanstack/react-router`; a skew between them produces route-generation bugs that look like application bugs.
 - **Commits:** Conventional Commits, one per task.
