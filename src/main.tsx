@@ -1,3 +1,4 @@
+import "@/styles/globals.css";
 import React from "react";
 import ReactDOM from "react-dom/client";
 
@@ -6,6 +7,6 @@ if (!root) throw new Error("#root is missing from index.html");
 
 ReactDOM.createRoot(root).render(
   <React.StrictMode>
-    <div id="app-root" />
+    <div id="app-root" className="flex" />
   </React.StrictMode>,
 );
