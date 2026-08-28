@@ -54,6 +54,7 @@
 ```bash
 cd src-tauri
 cargo add tauri-plugin-single-instance@2 tauri-plugin-window-state@2 tauri-plugin-dialog@2
+cargo add rfd@0.15 --no-default-features --features gtk3
 ```
 
 `tauri-plugin-opener` is already a dependency from the template.
@@ -603,12 +604,24 @@ use riff_lib::settings::model::Settings;
 use riff_lib::settings::store::Section;
 use serde_json::json;
 
+// Every type that crosses to the frontend belongs here, including the ones
+// that travel in the bootstrap payload rather than as a command result.
+// A rename in AppPaths would otherwise reach TypeScript unannounced.
+
 fn shapes() -> serde_json::Value {
     json!({
         "Settings": Settings::default(),
         "Section": [Section::General, Section::Appearance, Section::Onboarding],
         "PathKind": [PathKind::Config, PathKind::Data, PathKind::Cache, PathKind::Logs],
         "ExternalLink": [ExternalLink::Repository, ExternalLink::Issues, ExternalLink::License],
+        "AppPaths": riff_lib::paths::AppPaths {
+            config_dir: "/c".into(),
+            data_dir: "/d".into(),
+            state_dir: "/s".into(),
+            cache_dir: "/k".into(),
+            log_dir: "/s/logs".into(),
+            home_dir: "/h".into(),
+        },
         "AppInfo": AppInfo {
             version: "0.0.0".into(),
             tauri_version: "0.0.0".into(),
@@ -728,6 +741,7 @@ mod tests {
         assert!(script.contains("dataset.theme"));
         assert!(script.contains("dataset.density"));
         assert!(script.contains("dataset.contrast"));
+        assert!(script.contains("dataset.motion"));
         assert!(script.contains("--ui-scale"));
     }
 
@@ -792,6 +806,12 @@ pub fn render_script(payload: &Bootstrap) -> String {
   root.dataset.theme = a.theme === "light" ? "light" : "dark";
   root.dataset.density = a.density === "compact" ? "compact" : "comfortable";
   root.dataset.contrast = a.highContrast ? "high" : "normal";
+  // Also before first paint: without it a user who set "always reduce" still
+  // sees the first animation of every launch.
+  root.dataset.motion =
+    a.reduceMotion === "always" ? "reduced"
+    : a.reduceMotion === "never" ? "full"
+    : (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches ? "reduced" : "full");
   root.style.setProperty("--ui-scale", String(a.uiScale || 1));
 }})();"#
     )
@@ -990,6 +1010,21 @@ pub struct QuitApproved(pub std::sync::atomic::AtomicBool);
 /// threading a handle through the panic hook.
 static APP_HANDLE: std::sync::OnceLock<tauri::AppHandle> = std::sync::OnceLock::new();
 
+/// Fails loudly. `eprintln!` alone is invisible when Riff is launched from a
+/// desktop entry, which is how almost everyone launches it — the application
+/// would simply never appear, with no way to find out why. `rfd` is already
+/// in the tree as `tauri-plugin-dialog`'s own backend, and it needs no Tauri
+/// application, which is the point: this runs before one exists.
+fn fatal(message: &str) -> ! {
+    eprintln!("riff: {message}");
+    rfd::MessageDialog::new()
+        .set_level(rfd::MessageLevel::Error)
+        .set_title("Riff cannot start")
+        .set_description(message)
+        .show();
+    std::process::exit(1);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // 1. Paths, before anything can need them.
@@ -997,13 +1032,11 @@ pub fn run() {
     {
         Ok(paths) => paths,
         Err(err) => {
-            eprintln!("riff: {err}");
-            std::process::exit(1);
+            fatal(&err.to_string());
         }
     };
     if let Err(err) = paths::ensure_dirs(&paths) {
-        eprintln!("riff: cannot create data directories: {err}");
-        std::process::exit(1);
+        fatal(&format!("cannot create data directories: {err}"));
     }
 
     // 2. Logging, so a startup failure still leaves a trail. One directory

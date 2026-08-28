@@ -781,6 +781,13 @@ mod tests {
     }
 
     #[test]
+    fn a_document_that_is_not_an_object_is_left_alone_rather_than_panicking() {
+        let mut doc = json!([1, 2, 3]);
+        assert_eq!(run_with(&mut doc, &synthetic()), None);
+        assert_eq!(doc, json!([1, 2, 3]));
+    }
+
+    #[test]
     fn the_real_step_table_is_empty_at_schema_version_one() {
         assert!(STEPS.is_empty(), "add a test alongside any real migration");
     }
@@ -819,6 +826,11 @@ pub fn run(document: &mut Value) -> Option<u32> {
 }
 
 pub fn run_with(document: &mut Value, steps: &[MigrationStep]) -> Option<u32> {
+    // A document that is not an object has no version and no fields for a
+    // step to touch; indexing one would panic.
+    if !document.is_object() {
+        return None;
+    }
     let start = document
         .get("version")
         .and_then(Value::as_u64)
@@ -828,10 +840,15 @@ pub fn run_with(document: &mut Value, steps: &[MigrationStep]) -> Option<u32> {
     let mut current = start;
     let mut ran = false;
 
-    loop {
+    // Bounded by the table length: a step table with a cycle (or a step whose
+    // `to` is not greater than its `from`) would otherwise spin forever
+    // holding the settings file hostage at startup. Cheap insurance on
+    // machinery that has no real migrations to prove it correct yet.
+    for _ in 0..=steps.len() {
         let Some(step) = steps.iter().find(|s| s.from == current) else {
             break;
         };
+        debug_assert!(step.to > step.from, "migration steps must move forward");
         (step.apply)(document);
         current = step.to;
         document["version"] = Value::from(current);
@@ -853,7 +870,7 @@ pub mod migrate;
 - [ ] **Step 5: Run the tests**
 
 Run: `cd src-tauri && cargo test settings::migrate`
-Expected: PASS, 6 tests
+Expected: PASS, 7 tests
 
 - [ ] **Step 6: Commit**
 

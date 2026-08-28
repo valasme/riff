@@ -57,14 +57,17 @@ Create `src/styles/fonts.css`:
    from a font CDN is not merely discouraged — it is blocked. */
 
 /* UI. Variable, so every weight costs one file. */
-@import "@fontsource-variable/outfit/index.css";
+@import "@fontsource-variable/outfit/latin.css";
 
 /* Wordmark only. Italic 700 is the single cut the mark uses; importing the
    whole family would ship eight faces to render four letters. */
 @import "@fontsource/playfair-display/700-italic.css";
 
 /* Paths, versions and diagnostics. */
-@import "@fontsource-variable/jetbrains-mono/index.css";
+/* `latin.css`, not `index.css`: index pulls every unicode subset — latin-ext,
+   cyrillic, vietnamese — which is roughly fifteen woff2 files bundled to
+   render an English-only interface. §7.2 says only the cuts in use. */
+@import "@fontsource-variable/jetbrains-mono/latin.css";
 ```
 
 - [ ] **Step 3: Verify the faces are emitted and self-hosted**
@@ -154,6 +157,22 @@ Overwrite `src/styles/globals.css`:
   --fg-muted: #4a4a4a;
 }
 
+/* Honoured by default for the same reason `prefers-reduced-motion` is: it is
+   an unambiguous accessibility declaration the desktop makes on the user's
+   behalf. Theme has no System option because colour scheme is a taste
+   question the user was already asked once (D2); contrast is not. The
+   explicit setting still wins, via [data-contrast]. */
+@media (prefers-contrast: more) {
+  :root:not([data-contrast="normal"]) {
+    --border-subtle: #6d6d6d;
+    --fg-muted: #b0b0b0;
+  }
+  [data-theme="light"]:not([data-contrast="normal"]) {
+    --border-subtle: #8a8a8a;
+    --fg-muted: #4a4a4a;
+  }
+}
+
 [data-density="compact"] {
   --row-height: 2.125rem;
   --row-gap: 0.125rem;
@@ -224,7 +243,9 @@ body {
 :focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
-  border-radius: 4px;
+  /* No `border-radius` here. The outline already follows the element's own
+     radius; setting one would snap a 12px nav pill to 4px on keyboard focus,
+     changing the shape of the thing being focused. */
 }
 
 /* Honour the desktop's declaration, and let the setting force it either way. */
@@ -456,11 +477,27 @@ git diff src/styles/globals.css
 - [ ] **Step 3: Add only the primitives this milestone uses**
 
 ```bash
-pnpm dlx shadcn@4.19.0 add button dialog dropdown-menu select switch slider \
-  radio-group tooltip separator scroll-area skeleton input label sonner command
+pnpm dlx shadcn@4.19.0 add button dialog switch slider radio-group tooltip \
+  skeleton label sonner command
 ```
 
-Nothing beyond this list. A primitive with no consumer is dead code that still has to be maintained and audited.
+Nothing beyond this list, and the list is shorter than the spec's §6.4 draft
+on purpose. `select`, `dropdown-menu`, `scroll-area`, `separator` and `input`
+were on it and no plan ever imports them — General uses a native `<select>`
+for a three-option list and History a native `<input>`. A primitive with no
+consumer is dead code that still has to be maintained and audited, and that
+rule has to apply to this list too.
+
+`sonner` ships a component that imports `next-themes`. Delete that import and
+drive it from Riff's own store instead; pulling a Next.js dependency into a
+Vite application to read a theme Riff already owns is not a trade worth
+making.
+
+shadcn's Tailwind-v4 components use `animate-in`, `fade-in-0` and
+`zoom-in-95`, which come from `tw-animate-css`. If `shadcn init` adds
+`@import "tw-animate-css";` to `globals.css`, keep that line when you restore
+the file in Step 2 and add the package — otherwise every overlay animation is
+silently a no-op, with no build error to tell you.
 
 - [ ] **Step 4: Retint the primitives to the tokens**
 

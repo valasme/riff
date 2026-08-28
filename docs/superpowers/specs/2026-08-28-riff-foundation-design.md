@@ -294,7 +294,7 @@ Two Zustand stores, and nothing else.
 
 `useUi` holds state that must not persist: palette open, transient sidebar collapse when `rememberCollapsed` is false, active toasts.
 
-Persisted settings are read through selector hooks (`useTheme()`, `useDensity()`) so components never subscribe to the whole object and re-render on unrelated changes.
+Persisted settings are read through **primitive** selector hooks — `useTheme()`, `useDensity()`, `useUiScale()` — so components never subscribe to the whole object and re-render on unrelated changes. Object selectors would not achieve this: `adopt` replaces `settings` wholesale, so `s.settings.appearance` returns a fresh identity every time and Zustand's default equality always sees a change. The settings screens themselves use section hooks, having nothing to gain from a narrower subscription.
 
 ### 6.3 Theming
 
@@ -310,7 +310,7 @@ UI scale is one variable: `html { font-size: calc(16px * var(--ui-scale)); }`. E
 
 ### 6.4 Components
 
-shadcn/ui on Radix, installed with `pnpm dlx shadcn@4`, re-skinned to the tokens in §7. Only what is used: `button`, `dialog`, `dropdown-menu`, `select`, `switch`, `slider`, `radio-group`, `tooltip`, `separator`, `scroll-area`, `skeleton`, `input`, `label`, `sonner`, `command`.
+shadcn/ui on Radix, installed with `pnpm dlx shadcn@4`, re-skinned to the tokens in §7. Only what is used: `button`, `dialog`, `switch`, `slider`, `radio-group`, `tooltip`, `skeleton`, `label`, `sonner`, `command`. `select`, `dropdown-menu`, `scroll-area`, `separator` and `input` are deliberately absent — a three-option list is a native `<select>` and a read-only search field is a native `<input>`, so installing those primitives would ship five components with no consumer.
 
 Application components live in `src/components/`; feature-owned components live under their feature. A component that only one feature uses belongs to that feature.
 
@@ -360,6 +360,8 @@ Measured against WCAG 2.2, and recorded because it drove a design decision.
 | `#3c3c3c` on `#242424` | 1.4:1 | 3:1 boundaries | **Fail** |
 | Ring `#e4e4e4` on `#3c3c3c` | 8.6:1 | 3:1 | Pass |
 
+Riff also honours `prefers-contrast: more` by default, for the same reason it honours `prefers-reduced-motion`: it is an unambiguous accessibility declaration the desktop makes on the user's behalf. Theme has no System option because colour scheme is a taste question the user was asked once (D2); contrast is not a taste question. The explicit setting still wins.
+
 Resolution: controls remain identifiable without relying on their borders — every one carries a text label or an `aria-label` plus a tooltip, and hover and focus states change fill, not only outline. The High contrast toggle raises borders to `#6d6d6d` (3.0:1) for users who need boundary contrast. The default keeps the design intact; nobody is locked out.
 
 ### 7.4 Layout metrics
@@ -383,7 +385,7 @@ Collapsing the sidebar yields an icon-only rail rather than hiding it entirely, 
 
 ### 7.5 Icons
 
-`lucide-react`, confirmed as the mockups' source. `panel-left` (sidebar toggle), `search` (palette), `audio-waveform` (Practice), `folder-clock` (History), `settings` (Settings), `house` (General), `palette` (Appearance), `info` (About), `filter`, `file-text`, `clock`, `picture-in-picture-2`, `x`, `minus`, `square`.
+`lucide-react`, confirmed as the mockups' source. `panel-left` (sidebar toggle), `search` (palette), `audio-waveform` (Practice), `folder-clock` (History), `settings` (Settings), `house` (General), `palette` (Appearance), `info` (About), `filter`, `file-text`, `clock`, `picture-in-picture-2`, `menu` (row actions), `copy`, `x`, `minus`, `square`.
 
 ---
 
@@ -484,7 +486,7 @@ Radix supplies keyboard behaviour and ARIA for every primitive; the work is not 
 - `aria-current="page"` on the active navigation item
 - A polite live region announcing the destination on route change, since a client-side route change is silent to a screen reader
 - Visible focus on every interactive element; focus is never removed, only restyled
-- `prefers-reduced-motion` honoured, with `appearance.reduceMotion` able to force or override it
+- `prefers-reduced-motion` and `prefers-contrast: more` both honoured by default, each with a setting able to force or override it
 - Interactive targets at least 24×24 CSS pixels (WCAG 2.2 §2.5.8)
 - No information conveyed by colour alone
 - The UI-scale slider is operable by keyboard with announced values
@@ -796,9 +798,9 @@ Every package is pinned to the version verified current on 2026-08-28. Nothing i
 
 **Runtime (npm)** — `react` 19.1, `react-dom` 19.1, `@tanstack/react-router` 1.170, `zustand` 5.0, `i18next` 26.4, `react-i18next` 17.0, `lucide-react` 1.34, `cmdk` 1.1, `sonner` 2.0, `radix-ui` 1.6, `class-variance-authority` 0.7, `clsx`, `tailwind-merge` 3.6, `react-error-boundary` 6.1, `@fontsource-variable/outfit` 5.3, `@fontsource/playfair-display` 5.3, `@fontsource-variable/jetbrains-mono` 5.3, `@tauri-apps/api` 2 — and no plugin JS package at all, because `opener`, `dialog` and `window-state` are driven entirely from Rust and logging goes through our own `log_write` command (§12).
 
-**Development (npm)** — `vite` 7, `@vitejs/plugin-react` 4.6, `babel-plugin-react-compiler` 1.0, `tailwindcss` 4.3, `@tailwindcss/vite` 4.3, `@tanstack/router-plugin` pinned to the **exact same version** as `@tanstack/react-router` — the plugin generates the route tree the runtime consumes, and a version skew between them produces generation bugs that look like application bugs, `@tanstack/router-devtools`, `typescript` 5.8, `@biomejs/biome` 2.5, `vitest` 4.1, `@vitest/coverage-v8`, `jsdom`, `@testing-library/react` 16.3, `@testing-library/user-event`, `@testing-library/jest-dom`, `axe-core` 4.13, `lefthook` 2.1, `@commitlint/{cli,config-conventional}`, `i18next-parser`, `rollup-plugin-visualizer`, `@tauri-apps/cli` 2.11, `shadcn` 4.19.
+**Development (npm)** — `vite` 7, `@vitejs/plugin-react` 4.6, `babel-plugin-react-compiler` 1.0, `tailwindcss` 4.3, `@tailwindcss/vite` 4.3, `@tanstack/router-plugin` pinned to the **exact same version** as `@tanstack/react-router` — the plugin generates the route tree the runtime consumes, and a version skew between them produces generation bugs that look like application bugs, `@tanstack/router-devtools`, `typescript` 5.8, `@types/node`, `@biomejs/biome` 2.5, `vitest` 4.1, `@vitest/coverage-v8`, `jsdom`, `@testing-library/react` 16.3, `@testing-library/user-event`, `@testing-library/jest-dom`, `axe-core` 4.13, `lefthook` 2.1, `@commitlint/{cli,config-conventional}`, `i18next-parser`, `rollup-plugin-visualizer`, `@tauri-apps/cli` 2.11, `shadcn` 4.19.
 
-**Rust** — `tauri` 2.11, `tauri-plugin-{opener,dialog,window-state,single-instance}` 2, `clap` 4 (derive) with `clap_mangen` and `clap_complete` as build dependencies, `serde` 1, `serde_json` 1, `thiserror` 2.0, `tracing` 0.1, `tracing-subscriber` 0.3, `tracing-appender` 0.2, `notify` 8.2, `schemars` 1.2, `directories` 6.0, `tempfile` 3.27, `time` 0.3.
+**Rust** — `tauri` 2.11, `tauri-plugin-{opener,dialog,window-state,single-instance}` 2, `clap` 4 (derive) with `clap_mangen` and `clap_complete` as build dependencies, `serde` 1, `serde_json` 1, `thiserror` 2.0, `tracing` 0.1, `tracing-subscriber` 0.3, `tracing-appender` 0.2, `notify` 8.2, `schemars` 1.2, `directories` 6.0, `tempfile` 3.27, `time` 0.3, `rfd` 0.15 (the fatal-startup dialog, before a Tauri application exists).
 
 **Explicitly not installed** — `@tanstack/react-query`, `@tanstack/react-table`, `@tanstack/react-virtual`, `react-resizable-panels`, `pdfjs-dist`, `eslint`, `prettier`, `vitest-axe`, `tauri-specta`, `specta`, any HTTP client in either language. Each is either deferred with the feature that needs it (D11, D12) or forbidden outright (D7).
 
@@ -831,6 +833,10 @@ Every package is pinned to the version verified current on 2026-08-28. Nothing i
 - CI is green: lint, typecheck, both test suites, build, coverage gate, licence check
 - A tagged release produces deb, rpm and AppImage with checksums; the rpm installs in a fresh Fedora container and the deb in Debian trixie, both with no unresolved libraries, and no binary requires a glibc symbol newer than 2.39
 - Killing the frontend before `app_ready()` still results in a visible window
+- Compact density visibly changes row heights and gaps, not only page padding
+- At 1.5× UI scale in a 960px window the sidebar drops to its rail and the settings sub-navigation becomes a horizontal strip
+- Importing settings asks first; so does resetting them
+- The MIT licence text and the third-party notices are readable inside the application, with no network
 - A second launch focuses the existing window rather than starting a second process
 - The running application opens no network connection — verifiable with `ss -tup`
 - Every launch writes its own log directory, opening with a banner naming the version, distribution, desktop and session type, and `latest` points at it

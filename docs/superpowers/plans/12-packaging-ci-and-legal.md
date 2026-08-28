@@ -44,6 +44,25 @@
 - Create: `src-tauri/riff.desktop`, `src-tauri/io.github.valasme.riff.metainfo.xml`
 - Modify: `src-tauri/tauri.conf.json`, `src-tauri/icons/*`
 
+- [ ] **Step 0: Fix the package identity the scaffold left behind**
+
+In `src-tauri/Cargo.toml`:
+
+```toml
+authors = ["valasme"]
+description = "A local-first practice workspace for musicians"
+license = "MIT"
+repository = "https://github.com/valasme/riff"
+```
+
+and in `tauri.conf.json`, inside `bundle`:
+
+```json
+    "publisher": "valasme",
+```
+
+`publisher` is not cosmetic. Tauri defaults it to **the second element of the identifier**, so `io.github.valasme.riff` would ship a deb whose `Maintainer` field reads `github`. `authors = ["you"]` and `description = "A Tauri App"` are the template's, and both reach the package metadata.
+
 - [ ] **Step 1: Generate the icon set from the supplied artwork**
 
 ```bash
@@ -106,6 +125,19 @@ Create `src-tauri/io.github.valasme.riff.metainfo.xml`:
   <url type="homepage">https://github.com/valasme/riff</url>
   <url type="bugtracker">https://github.com/valasme/riff/issues</url>
   <content_rating type="oars-1.1" />
+  <!-- Software centres will not show a version without this, which is the
+       whole reason the file exists. git-cliff fills it on release. -->
+  <releases>
+    <release version="0.1.0" date="2026-08-28">
+      <description><p>First release: onboarding, theming, navigation, the keyboard palette and fully working settings. Practice and History are visual placeholders.</p></description>
+    </release>
+  </releases>
+  <screenshots>
+    <screenshot type="default">
+      <caption>The Practice workspace</caption>
+      <image>https://raw.githubusercontent.com/valasme/riff/main/docs/design/practice-route.png</image>
+    </screenshot>
+  </screenshots>
   <categories>
     <category>Audio</category>
     <category>Music</category>
@@ -185,7 +217,7 @@ Create `scripts/generate-licenses.mjs`:
 // Rust data comes from `cargo metadata`, which is built in. No extra tool.
 
 import { execFileSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 
 function run(command, args, cwd) {
   return execFileSync(command, args, { cwd, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
@@ -201,10 +233,29 @@ function npmPackages() {
         version: Array.isArray(pkg.versions) ? pkg.versions.join(", ") : String(pkg.versions ?? ""),
         license,
         ecosystem: "npm",
+        text: licenseText(Array.isArray(pkg.paths) ? pkg.paths[0] : pkg.path),
       });
     }
   }
   return entries;
+}
+
+/** Reads the licence text a package ships, so the notices satisfy the
+ *  licences rather than merely naming them. MIT, BSD and Apache-2.0 all
+ *  require the notice to travel with every copy; a table of SPDX identifiers
+ *  does not do that. */
+function licenseText(dir) {
+  if (!dir) return "";
+  for (const name of readdirSync(dir)) {
+    if (/^(LICENSE|LICENCE|COPYING|NOTICE)/i.test(name)) {
+      try {
+        return readFileSync(`${dir}/${name}`, "utf8");
+      } catch {
+        /* keep going */
+      }
+    }
+  }
+  return "";
 }
 
 function cargoPackages() {
@@ -216,6 +267,7 @@ function cargoPackages() {
       version: p.version,
       license: p.license ?? "see repository",
       ecosystem: "cargo",
+      text: licenseText(p.manifest_path?.replace(/\/Cargo\.toml$/, "")),
     }));
 }
 
@@ -241,6 +293,11 @@ const markdown = [
       .map((e) => `| ${e.name} | ${e.version} | ${e.license} |`),
     "",
   ]),
+  "## Licence texts",
+  "",
+  ...all
+    .filter((e) => e.text)
+    .flatMap((e) => [`### ${e.name} ${e.version}`, "", "```", e.text.trim(), "```", ""]),
 ].join("\n");
 
 writeFileSync("THIRD-PARTY-LICENSES.md", markdown);
@@ -536,6 +593,24 @@ body:
       required: true
 ```
 
+`.github/ISSUE_TEMPLATE/question.yml`:
+
+```yaml
+name: Question
+description: Ask how something works
+labels: [question]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: What would you like to know?
+    validations:
+      required: true
+```
+
+Without this, `blank_issues_enabled: false` leaves the bug form as the only
+way to open an issue — while the README invites questions.
+
 `.github/ISSUE_TEMPLATE/config.yml`:
 
 ```yaml
@@ -573,7 +648,15 @@ Then in `cliff.toml`, set the repository URL to `https://github.com/valasme/riff
 
 Run: `git cliff --unreleased --output CHANGELOG.md`
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Write `CLAUDE.md`**
+
+Named in spec §19 and built nowhere. It is the map a future session — human or
+agent — gets instead of reading twelve plans: what Riff is, the four
+invariants from Plan 03, the no-caller-supplied-paths rule, the single
+capability, the zero-network constraint, where the spec lives, and the gate
+commands. Short. It is a pointer, not a duplicate.
+
+- [ ] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -594,7 +677,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   pull_request:
 
 concurrency:
@@ -603,6 +686,9 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+
+permissions:
+  contents: read
 
 jobs:
   # ubuntu-24.04, not 26.04: Tauri v2 needs webkit2gtk 4.1, whose earliest
@@ -649,10 +735,26 @@ jobs:
           pnpm licenses:generate
           git diff --exit-code third-party-licenses.json THIRD-PARTY-LICENSES.md
 
-      - name: Translations are current
+      # Deliberately NOT `git diff --exit-code src/locales`. The catalogues are
+      # hand-written, i18next-parser reformats and reorders them, and it cannot
+      # see composed keys like t(`settings:appearance.themeOptions.${v}`) — so
+      # a byte-identical gate fails on its first run for reasons nobody can
+      # act on. What matters is that no key a component asks for is missing.
+      - name: Translations cover every extracted key
         run: |
-          pnpm i18n:extract
-          git diff --exit-code src/locales
+          pnpm i18n:extract --output "/tmp/extracted/\$LOCALE/\$NAMESPACE.json"
+          node -e '
+            const fs = require("node:fs");
+            const flat = (o, p = "") => Object.entries(o).flatMap(([k, v]) =>
+              v && typeof v === "object" ? flat(v, p + k + ".") : [p + k]);
+            let missing = 0;
+            for (const file of fs.readdirSync("/tmp/extracted/en")) {
+              const want = flat(JSON.parse(fs.readFileSync(`/tmp/extracted/en/${file}`)));
+              const have = new Set(flat(JSON.parse(fs.readFileSync(`src/locales/en/${file}`))));
+              for (const key of want) if (!have.has(key)) { console.error(`missing ${file}:${key}`); missing++; }
+            }
+            process.exit(missing ? 1 : 0);
+          '"
 
       - name: No untranslated keys
         run: |
@@ -683,19 +785,29 @@ jobs:
       - name: Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
+      - name: Dependency review
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v4
+        with:
+          deny-licenses: GPL-2.0, GPL-3.0, AGPL-3.0
+
       - name: Licence compliance
         uses: EmbarkStudios/cargo-deny-action@v2
         with:
           manifest-path: src-tauri/Cargo.toml
-          command: check licenses bans advisories
+          command: check
 
       - name: Build
         run: pnpm tauri build --no-bundle
 
       - name: Bundle size budget
         run: |
-          BYTES=$(cat dist/assets/*.js | gzip -c | wc -c)
-          echo "initial chunk: ${BYTES} bytes gzipped"
+          # The ENTRY chunk, not every chunk concatenated. With
+          # autoCodeSplitting the route chunks are lazy, so summing them
+          # measures a number no user ever downloads at once.
+          ENTRY=$(node -e "const m=require('fs').readdirSync('dist/assets').filter(f=>/^index-.*\.js$/.test(f));if(!m.length){console.error('no entry chunk');process.exit(1)}console.log('dist/assets/'+m[0])")
+          BYTES=$(gzip -c "$ENTRY" | wc -c)
+          echo "entry chunk ${ENTRY}: ${BYTES} bytes gzipped"
           test "$BYTES" -lt 256000 || { echo "::error::bundle exceeds the 250 KB gzipped budget"; exit 1; }
 ```
 
@@ -735,6 +847,12 @@ on:
 
 permissions:
   contents: write
+  # Lets the build attest its own artifacts. Updates are manual, so a release
+  # page is the whole trust story: sha256sums proves a download was not
+  # corrupted, and proves nothing about who produced it, because whoever can
+  # replace the artifact can replace the sums beside it.
+  id-token: write
+  attestations: write
 
 jobs:
   bundle:
@@ -762,6 +880,20 @@ jobs:
       - id: version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
+      # Spec §16 says CI asserts these agree. Without it, tagging v0.2.0 while
+      # package.json still reads 0.1.0 builds artifacts named 0.1.0 and
+      # publishes them under a release titled 0.2.0.
+      - name: Tag matches the manifests
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG=$(node -p "require('./package.json').version")
+          CARGO=$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -1)
+          echo "tag=$TAG package.json=$PKG Cargo.toml=$CARGO"
+          test "$TAG" = "$PKG" && test "$PKG" = "$CARGO"
+
+      # build.rs must declare these, or Swatinem/rust-cache restores a build
+      # that was compiled with a different SHA and the binary reports a stale
+      # commit. option_env! alone registers no rerun-if-env-changed.
       - name: Stamp the build
         run: |
           echo "RIFF_BUILD_DATE=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
@@ -786,6 +918,13 @@ jobs:
           echo "highest required glibc symbol: $MAX"
           test "$(printf '%s\n2.39\n' "$MAX" | sort -V | tail -1)" = "2.39" \
             || { echo "::error::binary requires glibc $MAX, above the 2.39 floor"; exit 1; }
+
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            src-tauri/target/release/bundle/**/*.deb
+            src-tauri/target/release/bundle/**/*.rpm
+            src-tauri/target/release/bundle/**/*.AppImage
 
       - uses: actions/upload-artifact@v4
         with:

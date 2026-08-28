@@ -315,6 +315,14 @@ interface SettingsState extends BootstrapPayload {
 
 const initial = safeBootstrap();
 
+/** Monotonic ticket, so a stale reply cannot overwrite a newer one. */
+let sequence = 0;
+
+// The Rust bootstrap script writes theme, density, contrast and scale before
+// the first paint, but not `data-motion` — so `reduceMotion: "always"` would
+// otherwise do nothing until some unrelated setting changed.
+applyAppearance(document.documentElement, initial.settings.appearance);
+
 export const useSettings = create<SettingsState>((set, get) => ({
   ...initial,
 
@@ -326,13 +334,19 @@ export const useSettings = create<SettingsState>((set, get) => ({
   patch: async (patch) => {
     const previous = get().settings;
     // Optimistic, so a switch feels instant. Rust's answer still wins.
+    const ticket = ++sequence;
     get().adopt(mergeDeep(previous, patch));
     try {
-      get().adopt(await ipc.settingsPatch(patch));
+      const confirmed = await ipc.settingsPatch(patch);
+      // Two patches in flight resolve in whatever order the IPC returns, so
+      // adopting unconditionally lets an older reply overwrite a newer one —
+      // toggle two switches quickly and one silently reverts.
+      if (ticket === sequence) get().adopt(confirmed);
     } catch (error) {
       // Only validation failures reach here — a failed disk write arrives as
       // `settings://write-failed` with the value still applied, because
       // reverting the control would misrepresent what the user chose.
+      if (ticket !== sequence) return;
       get().adopt(previous);
       const code = isRiffError(error) ? error.code : "unknown";
       toast.error(i18n.t(`errors:code.${code}`, { defaultValue: i18n.t("errors:code.unknown") }));
@@ -375,7 +389,23 @@ export async function subscribeToBackend(): Promise<() => void> {
   };
 }
 
-// Selector hooks, so a component re-renders only for the slice it uses.
+// Selector hooks. `adopt` replaces `settings` wholesale, so an object
+// selector like `s.settings.appearance` returns a fresh identity on every
+// change and re-renders for edits it does not care about — which is the exact
+// thing §6.2 says these exist to prevent. The primitive selectors below
+// compare by value and genuinely do it.
+export const useTheme = () => useSettings((s) => s.settings.appearance.theme);
+export const useDensity = () => useSettings((s) => s.settings.appearance.density);
+export const useUiScale = () => useSettings((s) => s.settings.appearance.uiScale);
+export const useHighContrast = () => useSettings((s) => s.settings.appearance.highContrast);
+export const useTitleBarStyle = () => useSettings((s) => s.settings.appearance.titleBar);
+export const useStartupRoute = () => useSettings((s) => s.settings.general.startupRoute);
+export const useSidebarCollapsed = () => useSettings((s) => s.settings.appearance.sidebar.collapsed);
+export const useRememberCollapsed = () =>
+  useSettings((s) => s.settings.appearance.sidebar.rememberCollapsed);
+
+// Whole-section hooks for the settings screens, which render every field and
+// therefore have nothing to gain from a narrower subscription.
 export const useAppearance = () => useSettings((s) => s.settings.appearance);
 export const useGeneral = () => useSettings((s) => s.settings.general);
 ```
@@ -457,6 +487,7 @@ git commit -m "feat(settings): add the zustand store with optimistic patching"
     "importExport": { "label": "Settings file", "description": "Copy your settings to another machine, or bring them back." },
     "export": "Export settings",
     "import": "Import settings",
+    "importConfirm": { "title": "Replace your settings?", "body": "The file you pick replaces your current General and Appearance settings. This cannot be undone. Your onboarding choice is kept." },
     "exported": "Settings exported to {{path}}",
     "imported": "Settings imported",
     "reset": { "label": "Reset all settings", "description": "Restores General and Appearance to their defaults. Your onboarding choice is kept.", "action": "Reset", "confirmTitle": "Reset all settings?", "confirmBody": "General and Appearance return to their defaults. This cannot be undone." },
@@ -486,6 +517,7 @@ git commit -m "feat(settings): add the zustand store with optimistic patching"
     "license": "Licence",
     "licenseBody": "Riff is free software released under the MIT Licence.",
     "copyDiagnostics": "Copy diagnostics",
+    "copyValue": "Copy {{label}}",
     "privacy": "Riff makes no network connections. Nothing you do here leaves this machine."
   }
 }
@@ -531,11 +563,17 @@ export function SettingRow({
   children: ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between gap-6 border-b border-separator py-4 last:border-b-0">
+    <div className="flex min-h-[var(--row-height)] items-start justify-between gap-6 border-b border-separator py-4 last:border-b-0">
       <div className="min-w-0">
-        <label htmlFor={htmlFor} className="block text-[0.9375rem] font-medium">
-          {label}
-        </label>
+        {/* A <label> with no `for` points at nothing. Rows whose control is a
+            radiogroup or a button get a plain element instead. */}
+        {htmlFor ? (
+          <label htmlFor={htmlFor} className="block text-[0.9375rem] font-medium">
+            {label}
+          </label>
+        ) : (
+          <span className="block text-[0.9375rem] font-medium">{label}</span>
+        )}
         {description && <p className="mt-1 text-[0.8125rem] text-muted-foreground">{description}</p>}
       </div>
       <div className="shrink-0">{children}</div>
@@ -734,7 +772,7 @@ import { ipc, type Density, type ReduceMotion, type Theme, type TitleBarStyle } 
 import { useAppearance, useSettings } from "@/stores/settings";
 
 export function AppearanceSection() {
-  const { t } = useTranslation(["settings", "errors"]);
+  const { t, i18n } = useTranslation(["settings", "errors"]);
   const appearance = useAppearance();
   const patch = useSettings((s) => s.patch);
 
@@ -765,6 +803,7 @@ export function AppearanceSection() {
   return (
     <section className="py-2">
       <Choice
+        name="theme"
         label={t("settings:appearance.theme.label")}
         description={t("settings:appearance.theme.description")}
         value={appearance.theme}
@@ -774,6 +813,7 @@ export function AppearanceSection() {
       />
 
       <Choice
+        name="density"
         label={t("settings:appearance.density.label")}
         description={t("settings:appearance.density.description")}
         value={appearance.density}
@@ -787,16 +827,29 @@ export function AppearanceSection() {
         description={t("settings:appearance.uiScale.description")}
       >
         <div className="flex w-56 items-center gap-3">
+          {/* `thumbLabel`, not `aria-label`. shadcn spreads props onto Radix's
+              Root, but role="slider" lives on the Thumb — an aria-label on
+              Root names an element with no role and leaves the thumb
+              anonymous, so `getByRole("slider", { name })` finds nothing and
+              neither does a screen reader. shadcn primitives are copied into
+              the repository and owned by us, so add the passthrough to
+              `src/components/ui/slider.tsx`:
+
+                function Slider({ thumbLabel, ...props }) { ...
+                  <SliderPrimitive.Thumb aria-label={thumbLabel} ... />
+          */}
           <Slider
-            aria-label={t("settings:appearance.uiScale.label")}
+            thumbLabel={t("settings:appearance.uiScale.label")}
             min={0.8}
             max={1.5}
             step={0.05}
             value={[appearance.uiScale]}
             onValueChange={([uiScale]) => void patch({ appearance: { uiScale } })}
           />
+          {/* §10: numbers go through Intl, never hand-formatted. A percent
+              sign glued to a rounded number is a hand-formatted number. */}
           <span className="w-12 shrink-0 text-end font-mono text-xs text-muted-foreground">
-            {Math.round(appearance.uiScale * 100)}%
+            {new Intl.NumberFormat(i18n.language, { style: "percent" }).format(appearance.uiScale)}
           </span>
           <Button
             variant="ghost"
@@ -810,6 +863,7 @@ export function AppearanceSection() {
       </SettingRow>
 
       <Choice
+        name="motion"
         label={t("settings:appearance.reduceMotion.label")}
         description={t("settings:appearance.reduceMotion.description")}
         value={appearance.reduceMotion}
@@ -831,6 +885,7 @@ export function AppearanceSection() {
       </SettingRow>
 
       <Choice
+        name="titlebar"
         label={t("settings:appearance.titleBar.label")}
         description={t("settings:appearance.titleBar.description")}
         value={appearance.titleBar}
@@ -856,7 +911,10 @@ export function AppearanceSection() {
   );
 }
 
+/** ids come from the stable field name, never the translated label: labels
+ *  contain spaces ("Reduce motion-system") and two rows could collide. */
 function Choice<T extends string>({
+  name,
   label,
   description,
   value,
@@ -864,6 +922,7 @@ function Choice<T extends string>({
   optionLabel,
   onChange,
 }: {
+  name: string;
   label: string;
   description: string;
   value: T;
@@ -881,8 +940,8 @@ function Choice<T extends string>({
       >
         {options.map((option) => (
           <div key={option} className="flex items-center gap-2">
-            <RadioGroupItem value={option} id={`${label}-${option}`} />
-            <label htmlFor={`${label}-${option}`} className="text-sm">
+            <RadioGroupItem value={option} id={`${name}-${option}`} />
+            <label htmlFor={`${name}-${option}`} className="text-sm">
               {optionLabel(option)}
             </label>
           </div>
@@ -1023,6 +1082,7 @@ Expected: FAIL — cannot resolve `./GeneralSection`
 `src/features/settings/sections/GeneralSection.tsx`:
 
 ```tsx
+import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -1050,6 +1110,8 @@ export function GeneralSection() {
   const reset = useSettings((s) => s.reset);
   const paths = useSettings((s) => s.paths);
   const [confirmingReset, setConfirmingReset] = useState(false);
+  const [confirmingImport, setConfirmingImport] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <section className="py-2">
@@ -1134,16 +1196,11 @@ export function GeneralSection() {
           >
             {t("settings:general.export")}
           </Button>
-          <Button
-            variant="secondary"
-            onClick={async () => {
-              const imported = await ipc.settingsImport();
-              if (imported) {
-                useSettings.getState().adopt(imported);
-                toast.success(t("settings:general.imported"));
-              }
-            }}
-          >
+          {/* Guarded, and Reset is too. Import is the more destructive of the
+              two — Reset goes to known defaults, Import goes to arbitrary
+              values from a file — so leaving it as the unguarded one had it
+              backwards. There is no undo for either. */}
+          <Button variant="secondary" onClick={() => setConfirmingImport(true)}>
             {t("settings:general.import")}
           </Button>
         </div>
@@ -1153,7 +1210,16 @@ export function GeneralSection() {
         label={t("settings:general.rerunOnboarding.label")}
         description={t("settings:general.rerunOnboarding.description")}
       >
-        <Button variant="secondary" onClick={() => void reset("onboarding")}>
+        <Button
+          variant="secondary"
+          onClick={async () => {
+            await reset("onboarding");
+            // The guard lives in the root route's beforeLoad, which only runs
+            // on navigation. Without this the button clears completedAt and
+            // the screen does not change — it looks broken.
+            await navigate({ to: "/onboarding" });
+          }}
+        >
           {t("settings:general.rerunOnboarding.action")}
         </Button>
       </SettingRow>
@@ -1166,6 +1232,32 @@ export function GeneralSection() {
           {t("settings:general.reset.action")}
         </Button>
       </SettingRow>
+
+      <Dialog open={confirmingImport} onOpenChange={setConfirmingImport}>
+        <DialogContent role="alertdialog">
+          <DialogHeader>
+            <DialogTitle>{t("settings:general.importConfirm.title")}</DialogTitle>
+            <DialogDescription>{t("settings:general.importConfirm.body")}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmingImport(false)}>
+              {t("common:cancel")}
+            </Button>
+            <Button
+              onClick={async () => {
+                setConfirmingImport(false);
+                const imported = await ipc.settingsImport();
+                if (imported) {
+                  useSettings.getState().adopt(imported);
+                  toast.success(t("settings:general.imported"));
+                }
+              }}
+            >
+              {t("settings:general.import")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={confirmingReset} onOpenChange={setConfirmingReset}>
         <DialogContent role="alertdialog">
@@ -1338,6 +1430,8 @@ import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { SettingRow } from "@/features/settings/SettingRow";
+import { Copy } from "lucide-react";
+import { MIT_LICENSE } from "@/lib/license";
 import { ipc } from "@/lib/ipc";
 import { useSettings } from "@/stores/settings";
 
@@ -1387,18 +1481,42 @@ export function AboutSection() {
     <section className="py-2">
       <dl className="border-b border-separator py-4">
         {rows.map(([label, value]) => (
-          <div key={label} className="flex justify-between gap-4 py-1">
+          <div key={label} className="flex items-center justify-between gap-4 py-1">
             <dt className="text-sm text-muted-foreground">{label}</dt>
-            <dd className="font-mono text-xs">{value}</dd>
+            <dd className="flex items-center gap-2 font-mono text-xs">
+              {value}
+              {/* §8.5 says each of these is copyable. One bulk button is not
+                  the same affordance as being able to grab the version. */}
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label={t("settings:about.copyValue", { label })}
+                onClick={() => {
+                  void navigator.clipboard?.writeText(value);
+                  toast.success(t("common:copied"));
+                }}
+              >
+                <Copy size={14} aria-hidden />
+              </Button>
+            </dd>
           </div>
         ))}
       </dl>
 
-      <SettingRow label={t("settings:about.license")} description={t("settings:about.licenseBody")}>
-        <Button variant="secondary" onClick={() => void ipc.openExternal("license")}>
+      {/* The full text, in the application. Linking to GitHub for it would
+          be a network round trip in an application whose first promise is
+          that it makes none. */}
+      <details className="border-b border-separator py-4">
+        <summary className="cursor-pointer text-[0.9375rem] font-medium">
           {t("settings:about.license")}
-        </Button>
-      </SettingRow>
+        </summary>
+        <p className="mt-1 text-[0.8125rem] text-muted-foreground">
+          {t("settings:about.licenseBody")}
+        </p>
+        <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-raised p-3 font-mono text-xs">
+          {MIT_LICENSE}
+        </pre>
+      </details>
 
       <SettingRow label={t("settings:about.repository")} description={t("settings:about.privacy")}>
         <div className="flex gap-2">

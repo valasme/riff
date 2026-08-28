@@ -196,6 +196,7 @@ git commit -m "feat(keys): add deterministic chord resolution"
     "appearance.toggleContrast": "Toggle high contrast",
     "app.openConfig": "Open the settings folder",
     "app.openLogs": "Open the log folder",
+    "ui.closeOverlay": "Close the topmost overlay",
     "app.quit": "Quit Riff"
   }
 }
@@ -220,6 +221,7 @@ function context() {
     },
     openPath: vi.fn(),
     quit: vi.fn(),
+    closeOverlay: vi.fn(),
   };
 }
 
@@ -236,6 +238,12 @@ describe("createKeymap", () => {
       .map((b) => b.chord)
       .filter(Boolean);
     expect(new Set(chords).size).toBe(chords.length);
+  });
+
+  it("lists each action once, so cmdk values stay unique", () => {
+    const shown = createKeymap(context()).filter((b) => !b.hidden);
+    const labels = shown.map((b) => b.descriptionKey);
+    expect(new Set(labels).size).toBe(labels.length);
   });
 
   it("gives every binding a translatable description", () => {
@@ -280,6 +288,7 @@ export interface KeymapContext {
   };
   openPath: (kind: PathKind) => void;
   quit: () => void;
+  closeOverlay: () => void;
 }
 
 export interface Keybinding {
@@ -288,6 +297,8 @@ export interface Keybinding {
   chord: string;
   descriptionKey: string;
   group: "navigation" | "appearance" | "application";
+  /** An alternative chord for an action already listed. Bound, not shown. */
+  hidden?: boolean;
   run: () => void;
 }
 
@@ -303,7 +314,10 @@ export function createKeymap(ctx: KeymapContext): Keybinding[] {
     { id: "nav.practice", chord: "alt+1", group: "navigation", descriptionKey: "palette:commands.nav.practice", run: () => ctx.navigate({ to: "/practice" }) },
     { id: "nav.history", chord: "alt+2", group: "navigation", descriptionKey: "palette:commands.nav.history", run: () => ctx.navigate({ to: "/history" }) },
     { id: "nav.settings", chord: "alt+3", group: "navigation", descriptionKey: "palette:commands.nav.settings", run: () => ctx.navigate({ to: "/settings/general" }) },
-    { id: "nav.settingsAlt", chord: "ctrl+,", group: "navigation", descriptionKey: "palette:commands.nav.settings", run: () => ctx.navigate({ to: "/settings/general" }) },
+    // Second chord for the same action. `hidden` keeps it out of the palette:
+    // two rows reading "Go to Settings" would carry the same cmdk `value`, and
+    // duplicate values make cmdk select both at once.
+    { id: "nav.settingsAlt", chord: "ctrl+,", group: "navigation", hidden: true, descriptionKey: "palette:commands.nav.settings", run: () => ctx.navigate({ to: "/settings/general" }) },
     { id: "nav.about", chord: "", group: "navigation", descriptionKey: "palette:commands.nav.about", run: () => ctx.navigate({ to: "/settings/about" }) },
 
     { id: "ui.togglePalette", chord: "alt+k", group: "application", descriptionKey: "palette:commands.ui.togglePalette", run: ctx.togglePalette },
@@ -316,6 +330,12 @@ export function createKeymap(ctx: KeymapContext): Keybinding[] {
     { id: "app.openConfig", chord: "", group: "application", descriptionKey: "palette:commands.app.openConfig", run: () => ctx.openPath("config") },
     { id: "app.openLogs", chord: "", group: "application", descriptionKey: "palette:commands.app.openLogs", run: () => ctx.openPath("logs") },
     { id: "app.quit", chord: "ctrl+q", group: "application", descriptionKey: "palette:commands.app.quit", run: ctx.quit },
+
+    // Radix already closes its own overlays on Escape, so this binds nothing
+    // new — it is here because §9 lists Escape, and a Shortcuts page built
+    // from this registry has to be able to show it. `hidden` keeps it out of
+    // the palette, where "close this palette" would be noise.
+    { id: "ui.closeOverlay", chord: "escape", group: "application", hidden: true, descriptionKey: "palette:commands.ui.closeOverlay", run: ctx.closeOverlay },
   ];
 }
 ```
@@ -352,7 +372,7 @@ export function useKeybindings(bindings: Keybinding[]): void {
 - [ ] **Step 6: Run the tests**
 
 Run: `pnpm test keybindings`
-Expected: PASS, 13 tests
+Expected: PASS, 14 tests
 
 - [ ] **Step 7: Commit**
 
@@ -422,8 +442,11 @@ describe("CommandPalette", () => {
   });
 
   it("has no accessibility violations", async () => {
-    const { container } = renderPalette();
-    await expect(container).toHaveNoAxeViolations();
+    renderPalette();
+    // document.body, not `container`. Radix portals the dialog out of the
+    // render container, so asserting on the container inspects an empty div
+    // and passes no matter how broken the dialog is.
+    await expect(document.body).toHaveNoAxeViolations();
   });
 });
 ```
@@ -465,12 +488,21 @@ export function CommandPalette({
   const { t } = useTranslation("palette");
 
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange}>
+    // `title` and `description` are required, not decorative: Radix renders
+    // the dialog's accessible name from them, and without one axe reports
+    // aria-dialog-name — which the container-scoped assertion below could
+    // never catch, because the dialog is portalled to <body>.
+    <CommandDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={t("placeholder")}
+      description={t("empty")}
+    >
       <CommandInput placeholder={t("placeholder")} />
       <CommandList>
         <CommandEmpty>{t("empty")}</CommandEmpty>
         {GROUPS.map((group) => {
-          const items = bindings.filter((b) => b.group === group);
+          const items = bindings.filter((b) => b.group === group && !b.hidden);
           if (items.length === 0) return null;
           return (
             <CommandGroup key={group} heading={t(`groups.${group}`)}>
@@ -549,7 +581,102 @@ git commit -m "feat(palette): add the alt+k navigation palette"
 
 ---
 
-### Task 4: Gate check
+### Task 4: The shell's own tests
+
+`__root.tsx` has accumulated the route announcer, `lastRoute` writing, sidebar
+collapse, `subscribeToBackend`, the keymap, the palette, the quit dialog and
+the onboarding guard — across Plans 06, 07, 08 and this one. It is the densest
+file in the frontend and, until now, the only one with no test at all. Two of
+the tests spec §14 names by hand live here.
+
+**Files:**
+- Create: `src/routes/__root.test.tsx`
+
+- [ ] **Step 1: Write the failing tests**
+
+```tsx
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
+
+const patch = vi.fn().mockResolvedValue(undefined);
+const settings = {
+  general: { startupRoute: "practice", lastRoute: "/practice", restoreWindowState: true, confirmOnQuit: false, language: "en" },
+  appearance: { theme: "dark", density: "comfortable", uiScale: 1, reduceMotion: "system", highContrast: false, titleBar: "custom", sidebar: { collapsed: false, rememberCollapsed: true } },
+  onboarding: { completedAt: "2026-08-28T10:00:00Z", version: 1 },
+};
+
+vi.mock("@/stores/settings", () => ({
+  useSettings: Object.assign(
+    (selector: (s: Record<string, unknown>) => unknown) => selector({ settings, patch }),
+    { getState: () => ({ settings, patch }) },
+  ),
+  useAppearance: () => settings.appearance,
+  useTitleBarStyle: () => settings.appearance.titleBar,
+  subscribeToBackend: () => Promise.resolve(() => {}),
+  reportRecovery: () => {},
+}));
+
+const { RootLayout } = await import("./__root");
+
+describe("the shell", () => {
+  it("announces the destination on a route change", async () => {
+    render(<RootLayout />);
+    await waitFor(() =>
+      expect(screen.getByText(/Navigated to/)).toBeInTheDocument(),
+    );
+  });
+
+  it("opens the palette on alt+k", async () => {
+    const user = userEvent.setup();
+    render(<RootLayout />);
+    await user.keyboard("{Alt>}k{/Alt}");
+    expect(await screen.findByRole("combobox")).toBeInTheDocument();
+  });
+
+  it("does not fire a shortcut while the palette input has focus", async () => {
+    const user = userEvent.setup();
+    render(<RootLayout />);
+    await user.keyboard("{Alt>}k{/Alt}");
+    const input = await screen.findByRole("combobox");
+    input.focus();
+    await user.keyboard("{Alt>}1{/Alt}");
+    // Still open: alt+1 must not navigate out from under someone typing.
+    expect(screen.getByRole("combobox")).toBeInTheDocument();
+  });
+
+  it("hides riffs own title bar when system decorations are chosen", async () => {
+    settings.appearance.titleBar = "system";
+    const { container } = render(<RootLayout />);
+    expect(container.querySelector("[data-tauri-drag-region]")).toBeNull();
+    settings.appearance.titleBar = "custom";
+  });
+
+  it("has no accessibility violations, dialogs included", async () => {
+    render(<RootLayout />);
+    await expect(document.body).toHaveNoAxeViolations();
+  });
+});
+```
+
+Export `RootLayout` from `__root.tsx` so it can be rendered without a router —
+the route object stays the default export path, the component becomes testable.
+
+- [ ] **Step 2: Run, implement the export, run again**
+
+Run: `pnpm test __root`
+Expected: PASS, 5 tests
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add -A
+git commit -m "test(shell): cover the root layout, keymap suppression and title bar"
+```
+
+---
+
+### Task 5: Gate check
 
 - [ ] **Step 1: Run everything**
 

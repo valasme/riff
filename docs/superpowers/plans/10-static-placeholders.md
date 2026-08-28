@@ -6,7 +6,7 @@
 
 **Architecture:** Presentational components with no state of their own. That is the point: when the real implementations arrive there is nothing to unwind. No layout engine, no table library, no virtualisation — installing those now would ship unused code and pretend a decision has been made that has not.
 
-**Tech Stack:** Nothing new. Tokens from Plan 05, shadcn `skeleton` and `input`.
+**Tech Stack:** Nothing new. Tokens from Plan 05 and shadcn `skeleton`; the search field is a native `<input>`, so no extra primitive is installed for it.
 
 **Spec:** `docs/superpowers/specs/2026-08-28-riff-foundation-design.md` (§8.3, §8.4)
 
@@ -204,7 +204,7 @@ Add to `src/locales/en/common.json`:
 ```json
   "search": "Search",
   "filter": "Filter",
-  "history": { "name": "Name", "lastPractised": "Last practised", "rowActions": "Row actions", "sessions": "Practice sessions" }
+  "history": { "name": "Name", "lastPractised": "Last practised", "rowActions": "Row actions", "rowMenu": "Row menu", "sessions": "Practice sessions" }
 ```
 
 - [ ] **Step 2: Write the failing test**
@@ -272,7 +272,11 @@ import { Clock, FileText, Filter, Menu, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const ROWS = 3;
+/** The mockup draws the grid filling the panel with three skeleton rows at
+ *  the top and empty checkbox rows below, so the table reads as a table
+ *  rather than as three rows floating in a bordered box. */
+const ROWS = 8;
+const FILLED = 3;
 
 /**
  * The mockup's own skeleton rows, kept as skeletons because that is what the
@@ -289,7 +293,10 @@ export function HistoryPlaceholder() {
           <Search
             size={18}
             aria-hidden
-            className="pointer-events-none absolute inset-block-0 my-auto ms-3 text-muted-foreground"
+            // `inset-y-0` + `my-auto`, not `inset-block-0`: Tailwind has no
+            // `inset-block-*` utility, so that class emits nothing and the
+            // icon sits at the top of the field.
+            className="pointer-events-none absolute inset-y-0 my-auto ms-3 text-muted-foreground"
           />
           <input
             type="search"
@@ -318,15 +325,22 @@ export function HistoryPlaceholder() {
               <th scope="col" className="w-14 p-3">
                 <span className="sr-only">{t("history.rowActions")}</span>
               </th>
-              <th scope="col" className="p-3 text-start text-sm font-medium">
-                <FileText size={16} aria-hidden className="inline-block me-2" />
-                {t("history.name")}
+              {/* The mockup's header carries icons only. The label is kept
+                  for screen readers rather than dropped, which is the one
+                  place worth diverging from the drawing. */}
+              <th scope="col" className="border-s border-separator p-3 text-start text-sm font-medium">
+                <FileText size={16} aria-hidden className="inline-block" />
+                <span className="sr-only">{t("history.name")}</span>
               </th>
-              <th scope="col" className="p-3 text-start text-sm font-medium">
-                <Clock size={16} aria-hidden className="inline-block me-2" />
-                {t("history.lastPractised")}
+              <th scope="col" className="border-s border-separator p-3 text-start text-sm font-medium">
+                <Clock size={16} aria-hidden className="inline-block" />
+                <span className="sr-only">{t("history.lastPractised")}</span>
               </th>
-              <th scope="col" className="w-14 p-3" />
+              {/* Not `<th />`. axe's empty-table-header rule runs by default
+                  and fails an unnamed header cell. */}
+              <th scope="col" className="w-14 p-3">
+                <span className="sr-only">{t("history.rowMenu")}</span>
+              </th>
             </tr>
           </thead>
           <tbody aria-hidden="true">
@@ -335,14 +349,14 @@ export function HistoryPlaceholder() {
                 <td className="p-3">
                   <div className="h-5 w-5 rounded border border-foreground/70" />
                 </td>
-                <td className="p-3">
-                  <Skeleton className="h-4 w-64" />
+                <td className="border-s border-separator p-3">
+                  {i < FILLED && <Skeleton className="h-4 w-64" />}
                 </td>
-                <td className="p-3">
-                  <Skeleton className="h-4 w-48" />
+                <td className="border-s border-separator p-3">
+                  {i < FILLED && <Skeleton className="h-4 w-48" />}
                 </td>
                 <td className="p-3 text-muted-foreground">
-                  <Menu size={18} />
+                  {i < FILLED && <Menu size={18} />}
                 </td>
               </tr>
             ))}

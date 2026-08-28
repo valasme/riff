@@ -4,7 +4,7 @@
 
 **Goal:** Turn the `create-tauri-app` template into a disciplined project skeleton — demo code gone, toolchain pinned, and every quality gate that later plans rely on already failing loudly when it should.
 
-**Architecture:** No application code is written here. Every task installs one gate and proves it works by making it fail first, then pass. Later plans assume `pnpm lint`, `pnpm typecheck`, `pnpm test` and `cargo clippy -- -D warnings` all exist and are green.
+**Architecture:** No application code is written here. Every task installs one gate and proves it works by making it fail first, then pass. Later plans assume `pnpm lint`, `pnpm typecheck`, `pnpm test` and `cargo clippy --all-targets -- -D warnings` all exist and are green.
 
 **Tech Stack:** pnpm 11, Node 26, Rust 1.98, Vite 7, TypeScript 5.8, Tailwind CSS 4.3, Biome 2.5, Vitest 4, axe-core 4.13, lefthook 2.1, cargo-deny.
 
@@ -19,7 +19,7 @@ Copied from the spec. Every task inherits these.
 - **Zero network at runtime.** No HTTP client in either language. If a task appears to need one, the task is wrong.
 - **Rust owns the filesystem.** The webview's only capability is `core:default`.
 - **No caller-supplied paths across IPC.** Commands take enums; native pickers open in Rust.
-- **Rust lints:** `clippy::unwrap_used` denied outside tests, `expect_used` allowed with a message. `cargo clippy -- -D warnings` must pass.
+- **Rust lints:** `clippy::unwrap_used` denied outside tests, `expect_used` allowed with a message. `cargo clippy --all-targets -- -D warnings` must pass.
 - **Every user-visible string** goes through `t()`, including `aria-label`, tooltips, toasts and errors. English only.
 - **Colour tokens** (dark / light): surface `#242424` / `#fafafa`; card `#323232` / `#f2f2f2`; raised `#3c3c3c` / `#eaeaea`; border `#4d4d4d` / `#d4d4d4`; separator `#313131` / `#e6e6e6`; foreground `#e4e4e4` / `#1c1c1c`; muted-foreground `#9a9a9a` / `#5f5f5f`. High contrast: border → `#6d6d6d` / `#8a8a8a`, muted-foreground → `#b0b0b0` / `#4a4a4a`. **There is no accent hue.**
 - **Type:** Outfit Variable (UI), Playfair Display Italic 700 (wordmark only), JetBrains Mono Variable (paths, versions). Self-hosted; no runtime font fetch.
@@ -301,7 +301,15 @@ Overwrite `biome.json`, keeping the `$schema` line that `biome init` generated �
 {
   "$schema": "https://biomejs.dev/schemas/2.5.11/schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
-  "files": { "includes": ["**", "!dist/**", "!src-tauri/target/**", "!coverage/**"] },
+  "files": {
+    "includes": [
+      "**",
+      "!dist/**",
+      "!src-tauri/target/**",
+      "!coverage/**",
+      "!src/routeTree.gen.ts"
+    ]
+  },
   "formatter": {
     "enabled": true,
     "indentStyle": "space",
@@ -323,6 +331,8 @@ Overwrite `biome.json`, keeping the `$schema` line that `biome init` generated �
   "assist": { "actions": { "source": { "organizeImports": "on" } } }
 }
 ```
+
+`src/routeTree.gen.ts` is excluded deliberately. It is generated and committed, and CI regenerates it and diffs. If Biome reformats it on commit while the plugin writes its own style, that diff can never come back clean — the two formatters would fight forever over a file no human reads.
 
 If `biome check` rejects a key, the installed schema differs — run `pnpm exec biome check --write` and consult the error, which names the offending path exactly. Do not silence rules to make it pass.
 
@@ -397,6 +407,8 @@ In `tsconfig.json`, add these inside `compilerOptions`:
     "paths": { "@/*": ["./src/*"] },
     "types": ["vite/client"],
 ```
+
+Also add `"types": ["node"]` to `tsconfig.node.json`, which is the project that owns `vite.config.ts`: it imports `node:url` and reads `process.env`, and without `@types/node` those are errors nobody sees because `tsc --noEmit` does not build referenced projects. They surface the moment anyone runs `tsc -b` or opens the file in an editor.
 
 `exactOptionalPropertyTypes` is deliberately **not** enabled: it fights third-party React prop types constantly and buys little in an application this size.
 
@@ -555,7 +567,7 @@ git commit -m "build: add tailwind v4 and the react compiler"
 - [ ] **Step 1: Install**
 
 ```bash
-pnpm add -D vitest@4.1.11 @vitest/coverage-v8@4.1.11 jsdom \
+pnpm add -D @types/node vitest@4.1.11 @vitest/coverage-v8@4.1.11 jsdom \
   @testing-library/react@16.3.3 @testing-library/user-event @testing-library/jest-dom \
   axe-core@4.13.0
 ```
@@ -572,7 +584,12 @@ In `vite.config.ts`, add a `test` block after `build`:
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
-      include: ["src/features/**", "src/lib/**", "src/stores/**"],
+      // `src/routes/**` is included because __root.tsx accumulates the
+      // route announcer, lastRoute writing, sidebar state, the keymap, the
+      // palette and the onboarding guard across four plans. Excluding the
+      // densest file in the frontend from the gate that measures it is how
+      // it ends up with no tests at all.
+      include: ["src/features/**", "src/lib/**", "src/stores/**", "src/routes/**"],
       thresholds: { lines: 80, functions: 80, branches: 70, statements: 80 },
     },
   },
@@ -619,6 +636,11 @@ declare module "vitest" {
     toHaveNoAxeViolations(): Promise<T>;
   }
 }
+
+// If `pnpm typecheck` reports that `toHaveNoAxeViolations` does not exist on
+// the assertion, the installed Vitest names or parameterises this interface
+// differently. Check `node_modules/vitest/dist/index.d.ts` for the interface
+// `expect.extend` augments and match it — do not cast the expectation.
 ```
 
 - [ ] **Step 4: Write the setup file**
@@ -786,7 +808,9 @@ unimplemented = "deny"
 dbg_macro = "deny"
 
 [lints.rust]
-unsafe_code = "forbid"
+# `deny`, not `forbid`: forbid cannot be lifted by an #[allow], which is a
+# known way to break proc-macro-generated code. Same protection, no trap.
+unsafe_code = "deny"
 ```
 
 `expect_used` stays allowed on purpose: a genuine invariant should be stated with a message explaining why it holds, and banning that only pushes people back to `unwrap`.
@@ -802,15 +826,17 @@ pub fn probe() -> i32 {
 }
 ```
 
-Run: `cd src-tauri && cargo clippy -- -D warnings`
+Run: `cd src-tauri && cargo clippy --all-targets -- -D warnings`
 Expected: FAIL — `used `unwrap()` on an `Option` value`
 
 - [ ] **Step 3: Remove the probe and confirm green**
 
 Delete the `probe` function.
 
-Run: `cd src-tauri && cargo clippy -- -D warnings`
+Run: `cd src-tauri && cargo clippy --all-targets -- -D warnings`
 Expected: PASS
+
+`--all-targets` on purpose, and it is the form every later plan and CI use. Without it clippy checks only the lib target, so `unwrap_used` — the lint this gate exists for — never looks at a single test.
 
 - [ ] **Step 4: Add the licence allow-list**
 
@@ -840,7 +866,22 @@ GPL and AGPL are absent deliberately: a copyleft transitive dependency must not 
 
 - [ ] **Step 5: Run the check**
 
-Run: `cd src-tauri && cargo deny check licenses`
+Then set the other two sections CI runs, so `cargo deny check` means the same thing locally and in CI:
+
+```toml
+[bans]
+multiple-versions = "warn"
+
+[advisories]
+yanked = "deny"
+unmaintained = "workspace"
+```
+
+`unmaintained = "workspace"` limits the check to crates Riff depends on directly. The alternative, `all`, turns CI red on a transitive crate nobody can act on, and a check you cannot act on is a check you learn to ignore.
+
+- [ ] **Step 5b: Run the check**
+
+Run: `cd src-tauri && cargo deny check`
 Expected: PASS. If a crate is rejected, read its licence before adding anything.
 
 - [ ] **Step 6: Commit**
@@ -862,7 +903,7 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
-cd src-tauri && cargo fmt --check && cargo clippy -- -D warnings && cargo test && cargo deny check licenses
+cd src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test && cargo deny check
 ```
 
 Expected: every command exits 0.

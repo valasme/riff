@@ -280,12 +280,19 @@ export const Route = createRootRoute({
 });
 
 function RootLayout() {
-  const { t } = useTranslation("nav");
+  const { t, i18n } = useTranslation("nav");
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [announcement, setAnnouncement] = useState("");
 
   // A client-side route change is silent to a screen reader. This is the
   // only thing that tells one the destination changed.
+  // §10 requires both, and `dir` is what makes adding an RTL locale a
+  // translation task rather than a rewrite.
+  useEffect(() => {
+    document.documentElement.lang = i18n.language;
+    document.documentElement.dir = i18n.dir();
+  }, [i18n.language]);
+
   useEffect(() => {
     const name = pathname.split("/").filter(Boolean)[0] ?? "practice";
     setAnnouncement(t("routeAnnouncement", { name: t(name, { defaultValue: name }) }));
@@ -469,7 +476,10 @@ export function Providers({ children }: { children: ReactNode }) {
     <I18nextProvider i18n={i18n}>
       <TooltipProvider delayDuration={400}>
         <ErrorBoundary FallbackComponent={RouteError}>{children}</ErrorBoundary>
-        <Toaster position="bottom-right" closeButton />
+        {/* sonner defaults to theme="light". Without this every toast is a
+            white card on a #242424 application. Plan 07 replaces the literal
+            with the persisted theme once the store exists. */}
+        <Toaster theme="dark" position="bottom-end" closeButton />
       </TooltipProvider>
     </I18nextProvider>
   );
@@ -605,6 +615,7 @@ Add to `src/locales/en/nav.json`:
 ```json
   "minimize": "Minimize",
   "maximize": "Maximize",
+  "restore": "Restore",
   "closeWindow": "Close window",
   "openPalette": "Search or jump to"
 ```
@@ -626,14 +637,21 @@ import { ipc } from "@/lib/ipc";
 const BUTTON =
   "grid h-8 w-11 place-items-center text-foreground transition-colors hover:bg-raised";
 
-export function WindowControls() {
+export function WindowControls({ maximized = false }: { maximized?: boolean }) {
   const { t } = useTranslation("nav");
   return (
     <div className="flex items-center">
       <button type="button" className={BUTTON} aria-label={t("minimize")} onClick={() => void ipc.windowMinimize()}>
         <Minus size={16} aria-hidden />
       </button>
-      <button type="button" className={BUTTON} aria-label={t("maximize")} onClick={() => void ipc.windowToggleMaximize()}>
+      <button
+        type="button"
+        className={BUTTON}
+        // Telling a screen-reader user the button maximizes a window that is
+        // already maximized is worse than not labelling it at all.
+        aria-label={maximized ? t("restore") : t("maximize")}
+        onClick={() => void ipc.windowToggleMaximize()}
+      >
         <Square size={13} aria-hidden />
       </button>
       <button type="button" className={BUTTON} aria-label={t("closeWindow")} onClick={() => void ipc.windowClose()}>

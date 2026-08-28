@@ -159,7 +159,8 @@ git commit -m "feat(onboarding): add the gate and theme suggestion"
   "step": "Step {{current}} of {{total}}",
   "welcome": {
     "title": "Practice everything in one place",
-    "body": "Riff keeps your score, your video and your audio side by side, so you stop juggling three windows and start playing."
+    "body": "Riff keeps your score, your video and your audio side by side, so you stop juggling three windows and start playing.",
+    "status": "This early build has the workspace, the settings and the keyboard shortcuts. Playing a score, a video or a track is still to come."
   },
   "theme": {
     "title": "Pick a look",
@@ -289,9 +290,12 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/cn";
 import { ipc, type Theme } from "@/lib/ipc";
 import { PATH_KINDS, pathFor } from "@/lib/paths";
+import { router } from "@/app/router";
+import { resolveStartupRoute } from "@/lib/startup-route";
 import { useSettings } from "@/stores/settings";
 import { ONBOARDING_VERSION, preferredTheme } from "./gate";
 
@@ -324,7 +328,12 @@ export function OnboardingFlow() {
       appearance: { theme },
       onboarding: { completedAt: new Date().toISOString(), version: ONBOARDING_VERSION },
     });
-    navigate({ to: "/practice" });
+    // §8.2: routes to `general.startupRoute`, not a hardcoded /practice. It
+    // is /practice by default, so this only differs for someone who imported
+    // settings before finishing — but that is the case a hardcoded route gets
+    // wrong, and the guard would immediately bounce them anyway.
+    const { startupRoute, lastRoute } = useSettings.getState().settings.general;
+    navigate({ to: resolveStartupRoute(startupRoute, lastRoute, Object.keys(router.routesById)) });
   }
 
   const step = STEPS[index];
@@ -341,6 +350,9 @@ export function OnboardingFlow() {
             <p className="font-display text-5xl italic">riff</p>
             <h1 className="mt-6 text-2xl font-semibold">{t("onboarding:welcome.title")}</h1>
             <p className="mt-3 text-muted-foreground">{t("onboarding:welcome.body")}</p>
+            {/* The README is honest about placeholders; the first run is what
+                people actually read, so it says so too. */}
+            <p className="mt-4 text-[0.8125rem] text-muted-foreground">{t("onboarding:welcome.status")}</p>
           </>
         )}
 
@@ -348,30 +360,32 @@ export function OnboardingFlow() {
           <>
             <h1 className="text-2xl font-semibold">{t("onboarding:theme.title")}</h1>
             <p className="mt-2 text-muted-foreground">{t("onboarding:theme.body")}</p>
-            <div
-              role="radiogroup"
+            {/* Radix, not hand-rolled roles. role="radio" on a <button> with
+                no roving tabindex is the ARIA pattern without its keyboard
+                behaviour — arrow keys do nothing — and §11 is explicit that
+                the work here is not undoing what Radix already gets right. */}
+            <RadioGroup
+              value={theme}
+              onValueChange={(v) => choose(v as Theme)}
               aria-label={t("onboarding:theme.title")}
               className="mt-8 flex justify-center gap-6"
             >
               {(["dark", "light"] as Theme[]).map((option) => (
-                <button
+                <label
                   key={option}
-                  type="button"
-                  role="radio"
-                  aria-checked={theme === option}
-                  onClick={() => choose(option)}
                   className={cn(
-                    "w-64 rounded-[var(--radius-card)] border-2 p-3 transition-colors",
+                    "w-64 cursor-pointer rounded-[var(--radius-card)] border-2 p-3 transition-colors",
                     theme === option ? "border-ring" : "border-border-subtle",
                   )}
                 >
+                  <RadioGroupItem value={option} className="sr-only" />
                   <ThemePreview variant={option} />
                   <span className="mt-3 block text-sm font-medium">
                     {t(`onboarding:theme.${option}`)}
                   </span>
-                </button>
+                </label>
               ))}
-            </div>
+            </RadioGroup>
           </>
         )}
 
