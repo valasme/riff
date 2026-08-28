@@ -5,6 +5,10 @@ pub mod paths;
 pub mod settings;
 pub mod storage;
 
+/// Set once the user has confirmed quitting, so the second close attempt
+/// passes straight through instead of asking again forever.
+pub struct QuitApproved(pub std::sync::atomic::AtomicBool);
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
