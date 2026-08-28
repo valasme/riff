@@ -203,7 +203,6 @@ describe("useSettings", () => {
   });
 
   it("falls back to synchronous defaults when the bootstrap payload never arrived, then adopts the async read", async () => {
-    // biome-ignore lint/performance/noDelete: simulating a missing global, not a hot path.
     delete window.__RIFF_BOOTSTRAP__;
     const fetched = structuredClone(DEFAULTS);
     fetched.appearance.theme = "light";
