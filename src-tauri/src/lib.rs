@@ -1,3 +1,4 @@
+pub mod bootstrap;
 pub mod commands;
 pub mod error;
 pub mod logging;
