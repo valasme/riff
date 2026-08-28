@@ -39,7 +39,7 @@
 **Files:**
 - Create: `src/features/keybindings/chord.ts`, `src/features/keybindings/chord.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `src/features/keybindings/chord.test.ts`:
 
@@ -100,12 +100,12 @@ describe("formatChord", () => {
 });
 ```
 
-- [ ] **Step 2: Run and watch them fail**
+- [x] **Step 2: Run and watch them fail**
 
 Run: `pnpm test keybindings/chord`
 Expected: FAIL — cannot resolve `./chord`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/features/keybindings/chord.ts`:
 
@@ -153,12 +153,12 @@ export function formatChord(chord: string): string {
 }
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `pnpm test keybindings/chord`
 Expected: PASS, 8 tests
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -175,7 +175,7 @@ git commit -m "feat(keys): add deterministic chord resolution"
 **Files:**
 - Create: `src/features/keybindings/keymap.ts`, `src/features/keybindings/keymap.test.ts`, `src/features/keybindings/useKeybindings.ts`
 
-- [ ] **Step 1: Add the strings**
+- [x] **Step 1: Add the strings**
 
 `src/locales/en/palette.json`:
 
@@ -202,7 +202,7 @@ git commit -m "feat(keys): add deterministic chord resolution"
 }
 ```
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 `src/features/keybindings/keymap.test.ts`:
 
@@ -266,12 +266,12 @@ describe("createKeymap", () => {
 });
 ```
 
-- [ ] **Step 3: Run and watch it fail**
+- [x] **Step 3: Run and watch it fail**
 
 Run: `pnpm test keybindings/keymap`
 Expected: FAIL — cannot resolve `./keymap`
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 `src/features/keybindings/keymap.ts`:
 
@@ -340,7 +340,7 @@ export function createKeymap(ctx: KeymapContext): Keybinding[] {
 }
 ```
 
-- [ ] **Step 5: Implement the listener**
+- [x] **Step 5: Implement the listener**
 
 `src/features/keybindings/useKeybindings.ts`:
 
@@ -369,12 +369,12 @@ export function useKeybindings(bindings: Keybinding[]): void {
 }
 ```
 
-- [ ] **Step 6: Run the tests**
+- [x] **Step 6: Run the tests**
 
 Run: `pnpm test keybindings`
 Expected: PASS, 14 tests
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -389,7 +389,7 @@ git commit -m "feat(keys): add the keybinding registry and listener"
 - Create: `src/features/palette/CommandPalette.tsx`, `src/features/palette/CommandPalette.test.tsx`
 - Modify: `src/routes/__root.tsx`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `src/features/palette/CommandPalette.test.tsx`:
 
@@ -451,12 +451,12 @@ describe("CommandPalette", () => {
 });
 ```
 
-- [ ] **Step 2: Run and watch it fail**
+- [x] **Step 2: Run and watch it fail**
 
 Run: `pnpm test CommandPalette`
 Expected: FAIL — cannot resolve `./CommandPalette`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/features/palette/CommandPalette.tsx`:
 
@@ -530,7 +530,7 @@ export function CommandPalette({
 }
 ```
 
-- [ ] **Step 4: Mount it in the shell**
+- [x] **Step 4: Mount it in the shell**
 
 In `src/routes/__root.tsx`:
 
@@ -563,16 +563,16 @@ Pass `onOpenPalette={() => setPaletteOpen(true)}` to `<TitleBar />` and render:
 <CommandPalette open={paletteOpen} bindings={bindings} onOpenChange={setPaletteOpen} />
 ```
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `pnpm test CommandPalette`
 Expected: PASS, 4 tests
 
-- [ ] **Step 6: Verify by hand**
+- [x] **Step 6: Verify by hand**
 
 Run `pnpm app`. Press Alt+K; click the title bar's search icon; press Ctrl+B; press Alt+2. Type into the palette's input and confirm Alt+1 does **not** navigate while typing.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -592,7 +592,7 @@ the tests spec §14 names by hand live here.
 **Files:**
 - Create: `src/routes/__root.test.tsx`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
 import { render, screen, waitFor } from "@testing-library/react";
@@ -662,12 +662,12 @@ describe("the shell", () => {
 Export `RootLayout` from `__root.tsx` so it can be rendered without a router —
 the route object stays the default export path, the component becomes testable.
 
-- [ ] **Step 2: Run, implement the export, run again**
+- [x] **Step 2: Run, implement the export, run again**
 
 Run: `pnpm test __root`
 Expected: PASS, 5 tests
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add -A
@@ -678,14 +678,14 @@ git commit -m "test(shell): cover the root layout, keymap suppression and title 
 
 ### Task 5: Gate check
 
-- [ ] **Step 1: Run everything**
+- [x] **Step 1: Run everything**
 
 ```bash
 pnpm lint && pnpm typecheck && pnpm test && pnpm build
 ```
 Expected: all exit 0.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add -A
