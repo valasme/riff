@@ -1,0 +1,20 @@
+/* Self-hosted. The CSP has no `font-src` beyond 'self', so a runtime fetch
+   from a font CDN is not merely discouraged — it is blocked. */
+
+/* UI. Variable, so every weight costs one file.
+   Variable fontsource packages export by weight axis, not by subset — there
+   is no `latin.css` here the way static families have one. `wght.css` is
+   already scoped to two @font-face blocks (basic latin, latin-ext); the
+   `index.css` this package would otherwise ship does not exist for the
+   variable line, so this is already the minimal cut. */
+@import "@fontsource-variable/outfit/wght.css";
+
+/* Wordmark only. Italic 700, latin subset, is the single cut the mark uses;
+   `700-italic.css` (no subset prefix) bundles latin, latin-ext, cyrillic and
+   vietnamese into one file — importing the whole family would ship far more
+   than the four letters the mark needs. */
+@import "@fontsource/playfair-display/latin-700-italic.css";
+
+/* Paths, versions and diagnostics. Upright only — diagnostics text is never
+   italic — so `wght.css`, not `wght-italic.css`. */
+@import "@fontsource-variable/jetbrains-mono/wght.css";
