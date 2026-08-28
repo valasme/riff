@@ -13,6 +13,25 @@ class ResizeObserverStub {
 }
 globalThis.ResizeObserver ??= ResizeObserverStub;
 
+// jsdom never implemented `isContentEditable` (it stays `undefined`
+// regardless of the attribute) — there is no open issue asking for it, just
+// silence. Real browsers walk the element and its ancestors for the nearest
+// explicit `contenteditable` value; this mirrors that closely enough for a
+// keyboard-suppression test to mean something.
+Object.defineProperty(HTMLElement.prototype, "isContentEditable", {
+  configurable: true,
+  get(this: HTMLElement) {
+    let el: HTMLElement | null = this;
+    while (el) {
+      const value = el.getAttribute("contenteditable");
+      if (value === "true" || value === "") return true;
+      if (value === "false") return false;
+      el = el.parentElement;
+    }
+    return false;
+  },
+});
+
 afterEach(() => {
   cleanup();
 });
