@@ -33,7 +33,7 @@ export const Route = createRootRoute({
   },
 });
 
-function RootLayout() {
+export function RootLayout() {
   const { t, i18n } = useTranslation("nav");
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [announcement, setAnnouncement] = useState("");
