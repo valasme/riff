@@ -57,7 +57,8 @@ cargo add tauri-plugin-single-instance@2 tauri-plugin-window-state@2 tauri-plugi
 cargo add rfd@0.15 --no-default-features --features gtk3
 ```
 
-`tauri-plugin-opener` is already a dependency from the template.
+`tauri-plugin-opener` is already a Rust dependency from the template. Its
+JavaScript package was removed in Plan 01 Task 2 — the webview never calls it.
 
 - [ ] **Step 2: Write the failing test**
 

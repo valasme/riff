@@ -141,7 +141,14 @@ pub fn run() {
 ```bash
 rm src/App.tsx src/App.css src/assets/react.svg public/tauri.svg public/vite.svg
 rmdir src/assets 2>/dev/null || true
+pnpm remove @tauri-apps/plugin-opener
 ```
+
+The opener plugin stays as a **Rust** dependency — `open_path` and
+`open_external` use it — but its JavaScript package has no consumer and never
+will: the webview holds one capability and calls the plugin through none of
+them. Shipping it would be a dependency in the bundle for an API nothing
+imports.
 
 - [ ] **Step 5: Replace the entry point**
 
