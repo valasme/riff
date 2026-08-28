@@ -36,7 +36,7 @@
 - Create: `src/features/practice/PracticePlaceholder.tsx`, `src/features/practice/PracticePlaceholder.test.tsx`
 - Modify: `src/routes/practice.tsx`, `src/locales/en/common.json`
 
-- [ ] **Step 1: Add the strings**
+- [x] **Step 1: Add the strings**
 
 Add to `src/locales/en/common.json`:
 
@@ -46,7 +46,7 @@ Add to `src/locales/en/common.json`:
   "paneActions": { "popOut": "Pop out", "closePane": "Close pane" }
 ```
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 `src/features/practice/PracticePlaceholder.test.tsx`:
 
@@ -93,12 +93,12 @@ describe("PracticePlaceholder", () => {
 });
 ```
 
-- [ ] **Step 3: Run and watch it fail**
+- [x] **Step 3: Run and watch it fail**
 
 Run: `pnpm test PracticePlaceholder`
 Expected: FAIL — cannot resolve `./PracticePlaceholder`
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 `src/features/practice/PracticePlaceholder.tsx`:
 
@@ -177,12 +177,12 @@ import { PracticePlaceholder } from "@/features/practice/PracticePlaceholder";
 export const Route = createFileRoute("/practice")({ component: PracticePlaceholder });
 ```
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `pnpm test PracticePlaceholder`
 Expected: PASS, 4 tests
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A
@@ -197,7 +197,7 @@ git commit -m "feat(practice): add the static three-pane placeholder"
 - Create: `src/features/history/HistoryPlaceholder.tsx`, `src/features/history/HistoryPlaceholder.test.tsx`
 - Modify: `src/routes/history.tsx`, `src/locales/en/common.json`
 
-- [ ] **Step 1: Add the strings**
+- [x] **Step 1: Add the strings**
 
 Add to `src/locales/en/common.json`:
 
@@ -207,7 +207,7 @@ Add to `src/locales/en/common.json`:
   "history": { "name": "Name", "lastPractised": "Last practised", "rowActions": "Row actions", "rowMenu": "Row menu", "sessions": "Practice sessions" }
 ```
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 `src/features/history/HistoryPlaceholder.test.tsx`:
 
@@ -258,12 +258,12 @@ describe("HistoryPlaceholder", () => {
 });
 ```
 
-- [ ] **Step 3: Run and watch it fail**
+- [x] **Step 3: Run and watch it fail**
 
 Run: `pnpm test HistoryPlaceholder`
 Expected: FAIL — cannot resolve `./HistoryPlaceholder`
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 `src/features/history/HistoryPlaceholder.tsx`:
 
@@ -377,16 +377,16 @@ import { HistoryPlaceholder } from "@/features/history/HistoryPlaceholder";
 export const Route = createFileRoute("/history")({ component: HistoryPlaceholder });
 ```
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 Run: `pnpm test HistoryPlaceholder`
 Expected: PASS, 5 tests
 
-- [ ] **Step 6: Compare against the mockup**
+- [x] **Step 6: Compare against the mockup**
 
 Run `pnpm app`, open History, and put `docs/design/history-route.png` beside it. Check the search field height, the filter button, the column layout and the row separators.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -397,19 +397,19 @@ git commit -m "feat(history): add the static table placeholder"
 
 ### Task 3: Gate check
 
-- [ ] **Step 1: Run everything**
+- [x] **Step 1: Run everything**
 
 ```bash
 pnpm lint && pnpm typecheck && pnpm test && pnpm build
 ```
 Expected: all exit 0.
 
-- [ ] **Step 2: Confirm no deferred dependency crept in**
+- [x] **Step 2: Confirm no deferred dependency crept in**
 
 Run: `grep -E '"(@tanstack/react-(table|virtual|query)|react-resizable-panels|pdfjs-dist)"' package.json || echo "no deferred dependencies installed"`
 Expected: `no deferred dependencies installed`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add -A
