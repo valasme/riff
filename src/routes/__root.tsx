@@ -2,6 +2,7 @@ import { createRootRoute, Outlet, useRouterState } from "@tanstack/react-router"
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { RouteError } from "@/components/RouteError";
+import { Sidebar } from "@/components/Sidebar";
 import { TitleBar } from "@/features/window/TitleBar";
 
 export const Route = createRootRoute({
@@ -13,6 +14,8 @@ function RootLayout() {
   const { t, i18n } = useTranslation("nav");
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [announcement, setAnnouncement] = useState("");
+  // Plan 07 replaces this with the persisted setting.
+  const [collapsed, setCollapsed] = useState(false);
 
   // A client-side route change is silent to a screen reader. This is the
   // only thing that tells one the destination changed.
@@ -39,12 +42,12 @@ function RootLayout() {
       {/* Plan 07 makes this conditional on `appearance.titleBar`, because
           "System decorations" has to hide Riff's own bar or the window ends
           up with two. */}
-      <TitleBar />
+      <TitleBar onToggleSidebar={() => setCollapsed((v) => !v)} />
       {/* The container the sidebar's breakpoint measures. Chrome is rem-sized,
           so raising the UI scale shrinks this in px and the query fires —
           which a viewport media query could never do. */}
       <div className="@container/shell flex min-h-0 flex-1">
-        {/* Task 5 replaces this with <Sidebar />. */}
+        <Sidebar collapsed={collapsed} />
         <main id="main" className="min-w-0 flex-1 overflow-auto">
           <Outlet />
         </main>
