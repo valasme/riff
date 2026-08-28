@@ -13,6 +13,10 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as HistoryRouteImport } from './routes/history'
 import { Route as PracticeRouteImport } from './routes/practice'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SettingsIndexRouteImport } from './routes/settings.index'
+import { Route as SettingsAboutRouteImport } from './routes/settings.about'
+import { Route as SettingsAppearanceRouteImport } from './routes/settings.appearance'
+import { Route as SettingsGeneralRouteImport } from './routes/settings.general'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -34,39 +38,94 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsIndexRoute = SettingsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsAboutRoute = SettingsAboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsAppearanceRoute = SettingsAppearanceRouteImport.update({
+  id: '/appearance',
+  path: '/appearance',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsGeneralRoute = SettingsGeneralRouteImport.update({
+  id: '/general',
+  path: '/general',
+  getParentRoute: () => SettingsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/history': typeof HistoryRoute
   '/practice': typeof PracticeRoute
-  '/settings': typeof SettingsRoute
+  '/settings': typeof SettingsRouteWithChildren
+  '/settings/about': typeof SettingsAboutRoute
+  '/settings/appearance': typeof SettingsAppearanceRoute
+  '/settings/general': typeof SettingsGeneralRoute
+  '/settings/': typeof SettingsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/history': typeof HistoryRoute
   '/practice': typeof PracticeRoute
-  '/settings': typeof SettingsRoute
+  '/settings/about': typeof SettingsAboutRoute
+  '/settings/appearance': typeof SettingsAppearanceRoute
+  '/settings/general': typeof SettingsGeneralRoute
+  '/settings': typeof SettingsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/history': typeof HistoryRoute
   '/practice': typeof PracticeRoute
-  '/settings': typeof SettingsRoute
+  '/settings': typeof SettingsRouteWithChildren
+  '/settings/about': typeof SettingsAboutRoute
+  '/settings/appearance': typeof SettingsAppearanceRoute
+  '/settings/general': typeof SettingsGeneralRoute
+  '/settings/': typeof SettingsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/history' | '/practice' | '/settings'
+  fullPaths:
+    | '/'
+    | '/history'
+    | '/practice'
+    | '/settings'
+    | '/settings/about'
+    | '/settings/appearance'
+    | '/settings/general'
+    | '/settings/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/history' | '/practice' | '/settings'
-  id: '__root__' | '/' | '/history' | '/practice' | '/settings'
+  to:
+    | '/'
+    | '/history'
+    | '/practice'
+    | '/settings/about'
+    | '/settings/appearance'
+    | '/settings/general'
+    | '/settings'
+  id:
+    | '__root__'
+    | '/'
+    | '/history'
+    | '/practice'
+    | '/settings'
+    | '/settings/about'
+    | '/settings/appearance'
+    | '/settings/general'
+    | '/settings/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   HistoryRoute: typeof HistoryRoute
   PracticeRoute: typeof PracticeRoute
-  SettingsRoute: typeof SettingsRoute
+  SettingsRoute: typeof SettingsRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -99,14 +158,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/': {
+      id: '/settings/'
+      path: '/'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof SettingsIndexRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/about': {
+      id: '/settings/about'
+      path: '/about'
+      fullPath: '/settings/about'
+      preLoaderRoute: typeof SettingsAboutRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/appearance': {
+      id: '/settings/appearance'
+      path: '/appearance'
+      fullPath: '/settings/appearance'
+      preLoaderRoute: typeof SettingsAppearanceRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/general': {
+      id: '/settings/general'
+      path: '/general'
+      fullPath: '/settings/general'
+      preLoaderRoute: typeof SettingsGeneralRouteImport
+      parentRoute: typeof SettingsRoute
+    }
   }
 }
+
+interface SettingsRouteChildren {
+  SettingsAboutRoute: typeof SettingsAboutRoute
+  SettingsAppearanceRoute: typeof SettingsAppearanceRoute
+  SettingsGeneralRoute: typeof SettingsGeneralRoute
+  SettingsIndexRoute: typeof SettingsIndexRoute
+}
+
+const SettingsRouteChildren: SettingsRouteChildren = {
+  SettingsAboutRoute: SettingsAboutRoute,
+  SettingsAppearanceRoute: SettingsAppearanceRoute,
+  SettingsGeneralRoute: SettingsGeneralRoute,
+  SettingsIndexRoute: SettingsIndexRoute,
+}
+
+const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
+  SettingsRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   HistoryRoute: HistoryRoute,
   PracticeRoute: PracticeRoute,
-  SettingsRoute: SettingsRoute,
+  SettingsRoute: SettingsRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

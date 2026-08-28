@@ -1,1 +1,102 @@
-{}
+{
+  "title": "Settings",
+  "sections": { "general": "General", "appearance": "Appearance", "about": "About" },
+  "general": {
+    "startupRoute": {
+      "label": "On launch, open",
+      "description": "Which page Riff shows when it starts."
+    },
+    "startupOptions": {
+      "practice": "Practice",
+      "history": "History",
+      "last-used": "The page I was last on"
+    },
+    "restoreWindow": {
+      "label": "Restore window size and position",
+      "description": "Position is a request your window manager may decline. Under Wayland, most compositors place windows themselves."
+    },
+    "confirmOnQuit": {
+      "label": "Confirm before quitting",
+      "description": "Ask before closing Riff."
+    },
+    "dataLocations": {
+      "label": "Data locations",
+      "description": "Everything Riff stores lives in these folders and nowhere else."
+    },
+    "paths": { "config": "Settings", "data": "Data", "cache": "Cache", "logs": "Logs" },
+    "importExport": {
+      "label": "Settings file",
+      "description": "Copy your settings to another machine, or bring them back."
+    },
+    "export": "Export settings",
+    "import": "Import settings",
+    "importConfirm": {
+      "title": "Replace your settings?",
+      "body": "The file you pick replaces your current General and Appearance settings. This cannot be undone. Your onboarding choice is kept."
+    },
+    "exported": "Settings exported to {{path}}",
+    "imported": "Settings imported",
+    "reset": {
+      "label": "Reset all settings",
+      "description": "Restores General and Appearance to their defaults. Your onboarding choice is kept.",
+      "action": "Reset",
+      "confirmTitle": "Reset all settings?",
+      "confirmBody": "General and Appearance return to their defaults. This cannot be undone."
+    },
+    "rerunOnboarding": {
+      "label": "Run first-time setup again",
+      "description": "Shows the welcome, theme and privacy steps once more.",
+      "action": "Run setup"
+    }
+  },
+  "appearance": {
+    "theme": {
+      "label": "Theme",
+      "description": "Riff does not follow your desktop; you chose this during setup and can change it here."
+    },
+    "themeOptions": { "dark": "Dark", "light": "Light" },
+    "density": { "label": "Density", "description": "Adjusts spacing without changing text size." },
+    "densityOptions": { "comfortable": "Comfortable", "compact": "Compact" },
+    "uiScale": {
+      "label": "Interface scale",
+      "description": "Scales the whole interface, not only text.",
+      "reset": "Reset to 100%"
+    },
+    "reduceMotion": {
+      "label": "Reduce motion",
+      "description": "System follows your desktop's accessibility preference."
+    },
+    "motionOptions": {
+      "system": "Follow my system",
+      "always": "Always reduce",
+      "never": "Never reduce"
+    },
+    "highContrast": {
+      "label": "High contrast",
+      "description": "Strengthens borders and secondary text to meet WCAG contrast minimums."
+    },
+    "titleBar": {
+      "label": "Title bar",
+      "description": "Use Riff's own title bar, or ask your window manager for its decorations."
+    },
+    "titleBarOptions": { "custom": "Riff's title bar", "system": "System decorations" },
+    "rememberSidebar": {
+      "label": "Remember sidebar state",
+      "description": "Reopen Riff with the sidebar as you left it."
+    }
+  },
+  "about": {
+    "version": "Version",
+    "tauri": "Tauri",
+    "webkit": "WebKitGTK",
+    "buildDate": "Build date",
+    "commit": "Commit",
+    "repository": "Repository",
+    "issues": "Report an issue",
+    "license": "Licence",
+    "licenseBody": "Riff is free software released under the MIT Licence.",
+    "copyDiagnostics": "Copy diagnostics",
+    "copyValue": "Copy {{label}}",
+    "privacy": "Riff makes no network connections. Nothing you do here leaves this machine."
+  }
+}
