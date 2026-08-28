@@ -1,5 +1,6 @@
 pub mod bootstrap;
 pub mod commands;
+pub mod diagnostics;
 pub mod error;
 pub mod logging;
 pub mod paths;
