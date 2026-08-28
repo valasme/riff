@@ -32,6 +32,7 @@
   "bundle": {
     "active": true,
     "targets": ["deb", "rpm", "appimage"],
+    "publisher": "valasme",
     "category": "Music",
     "shortDescription": "Practise with sheet music, video and audio in one place",
     "longDescription": "Riff is a local-first practice workspace for musicians. It keeps a PDF score, a video lesson and an audio track side by side on one page. No accounts, no telemetry, no network.",
@@ -48,20 +49,24 @@
     "linux": {
       "deb": {
         "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0"],
+        "desktopTemplate": "riff.desktop",
         "files": {
           "/usr/share/man/man1/riff.1": "dist-extra/riff.1",
           "/usr/share/bash-completion/completions/riff": "dist-extra/riff.bash",
           "/usr/share/zsh/site-functions/_riff": "dist-extra/_riff",
-          "/usr/share/fish/vendor_completions.d/riff.fish": "dist-extra/riff.fish"
+          "/usr/share/fish/vendor_completions.d/riff.fish": "dist-extra/riff.fish",
+          "/usr/share/metainfo/io.github.valasme.riff.metainfo.xml": "io.github.valasme.riff.metainfo.xml"
         }
       },
       "rpm": {
         "depends": ["webkit2gtk4.1", "gtk3"],
+        "desktopTemplate": "riff.desktop",
         "files": {
           "/usr/share/man/man1/riff.1": "dist-extra/riff.1",
           "/usr/share/bash-completion/completions/riff": "dist-extra/riff.bash",
           "/usr/share/zsh/site-functions/_riff": "dist-extra/_riff",
-          "/usr/share/fish/vendor_completions.d/riff.fish": "dist-extra/riff.fish"
+          "/usr/share/fish/vendor_completions.d/riff.fish": "dist-extra/riff.fish",
+          "/usr/share/metainfo/io.github.valasme.riff.metainfo.xml": "io.github.valasme.riff.metainfo.xml"
         }
       },
       "appimage": { "bundleMediaFramework": false }

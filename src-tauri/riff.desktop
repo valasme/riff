@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Riff
+Comment={{comment}}
+Exec={{exec}} %U
+Icon={{icon}}
+Terminal=false
+Categories={{categories}}
+Keywords=music;practice;score;sheet;metronome;
+StartupNotify=true
+StartupWMClass=riff

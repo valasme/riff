@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.valasme.riff</id>
+  <name>Riff</name>
+  <summary>Practise with sheet music, video and audio in one place</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <developer id="io.github.valasme">
+    <name>valasme</name>
+  </developer>
+  <description>
+    <p>
+      Riff is a local-first practice workspace for musicians. It keeps a PDF score,
+      a video lesson and an audio track side by side on one page, so you stop
+      juggling three windows and start playing.
+    </p>
+    <p>
+      Riff has no accounts and no telemetry, and makes no network connections at all.
+      Everything it stores lives in your own XDG directories as plain, editable files.
+    </p>
+  </description>
+  <launchable type="desktop-id">riff.desktop</launchable>
+  <url type="homepage">https://github.com/valasme/riff</url>
+  <url type="bugtracker">https://github.com/valasme/riff/issues</url>
+  <content_rating type="oars-1.1" />
+  <!-- Software centres will not show a version without this, which is the
+       whole reason the file exists. git-cliff fills it on release. -->
+  <releases>
+    <release version="0.1.0" date="2026-08-28">
+      <description><p>First release: onboarding, theming, navigation, the keyboard palette and fully working settings. Practice and History are visual placeholders.</p></description>
+    </release>
+  </releases>
+  <screenshots>
+    <screenshot type="default">
+      <caption>The Practice workspace</caption>
+      <image>https://raw.githubusercontent.com/valasme/riff/main/docs/design/practice-route.png</image>
+    </screenshot>
+  </screenshots>
+  <categories>
+    <category>Audio</category>
+    <category>Music</category>
+  </categories>
+</component>
