@@ -1,2 +1,180 @@
 @import "tailwindcss";
 @import "./fonts.css";
+
+/* ---------------------------------------------------------------------------
+   Raw values. Four independent axes vary these: theme, contrast, density and
+   scale. Components never read them directly — they use the Tailwind
+   utilities below, which point at these variables by reference.
+   --------------------------------------------------------------------------- */
+
+:root {
+  --surface: #242424;
+  --card: #323232;
+  --raised: #3c3c3c;
+  --border-subtle: #4d4d4d;
+  --separator: #313131;
+  --fg: #e4e4e4;
+  --fg-muted: #9a9a9a;
+  --ring: #e4e4e4;
+
+  /* Density-driven spacing. Adjusts space, never font size, so density and
+     UI scale stay orthogonal controls.
+     These three are the ONLY things Compact changes, so every component that
+     has a row, a gap or page padding must read them. A hardcoded `h-10` or
+     `py-4` is a component opting out of the density setting, which is how a
+     control ends up persisting perfectly and doing nothing. */
+  --row-height: 2.5rem;
+  --row-gap: 0.25rem;
+  --content-padding: 1.5rem;
+  --section-gap: 1.5rem;
+
+  --ui-scale: 1;
+}
+
+[data-theme="light"] {
+  --surface: #fafafa;
+  --card: #f2f2f2;
+  --raised: #eaeaea;
+  --border-subtle: #d4d4d4;
+  --separator: #e6e6e6;
+  --fg: #1c1c1c;
+  --fg-muted: #5f5f5f;
+  --ring: #1c1c1c;
+}
+
+/* The source palette's borders measure 1.8:1 against the surface, below the
+   3:1 WCAG 1.4.11 wants for control boundaries. Rather than repaint the
+   design for everyone, this raises them for users who ask. #6d6d6d is exactly
+   3.0:1 on #242424 — computed, not guessed. */
+[data-contrast="high"] {
+  --border-subtle: #6d6d6d;
+  --fg-muted: #b0b0b0;
+}
+
+[data-theme="light"][data-contrast="high"] {
+  --border-subtle: #8a8a8a;
+  --fg-muted: #4a4a4a;
+}
+
+/* Honoured by default for the same reason `prefers-reduced-motion` is: it is
+   an unambiguous accessibility declaration the desktop makes on the user's
+   behalf. Theme has no System option because colour scheme is a taste
+   question the user was already asked once (D2); contrast is not. The
+   explicit setting still wins, via [data-contrast]. */
+@media (prefers-contrast: more) {
+  :root:not([data-contrast="normal"]) {
+    --border-subtle: #6d6d6d;
+    --fg-muted: #b0b0b0;
+  }
+  [data-theme="light"]:not([data-contrast="normal"]) {
+    --border-subtle: #8a8a8a;
+    --fg-muted: #4a4a4a;
+  }
+}
+
+[data-density="compact"] {
+  --row-height: 2.125rem;
+  --row-gap: 0.125rem;
+  --content-padding: 1rem;
+  --section-gap: 1rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Tailwind tokens. `inline` makes the generated utilities reference the
+   variables above rather than copying their values, which is what allows a
+   theme switch to be a single attribute change with no recompilation.
+   --------------------------------------------------------------------------- */
+
+@theme inline {
+  --color-surface: var(--surface);
+  --color-card: var(--card);
+  --color-raised: var(--raised);
+  --color-border-subtle: var(--border-subtle);
+  --color-separator: var(--separator);
+  --color-foreground: var(--fg);
+  --color-muted-foreground: var(--fg-muted);
+  --color-ring: var(--ring);
+
+  --font-sans: "Outfit Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Playfair Display", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+
+  /* rem, not px, and that is the whole point. `--ui-scale` multiplies the
+     root font size, so a px value here would leave the title bar, sidebar and
+     sub-navigation frozen while the text inside them grew — large type in a
+     fixed frame, which is worse than either extreme. §6.3 requires every
+     dimension in rem; these are the ones it is easiest to get wrong.
+     At the 16px default: 0.625rem = 10px, 2.75rem = 44px, 14rem = 224px,
+     3.5rem = 56px, 15rem = 240px. */
+  --radius-pane: 0.625rem;
+  --radius-card: 0.75rem;
+  --radius-nav: 0.75rem;
+
+  --spacing-titlebar: 2.75rem;
+  --spacing-sidebar: 14rem;
+  --spacing-sidebar-rail: 3.5rem;
+  --spacing-subnav: 15rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Base
+   --------------------------------------------------------------------------- */
+
+html {
+  /* Every dimension in the application is in rem, so this one line scales
+     the entire interface rather than only its text. */
+  font-size: calc(16px * var(--ui-scale, 1));
+}
+
+body {
+  margin: 0;
+  background-color: var(--surface);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden; /* the shell scrolls its own panes */
+}
+
+/* Focus is never removed, only restyled. The ring is 12.2:1 on the dark
+   surface, so it needs no accent colour to be unmistakable. */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  /* No `border-radius` here. The outline already follows the element's own
+     radius; setting one would snap a 12px nav pill to 4px on keyboard focus,
+     changing the shape of the thing being focused. */
+}
+
+/* Honour the desktop's declaration, and let the setting force it either way. */
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) *,
+  :root:not([data-motion="full"]) *::before,
+  :root:not([data-motion="full"]) *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+[data-motion="reduced"] *,
+[data-motion="reduced"] *::before,
+[data-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+/* Anything genuinely off-screen but announced. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border-width: 0;
+}

@@ -29,5 +29,8 @@
   "javascript": {
     "formatter": { "quoteStyle": "double", "semicolons": "always" }
   },
+  "css": {
+    "parser": { "tailwindDirectives": true }
+  },
   "assist": { "actions": { "source": { "organizeImports": "on" } } }
 }
