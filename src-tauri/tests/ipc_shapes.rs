@@ -7,6 +7,7 @@
 //! To accept an intentional change: RIFF_UPDATE_FIXTURES=1 cargo test --test ipc_shapes
 
 use riff_lib::commands::app::{AppInfo, ExternalLink, PathKind};
+use riff_lib::commands::diagnostics::LogLevel;
 use riff_lib::error::RiffError;
 use riff_lib::settings::model::Settings;
 use riff_lib::settings::store::Section;
@@ -22,6 +23,13 @@ fn shapes() -> serde_json::Value {
         "Section": [Section::General, Section::Appearance, Section::Onboarding],
         "PathKind": [PathKind::Config, PathKind::Data, PathKind::Cache, PathKind::Logs],
         "ExternalLink": [ExternalLink::Repository, ExternalLink::Issues, ExternalLink::License],
+        "LogLevel": [
+            LogLevel::Error,
+            LogLevel::Warn,
+            LogLevel::Info,
+            LogLevel::Debug,
+            LogLevel::Trace,
+        ],
         "AppPaths": riff_lib::paths::AppPaths {
             config_dir: "/c".into(),
             data_dir: "/d".into(),

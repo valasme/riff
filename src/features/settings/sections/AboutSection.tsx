@@ -7,20 +7,9 @@ import { ipc } from "@/lib/ipc";
 import { MIT_LICENSE } from "@/lib/license";
 import { useSettings } from "@/stores/settings";
 
-/**
- * Diagnostics are meant to be pasted into a public issue, so the home
- * directory — which carries the user's account name — is replaced. A
- * privacy-first application should not leak identity through its own
- * bug-report affordance.
- */
-function redactHome(text: string, home: string): string {
-  return home ? text.split(home).join("$HOME") : text;
-}
-
 export function AboutSection() {
   const { t } = useTranslation(["settings", "common"]);
   const appInfo = useSettings((s) => s.appInfo);
-  const paths = useSettings((s) => s.paths);
 
   const rows: [string, string][] = [
     [t("settings:about.version"), appInfo.version],
@@ -29,25 +18,6 @@ export function AboutSection() {
     [t("settings:about.buildDate"), appInfo.buildDate],
     [t("settings:about.commit"), appInfo.gitSha],
   ];
-
-  function copyDiagnostics() {
-    // Rust carries the real home directory. Deriving it by stripping
-    // "/.config/riff" from configDir silently fails under XDG_CONFIG_HOME or
-    // RIFF_CONFIG_HOME, and then dataDir and logDir keep the account name —
-    // a leak in the one affordance whose whole purpose is preventing it.
-    const home = paths.homeDir;
-    const report = [
-      ...rows.map(([label, value]) => `${label}: ${value}`),
-      "",
-      `Config: ${paths.configDir}`,
-      `Data:   ${paths.dataDir}`,
-      `Cache:  ${paths.cacheDir}`,
-      `Logs:   ${paths.logDir}`,
-    ].join("\n");
-
-    void navigator.clipboard.writeText(redactHome(report, home));
-    toast.success(t("common:copied"));
-  }
 
   return (
     <section className="py-2">
@@ -102,11 +72,17 @@ export function AboutSection() {
       </SettingRow>
 
       <SettingRow
-        label={t("settings:about.copyDiagnostics")}
-        description={t("settings:about.privacy")}
+        label={t("settings:about.exportDiagnostics.label")}
+        description={t("settings:about.exportDiagnostics.description")}
       >
-        <Button variant="secondary" onClick={copyDiagnostics}>
-          {t("settings:about.copyDiagnostics")}
+        <Button
+          variant="secondary"
+          onClick={async () => {
+            const path = await ipc.diagnosticsExport();
+            if (path) toast.success(t("settings:about.exportDiagnostics.done", { path }));
+          }}
+        >
+          {t("settings:about.exportDiagnostics.action")}
         </Button>
       </SettingRow>
     </section>

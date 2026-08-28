@@ -22,7 +22,7 @@ export function RouteError({ error }: { error: unknown }) {
           variant="secondary"
           onClick={() => void navigator.clipboard.writeText(String(detail))}
         >
-          {t("copyDiagnostics")}
+          {t("copyErrorDetails")}
         </Button>
       </div>
       <details className="max-w-full">

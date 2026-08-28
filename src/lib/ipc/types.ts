@@ -6,6 +6,7 @@ export type StartupRoute = "practice" | "history" | "last-used";
 export type Section = "general" | "appearance" | "onboarding";
 export type PathKind = "config" | "data" | "cache" | "logs";
 export type ExternalLink = "repository" | "issues" | "license";
+export type LogLevel = "error" | "warn" | "info" | "debug" | "trace";
 
 export interface General {
   startupRoute: StartupRoute;

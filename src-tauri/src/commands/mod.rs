@@ -1,4 +1,5 @@
 pub mod app;
+pub mod diagnostics;
 pub mod settings;
 pub mod window;
 
@@ -13,6 +14,8 @@ macro_rules! riff_handlers {
             $crate::commands::app::open_external,
             $crate::commands::app::open_path,
             $crate::commands::app::paths_get,
+            $crate::commands::diagnostics::diagnostics_export,
+            $crate::commands::diagnostics::log_write,
             $crate::commands::settings::settings_export,
             $crate::commands::settings::settings_get,
             $crate::commands::settings::settings_import,

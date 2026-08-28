@@ -3,7 +3,7 @@
   "description": "Riff hit an unexpected problem. Your settings are safe.",
   "reload": "Reload",
   "openLogs": "Open log folder",
-  "copyDiagnostics": "Copy diagnostics",
+  "copyErrorDetails": "Copy error details",
   "technicalDetails": "Technical details",
   "code": {
     "io": "Riff could not read or write a file.",

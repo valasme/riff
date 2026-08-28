@@ -19,6 +19,13 @@
     "issues",
     "license"
   ],
+  "LogLevel": [
+    "error",
+    "warn",
+    "info",
+    "debug",
+    "trace"
+  ],
   "PathKind": [
     "config",
     "data",

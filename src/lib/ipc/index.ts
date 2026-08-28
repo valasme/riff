@@ -4,6 +4,7 @@ import type {
   AppPaths,
   DeepPartial,
   ExternalLink,
+  LogLevel,
   PathKind,
   RiffError,
   Section,
@@ -39,6 +40,9 @@ export const ipc = {
   openExternal: (link: ExternalLink) => invoke<void>("open_external", { link }),
   appInfo: () => invoke<AppInfo>("app_info"),
   appReady: () => invoke<void>("app_ready"),
+  diagnosticsExport: () => invoke<string | null>("diagnostics_export"),
+  logWrite: (level: LogLevel, message: string, context?: unknown) =>
+    invoke<void>("log_write", { level, message, context: context ?? null }),
   windowMinimize: () => invoke<void>("window_minimize"),
   windowToggleMaximize: () => invoke<void>("window_toggle_maximize"),
   windowClose: () => invoke<void>("window_close"),

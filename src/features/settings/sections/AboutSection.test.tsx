@@ -6,6 +6,7 @@ import i18n from "@/app/i18n";
 
 const openExternal = vi.fn().mockResolvedValue(undefined);
 const writeText = vi.fn().mockResolvedValue(undefined);
+const diagnosticsExport = vi.fn().mockResolvedValue(null);
 
 vi.mock("@/stores/settings", () => ({
   useSettings: (selector: (s: Record<string, unknown>) => unknown) =>
@@ -27,7 +28,7 @@ vi.mock("@/stores/settings", () => ({
       },
     }),
 }));
-vi.mock("@/lib/ipc", () => ({ ipc: { openExternal } }));
+vi.mock("@/lib/ipc", () => ({ ipc: { openExternal, diagnosticsExport } }));
 
 const { AboutSection } = await import("./AboutSection");
 
@@ -57,15 +58,13 @@ describe("AboutSection", () => {
     expect(openExternal).toHaveBeenCalledWith("repository");
   });
 
-  it("redacts the home directory from copied diagnostics", async () => {
+  it("exports diagnostics through the rust command, not the clipboard", async () => {
     const user = userEvent.setup();
+    diagnosticsExport.mockResolvedValueOnce("/tmp/riff-diagnostics.txt");
     renderSection();
-    await user.click(screen.getByRole("button", { name: /copy diagnostics/i }));
-    const [call] = writeText.mock.calls;
-    if (!call) throw new Error("expected writeText to have been called");
-    const copied = call[0] as string;
-    expect(copied).toContain("$HOME/.config/riff");
-    expect(copied).not.toContain("/home/dimitris");
+    await user.click(screen.getByRole("button", { name: /export/i }));
+    expect(diagnosticsExport).toHaveBeenCalled();
+    expect(writeText).not.toHaveBeenCalled();
   });
 
   it("has no accessibility violations", async () => {
