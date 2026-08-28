@@ -3,3 +3,4 @@ pub mod model;
 pub mod patch;
 pub mod schema;
 pub mod store;
+pub mod watcher;
