@@ -36,3 +36,19 @@ Three, all resolved in the spec rather than left outstanding.
 1. **`tauri-specta` was dropped.** Its Tauri-v2 line is `2.0.0-rc.25` after twenty-five candidates and its stable `1.0.x` targets Tauri v1. The TypeScript IPC facade is hand-written and guarded by a committed shape fixture (Task 4.4).
 2. **`settings_patch` takes a JSON merge patch**, not the typed `SettingsPatch` struct §5 first described. The patch is re-deserialised through the full model on arrival, so clamping, lenient enums and unknown-key capture still run; the typed mirror bought nothing the round trip does not already give.
 3. **The boot theme script lives in the Rust init script**, not an inline `<script>` in `index.html` as §3.1 step 5 described. An inline script would force `script-src 'unsafe-inline'` into the CSP, which is the one directive worth keeping strict.
+
+---
+
+## After the foundation
+
+The twelve plans above are closed; the foundation shipped. Later milestones are indexed here and
+carry their own specs.
+
+| # | Plan | Spec | Delivers | Depends on |
+|---|---|---|---|---|
+| 13 | `13-pane-popout.md` | `specs/2026-08-29-pane-popout-design.md` | A practice pane can leave the grid for its own window and come back, on multi-monitor setups | 10 |
+
+13 comes before §15's media rather than after it deliberately. Pop-out is a *window* feature —
+creation, capability, lifecycle, cross-window state — and none of it needs a decoded frame. Built
+first, the players in §15 drop into panes that already know how to travel; built second, they are
+retrofitted into a layout that assumed one window.
