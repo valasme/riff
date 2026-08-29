@@ -41,11 +41,14 @@ pub fn render_script(payload: &Bootstrap) -> String {
   root.dataset.density = a.density === "compact" ? "compact" : "comfortable";
   root.dataset.contrast = a.highContrast ? "high" : "normal";
   // Also before first paint: without it a user who set "always reduce" still
-  // sees the first animation of every launch.
+  // sees the first animation of every launch. "system" is written as itself
+  // rather than resolved against matchMedia here — globals.css answers it,
+  // and answering it in JS freezes the desktop's preference at whatever it
+  // was during startup. See motionAttribute() in src/lib/appearance.ts.
   root.dataset.motion =
     a.reduceMotion === "always" ? "reduced"
     : a.reduceMotion === "never" ? "full"
-    : (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches ? "reduced" : "full");
+    : "system";
   root.style.setProperty("--ui-scale", String(a.uiScale || 1));
 }})();"#
     )
@@ -108,6 +111,24 @@ mod tests {
         assert!(script.contains("dataset.contrast"));
         assert!(script.contains("dataset.motion"));
         assert!(script.contains("--ui-scale"));
+    }
+
+    #[test]
+    fn the_script_leaves_the_system_motion_preference_for_the_stylesheet() {
+        // The pre-paint frame and `motionAttribute()` in src/lib/appearance.ts
+        // write the same attribute, so they have to agree on what "system"
+        // becomes. Resolving it here against matchMedia writes "full" whenever
+        // the desktop happens not to want reduced motion at startup — and
+        // "full" is what globals.css reads as "the user chose Never", so the
+        // desktop's preference could no longer take effect for the rest of the
+        // session.
+        let script = render_script(&sample());
+        assert!(
+            !script.contains("prefers-reduced-motion"),
+            "the bootstrap script resolves the system motion preference itself; \
+             globals.css must be the one that answers it"
+        );
+        assert!(script.contains(r#": "system";"#));
     }
 
     #[test]

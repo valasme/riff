@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Appearance } from "@/lib/ipc";
-import { applyAppearance, resolveMotion } from "./appearance";
+import { applyAppearance, motionAttribute } from "./appearance";
 
 const base: Appearance = {
   theme: "dark",
@@ -51,17 +51,23 @@ describe("applyAppearance", () => {
     expect(root.style.getPropertyValue("--ui-scale")).toBe("0.8");
   });
 
-  it("follows the desktop when motion preference is system", () => {
+  // Answering the media query here is what made "Follow my system" sample the
+  // desktop once at startup and hold that answer for the rest of the session.
+  // The attribute has to stay "system" whichever way the desktop is pointing,
+  // so the stylesheet is the thing that decides and can decide again.
+  it("defers the system preference to CSS rather than sampling matchMedia", () => {
     mockPrefersReducedMotion(true);
-    expect(resolveMotion("system")).toBe("reduced");
+    expect(motionAttribute("system")).toBe("system");
     mockPrefersReducedMotion(false);
-    expect(resolveMotion("system")).toBe("full");
+    expect(motionAttribute("system")).toBe("system");
+    applyAppearance(root, base);
+    expect(root.dataset.motion).toBe("system");
   });
 
   it("lets the setting override the desktop in both directions", () => {
     mockPrefersReducedMotion(true);
-    expect(resolveMotion("never")).toBe("full");
+    expect(motionAttribute("never")).toBe("full");
     mockPrefersReducedMotion(false);
-    expect(resolveMotion("always")).toBe("reduced");
+    expect(motionAttribute("always")).toBe("reduced");
   });
 });

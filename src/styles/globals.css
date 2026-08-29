@@ -342,7 +342,18 @@ li {
   outline: none;
 }
 
-/* Honour the desktop's declaration, and let the setting force it either way. */
+/* Honour the desktop's declaration, and let the setting force it either way.
+   `data-motion` carries three values and each one lands on a different rule:
+
+     "system"   absent from both selectors, so the media query below decides —
+                and keeps deciding, live, as the desktop preference changes
+     "full"     excluded from the media query by the :not(), so the desktop is
+                overruled and motion stays on
+     "reduced"  the standalone rule, so motion is off regardless of the desktop
+
+   The :not() is what makes "Never reduce" mean never. Resolving "system" to
+   one of the other two in JavaScript is what used to freeze it — see
+   motionAttribute() in src/lib/appearance.ts. */
 @media (prefers-reduced-motion: reduce) {
   :root:not([data-motion="full"]) *,
   :root:not([data-motion="full"]) *::before,
