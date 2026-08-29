@@ -340,6 +340,20 @@ mod tests {
         }
     }
 
+    /// `slug` writes it twice: once here and once as `#[serde(rename_all)]` on
+    /// the enum. They must stay the same word, because the webview sends the
+    /// serde spelling to `practice_pop_out` while Rust builds the window label
+    /// and the `#/popout/{slug}` URL from this one — drift would open a window
+    /// at a route React does not have. Single-word variants make them agree
+    /// today; a two-word pane would not.
+    #[test]
+    fn a_slug_is_the_name_the_settings_file_and_the_webview_already_use() {
+        for pane in Pane::ALL {
+            let serialised = serde_json::to_value(pane).expect("a pane serialises");
+            assert_eq!(serialised, serde_json::json!(pane.slug()));
+        }
+    }
+
     #[test]
     fn the_main_window_is_not_a_pane() {
         // `pane_for_window` decides whether a `CloseRequested` is a dock-back
