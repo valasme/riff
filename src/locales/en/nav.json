@@ -13,5 +13,11 @@
   "maximize": "Maximize",
   "restore": "Restore",
   "closeWindow": "Close window",
-  "openPalette": "Search or jump to"
+  "openPalette": "Search or jump to",
+  "popoutQuit": {
+    "title": "Quit Riff, or dock this pane back?",
+    "body": "Closing this window sends the pane back to the main Riff window. Quitting closes Riff entirely.",
+    "dockBack": "Dock back",
+    "quit": "Quit Riff"
+  }
 }

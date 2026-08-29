@@ -14,6 +14,7 @@ import { Route as HistoryRouteImport } from './routes/history'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as PracticeRouteImport } from './routes/practice'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as PopoutPaneRouteImport } from './routes/popout.$pane'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SettingsAboutRouteImport } from './routes/settings.about'
 import { Route as SettingsAppearanceRouteImport } from './routes/settings.appearance'
@@ -44,6 +45,11 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PopoutPaneRoute = PopoutPaneRouteImport.update({
+  id: '/popout/$pane',
+  path: '/popout/$pane',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -71,6 +77,7 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof OnboardingRoute
   '/practice': typeof PracticeRoute
   '/settings': typeof SettingsRouteWithChildren
+  '/popout/$pane': typeof PopoutPaneRoute
   '/settings/about': typeof SettingsAboutRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
   '/settings/general': typeof SettingsGeneralRoute
@@ -81,6 +88,7 @@ export interface FileRoutesByTo {
   '/history': typeof HistoryRoute
   '/onboarding': typeof OnboardingRoute
   '/practice': typeof PracticeRoute
+  '/popout/$pane': typeof PopoutPaneRoute
   '/settings/about': typeof SettingsAboutRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
   '/settings/general': typeof SettingsGeneralRoute
@@ -93,6 +101,7 @@ export interface FileRoutesById {
   '/onboarding': typeof OnboardingRoute
   '/practice': typeof PracticeRoute
   '/settings': typeof SettingsRouteWithChildren
+  '/popout/$pane': typeof PopoutPaneRoute
   '/settings/about': typeof SettingsAboutRoute
   '/settings/appearance': typeof SettingsAppearanceRoute
   '/settings/general': typeof SettingsGeneralRoute
@@ -106,6 +115,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/practice'
     | '/settings'
+    | '/popout/$pane'
     | '/settings/about'
     | '/settings/appearance'
     | '/settings/general'
@@ -116,6 +126,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/onboarding'
     | '/practice'
+    | '/popout/$pane'
     | '/settings/about'
     | '/settings/appearance'
     | '/settings/general'
@@ -127,6 +138,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/practice'
     | '/settings'
+    | '/popout/$pane'
     | '/settings/about'
     | '/settings/appearance'
     | '/settings/general'
@@ -139,6 +151,7 @@ export interface RootRouteChildren {
   OnboardingRoute: typeof OnboardingRoute
   PracticeRoute: typeof PracticeRoute
   SettingsRoute: typeof SettingsRouteWithChildren
+  PopoutPaneRoute: typeof PopoutPaneRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -176,6 +189,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/popout/$pane': {
+      id: '/popout/$pane'
+      path: '/popout/$pane'
+      fullPath: '/popout/$pane'
+      preLoaderRoute: typeof PopoutPaneRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings/': {
@@ -233,6 +253,7 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingRoute: OnboardingRoute,
   PracticeRoute: PracticeRoute,
   SettingsRoute: SettingsRouteWithChildren,
+  PopoutPaneRoute: PopoutPaneRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

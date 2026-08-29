@@ -1,4 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PracticePlaceholder } from "@/features/practice/PracticePlaceholder";
+import { PracticeGrid } from "@/features/practice/PracticeGrid";
 
-export const Route = createFileRoute("/practice")({ component: PracticePlaceholder });
+export const Route = createFileRoute("/practice")({ component: PracticeGrid });

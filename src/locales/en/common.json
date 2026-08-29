@@ -8,14 +8,38 @@
   "openFolder": "Open folder",
   "copy": "Copy",
   "copied": "Copied to clipboard",
-  "quit": { "title": "Quit Riff?", "body": "Your settings are already saved.", "action": "Quit" },
+  "quit": {
+    "title": "Quit Riff?",
+    "body": "Your settings are already saved.",
+    "action": "Quit"
+  },
   "inDevelopment": "In development",
-  "panes": { "score": "Score", "video": "Video", "audio": "Audio" },
-  "paneActions": { "popOut": "Pop out", "closePane": "Close pane" },
+  "panes": {
+    "score": "Score",
+    "video": "Video",
+    "audio": "Audio"
+  },
+  "paneActions": {
+    "popOut": "Pop out",
+    "dockBack": "Dock back",
+    "closePane": "Close pane"
+  },
   "paneEmpty": {
     "score": "A PDF score will open here.",
     "video": "A video lesson will play here.",
     "audio": "A backing track will play here."
+  },
+  "panesOut": {
+    "strip": "Panes in their own windows",
+    "focus": "Show the {{pane}} window",
+    "dockBack": "Dock {{pane}} back into Riff",
+    "emptyTitle": "All three panes are in their own windows",
+    "emptyBody": "Close a pane's window to send it back, or bring them all back at once.",
+    "bringAllBack": "Bring all back",
+    "reopenPrompt_one": "{{panes}} was in its own window last time.",
+    "reopenPrompt_other": "{{panes}} were in their own windows last time.",
+    "reopen": "Reopen",
+    "notNow": "Not now"
   },
   "search": "Search",
   "filter": "Filter",

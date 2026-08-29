@@ -13,6 +13,7 @@ import { createKeymap } from "@/features/keybindings/keymap";
 import { useKeybindings } from "@/features/keybindings/useKeybindings";
 import { ONBOARDING_VERSION, shouldShowOnboarding } from "@/features/onboarding/gate";
 import { CommandPalette } from "@/features/palette/CommandPalette";
+import { PANE_ICONS } from "@/features/practice/PracticePane";
 import { QuitConfirmation } from "@/features/window/QuitConfirmation";
 import { TitleBar } from "@/features/window/TitleBar";
 import { ipc } from "@/lib/ipc";
@@ -22,6 +23,10 @@ export const Route = createRootRoute({
   component: RootLayout,
   errorComponent: RouteError,
   beforeLoad: ({ location }) => {
+    // A pop-out is exempt. Re-running first-time setup does not close the
+    // pop-out windows, and a score window that turned itself into the welcome
+    // wizard would have no sidebar to escape by.
+    if (isPopout(location.pathname)) return;
     const { onboarding } = useSettings.getState().settings;
     const needed = shouldShowOnboarding(onboarding, ONBOARDING_VERSION);
     if (needed && location.pathname !== "/onboarding") {
@@ -33,8 +38,14 @@ export const Route = createRootRoute({
   },
 });
 
+/** `/popout/score` and friends. Every window shares this component, so most
+ *  of what follows asks this before drawing navigation chrome. */
+export function isPopout(pathname: string): boolean {
+  return pathname.startsWith("/popout/");
+}
+
 export function RootLayout() {
-  const { t, i18n } = useTranslation("nav");
+  const { t, i18n } = useTranslation(["nav", "common"]);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [announcement, setAnnouncement] = useState("");
   const { collapsed, rememberCollapsed } = useAppearance().sidebar;
@@ -49,6 +60,7 @@ export function RootLayout() {
   const [sessionCollapsed, setSessionCollapsed] = useState(false);
   const effectiveCollapsed = rememberCollapsed ? collapsed : sessionCollapsed;
   const onboardingActive = pathname === "/onboarding";
+  const popoutPane = isPopout(pathname) ? pathname.split("/")[2] : undefined;
   const [paletteOpen, setPaletteOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -117,7 +129,13 @@ export function RootLayout() {
     setAnnouncement(t("routeAnnouncement", { name: t(name, { defaultValue: name }) }));
     // Only tracked when the user asked for it, so a setting nobody uses costs
     // nothing in writes.
-    if (useSettings.getState().settings.general.startupRoute === "last-used") {
+    // Never a pop-out's path. `startupRoute: last-used` would then launch the
+    // MAIN window onto a single pane with no sidebar — a window that cannot
+    // navigate anywhere, on every subsequent start.
+    if (
+      !isPopout(pathname) &&
+      useSettings.getState().settings.general.startupRoute === "last-used"
+    ) {
       void useSettings.getState().patch({ general: { lastRoute: pathname } });
     }
   }, [pathname, t]);
@@ -140,6 +158,14 @@ export function RootLayout() {
           // way it was about to go.
           sidebarCollapsed={effectiveCollapsed}
           onOpenPalette={() => setPaletteOpen(true)}
+          badge={
+            popoutPane && popoutPane in PANE_ICONS
+              ? {
+                  icon: PANE_ICONS[popoutPane as keyof typeof PANE_ICONS],
+                  label: t(`common:panes.${popoutPane}`),
+                }
+              : undefined
+          }
         />
       )}
       {/* The container the sidebar's rail breakpoint measures. The query is
@@ -148,7 +174,7 @@ export function RootLayout() {
           appear exactly when the chrome would otherwise crowd the content. A
           viewport media query could not respond to scale at all. */}
       <div className="@container/shell flex min-h-0 flex-1">
-        {!onboardingActive && <Sidebar collapsed={effectiveCollapsed} />}
+        {!onboardingActive && !popoutPane && <Sidebar collapsed={effectiveCollapsed} />}
         <main id="main" className="min-w-0 flex-1 overflow-auto">
           <Outlet />
         </main>

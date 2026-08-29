@@ -1,3 +1,4 @@
+import type { LucideIcon } from "lucide-react";
 import { PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Kbd } from "@/components/ui/kbd";
@@ -9,10 +10,15 @@ export function TitleBar({
   onToggleSidebar,
   onOpenPalette,
   sidebarCollapsed = false,
+  badge,
 }: {
   onToggleSidebar?: () => void;
   onOpenPalette?: () => void;
   sidebarCollapsed?: boolean;
+  /** Takes the sidebar toggle's place in a pop-out window, which has no
+   *  sidebar to toggle. It says which pane this window is, and it is not a
+   *  control — there is nothing here for it to do. */
+  badge?: { icon: LucideIcon; label: string };
 }) {
   const { t } = useTranslation(["nav", "palette"]);
 
@@ -36,31 +42,45 @@ export function TitleBar({
         className="@container/titlebar relative z-30 flex h-[var(--spacing-titlebar)] shrink-0 items-center gap-3 border-b border-line bg-surface px-2"
       >
         <div data-tauri-drag-region className="flex min-w-0 flex-1 items-center gap-2.5">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                aria-label={toggleLabel}
-                aria-expanded={!sidebarCollapsed}
-                onClick={onToggleSidebar}
-                // The rectangle appears on hover, not at rest. A tile that is
-                // always filled reads as a permanently pressed control and is
-                // the only thing in the bar competing with the wordmark; the
-                // fill on hover is still what gives hover and focus a target.
-                className="grid size-8 shrink-0 place-items-center rounded-[var(--radius-control)] text-muted-foreground transition-colors duration-[var(--motion-fast)] ease-(--ease-standard) hover:bg-hover hover:text-foreground"
-              >
-                <ToggleIcon size={17} aria-hidden />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" sideOffset={8}>
-              {toggleLabel}
-              <Kbd chord="Ctrl+B" />
-            </TooltipContent>
-          </Tooltip>
+          {badge ? (
+            <span
+              data-tauri-drag-region
+              className="grid size-8 shrink-0 place-items-center text-muted-foreground"
+            >
+              <badge.icon size={17} aria-hidden />
+            </span>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={toggleLabel}
+                  aria-expanded={!sidebarCollapsed}
+                  onClick={onToggleSidebar}
+                  // The rectangle appears on hover, not at rest. A tile that is
+                  // always filled reads as a permanently pressed control and is
+                  // the only thing in the bar competing with the wordmark; the
+                  // fill on hover is still what gives hover and focus a target.
+                  className="grid size-8 shrink-0 place-items-center rounded-[var(--radius-control)] text-muted-foreground transition-colors duration-[var(--motion-fast)] ease-(--ease-standard) hover:bg-hover hover:text-foreground"
+                >
+                  <ToggleIcon size={17} aria-hidden />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" sideOffset={8}>
+                {toggleLabel}
+                <Kbd chord="Ctrl+B" />
+              </TooltipContent>
+            </Tooltip>
+          )}
 
           {/* Sized and spaced by the component; see Wordmark for why the
               trailing padding is not a `gap`. */}
           <Wordmark className="text-[1.375rem]" />
+          {badge && (
+            <span className="truncate text-[0.8125rem] font-medium text-muted-foreground">
+              {badge.label}
+            </span>
+          )}
         </div>
 
         {/* Centred by the two `flex-1` siblings, not by a magic margin, so it
