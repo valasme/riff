@@ -67,6 +67,38 @@ describe("AppearanceSection", () => {
     expect(patch).toHaveBeenCalledWith({ appearance: { uiScale: 1.05 } });
   });
 
+  it("shows the dragged percentage while the drag is still in progress", () => {
+    // The bug this pins: the thumb was drawn from the draft scale and the
+    // readout from the committed one, so a drag moved the handle while the
+    // number beside it sat at its old value until the mouse came up.
+    // Radix maps the pointer through `getBoundingClientRect`, which jsdom
+    // answers with zeroes, and calls `setPointerCapture`, which it does not
+    // implement -- so both are supplied here. The measurement is still real:
+    // Radix does its own arithmetic against the rect it is given.
+    renderSection();
+    const thumb = screen.getByRole("slider", { name: /interface scale/i });
+    const root = thumb.closest("[data-slot='slider']");
+    if (!root) throw new Error("slider root not found");
+    root.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 200, height: 10, right: 200, bottom: 10, x: 0, y: 0 }) as DOMRect;
+    for (const el of [root, thumb]) {
+      Object.assign(el, {
+        setPointerCapture: () => {},
+        releasePointerCapture: () => {},
+        hasPointerCapture: () => true,
+      });
+    }
+
+    // 90% along a 0.8-1.5 track is 1.43, which snaps to the 0.05 step.
+    fireEvent.pointerDown(root, { pointerId: 1, clientX: 180, clientY: 5, button: 0, buttons: 1 });
+
+    expect(thumb).toHaveAttribute("aria-valuenow", "1.45");
+    // No pointer-up, so nothing has been committed: this is mid-gesture, and
+    // the readout must already say so.
+    expect(patch).not.toHaveBeenCalled();
+    expect(screen.getByText("145%")).toBeInTheDocument();
+  });
+
   it("offers every theme, so a new one cannot be added to the store alone", () => {
     renderSection();
     for (const name of ["Dark", "Darker", "Light"]) {

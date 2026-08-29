@@ -155,11 +155,17 @@ export function AppearanceSection() {
             />
             {/* §10: numbers go through Intl, never hand-formatted. A percent
                 sign glued to a rounded number is a hand-formatted number.
-                `tabular-nums` so the row does not shuffle as it changes. */}
-            <span className="w-11 shrink-0 text-end font-mono text-xs tabular-nums text-muted-foreground">
-              {new Intl.NumberFormat(i18n.language, { style: "percent" }).format(
-                appearance.uiScale,
-              )}
+                `tabular-nums` so the row does not shuffle as it changes.
+
+                `uiScale`, not `appearance.uiScale` — the draft, the same value
+                the thumb is drawn from. Reading the committed value here left
+                the readout frozen at its old percentage for the whole drag
+                while the thumb tracked the pointer, so the one number that
+                says what you are choosing only caught up once you let go.
+                Full-strength foreground, not muted: this is the slider's
+                value, not a hint about it. */}
+            <span className="w-11 shrink-0 text-end font-mono text-xs tabular-nums text-foreground">
+              {new Intl.NumberFormat(i18n.language, { style: "percent" }).format(uiScale)}
             </span>
             <Button
               variant="ghost"
