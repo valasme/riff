@@ -43,6 +43,25 @@ describe("SettingsLayout", () => {
     expect(screen.getByRole("heading", { name: /general/i })).toBeInTheDocument();
   });
 
+  // jsdom has no layout engine, so this cannot measure a box — it asserts the
+  // class contract the measurement came from instead. The regression was found
+  // against real WebKit at 960x640 and is one deleted utility away from
+  // returning.
+  it("stacks the panes at the same width the sub-navigation turns horizontal", () => {
+    // A `w-full` nav inside a row flex leaves its sibling at `width: 0`, so
+    // every setting on the screen stayed in the DOM and none of it was
+    // visible. The two breakpoints have to be the same one.
+    pathname = "/settings/general";
+    const { container } = renderLayout();
+    const nav = container.querySelector("nav");
+    const outer = nav?.parentElement;
+    const breakpoint = nav?.className.match(/(@max-\[[^\]]+\]\/settings):flex-row/)?.[1];
+
+    expect(breakpoint).toBeDefined();
+    expect(nav?.className).toContain(`${breakpoint}:w-full`);
+    expect(outer?.className).toContain(`${breakpoint}:flex-col`);
+  });
+
   it("has no accessibility violations", async () => {
     pathname = "/settings/general";
     const { container } = renderLayout();

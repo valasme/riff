@@ -24,39 +24,58 @@ export function SettingsLayout() {
     // viewport — which is exactly the failure §7.4 designed around. The query
     // is in rem for the same reason: in px it would measure the same window
     // width at every scale and could only fire below the minimum window size.
-    <div className="@container/settings flex h-full min-h-0">
-      <nav
-        aria-label={t("nav:settingsSections")}
-        className={cn(
-          "flex w-[var(--spacing-subnav)] shrink-0 flex-col gap-[var(--row-gap)] overflow-y-auto border-e border-line p-3",
-          "@max-[44rem]/settings:w-full @max-[44rem]/settings:flex-row @max-[44rem]/settings:overflow-x-auto @max-[44rem]/settings:border-e-0 @max-[44rem]/settings:border-b",
-        )}
-      >
-        {SECTIONS.map(({ to, icon: Icon, key }) => (
-          <Link
-            key={to}
-            to={to}
-            aria-current={pathname === to ? "page" : undefined}
-            className={cn(
-              "flex h-[var(--row-height)] shrink-0 items-center gap-2.5 rounded-[var(--radius-nav)] px-2.5 text-[0.9375rem]",
-              "text-muted-foreground transition-colors duration-[var(--motion-fast)] ease-(--ease-standard)",
-              "hover:bg-hover hover:text-foreground",
-              pathname === to ? "bg-active-fill font-semibold text-foreground" : "font-medium",
-            )}
-          >
-            <Icon size={17} aria-hidden className="shrink-0" />
-            {t(`settings:sections.${key}`)}
-          </Link>
-        ))}
-      </nav>
+    //
+    // The container and the flex row are two elements on purpose. A container
+    // query is answered by the nearest *ancestor* container, never by the
+    // element that declares one, so `@max-[44rem]/settings:flex-col` written
+    // on the `@container/settings` div itself silently matches nothing — it
+    // goes looking for a `settings` container further up and finds none. The
+    // wrapper is what gives the row an ancestor to ask.
+    <div className="@container/settings h-full min-h-0">
+      {/* `flex-col` below the breakpoint is not cosmetic — it is what makes
+          the sub-navigation's own `w-full` survivable. Left as a row, a
+          `shrink-0` nav asking for the full container width takes all of it
+          and the content beside it computes to `width: 0`: at 1.5x scale in a
+          minimum-size window every setting on the screen was still in the DOM
+          and none of it was visible. The two flip together, which is what the
+          test asserts. */}
+      <div className="flex h-full min-h-0 @max-[44rem]/settings:flex-col">
+        <nav
+          aria-label={t("nav:settingsSections")}
+          className={cn(
+            "flex w-[var(--spacing-subnav)] shrink-0 flex-col gap-[var(--row-gap)] overflow-y-auto border-e border-line p-3",
+            "@max-[44rem]/settings:w-full @max-[44rem]/settings:flex-row @max-[44rem]/settings:overflow-x-auto @max-[44rem]/settings:border-e-0 @max-[44rem]/settings:border-b",
+          )}
+        >
+          {SECTIONS.map(({ to, icon: Icon, key }) => (
+            <Link
+              key={to}
+              to={to}
+              aria-current={pathname === to ? "page" : undefined}
+              className={cn(
+                "flex h-[var(--row-height)] shrink-0 items-center gap-2.5 rounded-[var(--radius-nav)] px-2.5 text-[0.9375rem]",
+                "text-muted-foreground transition-colors duration-[var(--motion-fast)] ease-(--ease-standard)",
+                "hover:bg-hover hover:text-foreground",
+                pathname === to ? "bg-active-fill font-semibold text-foreground" : "font-medium",
+              )}
+            >
+              <Icon size={17} aria-hidden className="shrink-0" />
+              {t(`settings:sections.${key}`)}
+            </Link>
+          ))}
+        </nav>
 
-      <div className="min-w-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[46rem] p-[var(--content-padding)]">
-          <PageHeader
-            title={t(`settings:sections.${current}`)}
-            description={t(`settings:sectionDescriptions.${current}`)}
-          />
-          <Outlet />
+        {/* `min-h-0` for the stacked case: a `flex-1` child that scrolls its own
+          overflow needs it in a column, or it grows to its content instead and
+          pushes the scrollbar onto the window. */}
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-[46rem] p-[var(--content-padding)]">
+            <PageHeader
+              title={t(`settings:sections.${current}`)}
+              description={t(`settings:sectionDescriptions.${current}`)}
+            />
+            <Outlet />
+          </div>
         </div>
       </div>
     </div>
