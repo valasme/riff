@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { RouteError } from "@/components/RouteError";
 import { Sidebar } from "@/components/Sidebar";
 import { createKeymap } from "@/features/keybindings/keymap";
@@ -120,6 +121,43 @@ export function RootLayout() {
   );
 
   useKeybindings(bindings);
+
+  // The offer to reopen last session's pop-out windows, made exactly once.
+  // Rust already took the list out of the file at launch, so declining or
+  // ignoring this needs no bookkeeping — and a crash before answering cannot
+  // leave a prompt that returns every launch until obeyed.
+  //
+  // It cannot delay the reveal: `app_ready()` is queued from main.tsx before
+  // any of this, and the offer needs a round trip before it can even be drawn.
+  const offered = useRef(false);
+  useEffect(() => {
+    if (offered.current || popoutPane || onboardingActive) return;
+    offered.current = true;
+    void ipc
+      .practicePendingReopen()
+      .then((panes) => {
+        if (panes.length === 0) return;
+        // `ES2021.Intl` is in tsconfig's lib for this alone. The target stays
+        // ES2020 — this declares that WebKit has `ListFormat`, which it does,
+        // rather than joining names with a comma and reading "Score, Video".
+        const names = new Intl.ListFormat(i18n.language, {
+          style: "long",
+          type: "conjunction",
+        }).format(panes.map((pane) => t(`common:panes.${pane}`)));
+        // "Reopen", never "Restore": `nav.restore` is the un-maximise glyph and
+        // `general.restoreWindowState` is window geometry. One word, one meaning.
+        toast(t("common:panesOut.reopenPrompt", { count: panes.length, panes: names }), {
+          action: {
+            label: t("common:panesOut.reopen"),
+            onClick: () => void ipc.practiceReopen(),
+          },
+          cancel: { label: t("common:panesOut.notNow"), onClick: () => {} },
+        });
+      })
+      // Nothing to offer is the same outcome as failing to ask, and neither
+      // is worth a toast of its own on top of the one that did not appear.
+      .catch(() => {});
+  }, [popoutPane, onboardingActive, t, i18n.language]);
 
   useEffect(() => {
     reportRecovery();
