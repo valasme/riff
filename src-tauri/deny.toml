@@ -65,6 +65,7 @@ feature-depth = 1
 [advisories]
 yanked = "deny"
 unmaintained = "workspace"
+unsound = "all"
 # The path where the advisory databases are cloned/fetched into
 #db-path = "$CARGO_HOME/advisory-dbs"
 # The url(s) of the advisory databases to use
@@ -72,6 +73,20 @@ unmaintained = "workspace"
 # A list of advisory IDs to ignore. Note that ignored advisories will still
 # output a note when they are encountered.
 ignore = [
+    # glib 0.18.5 is unsound in `VariantStrIter`, fixed in 0.20.0. We cannot
+    # take the fix: glib reaches us only through the gtk-rs 0.18 stack that
+    # Tauri pins — atk, cairo-rs, gdk, gio, gtk, javascriptcore-rs, webkit2gtk
+    # and wry all hold it there — so it moves when Tauri moves, not before.
+    # Riff never constructs a `VariantStrIter`; nothing in `src/` mentions glib
+    # at all. Delete this entry the moment Tauri ships against gtk-rs 0.20.
+    #
+    # This sits here rather than being invisible because `unsound = "all"`
+    # above widens the check from cargo-deny's `workspace` default, which only
+    # ever fails on *direct* dependencies. In a Tauri app nearly every crate is
+    # transitive, so the default meant this class of advisory went unreported
+    # across almost the entire tree — GitHub's dependency graph caught this one,
+    # the licence gate did not.
+    { id = "RUSTSEC-2024-0429", reason = "glib 0.18.5 is pinned by Tauri's gtk-rs 0.18 stack; unreachable from Riff, which never constructs a VariantStrIter" },
     #"RUSTSEC-0000-0000",
     #{ id = "RUSTSEC-0000-0000", reason = "you can specify a reason the advisory is ignored" },
     #"a-crate-that-is-yanked@0.1.1", # you can also ignore yanked crate versions if you wish
