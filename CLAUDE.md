@@ -151,3 +151,17 @@ Conventional Commits, enforced by commitlint; one logical change per commit. lef
 No external code contributions — bug reports are welcome, pull requests are declined (`.github/PULL_REQUEST_TEMPLATE.md`).
 
 **Releases are built and published by hand**, one artifact per distribution. There is no `release.yml` and none should be added; `ci.yml` is the whole of CI by design.
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues on `valasme/riff`, through the `gh` CLI; external PRs are not a request surface. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical roles, each label string equal to its name. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context — one root `CONTEXT.md` (not yet written) plus `docs/adr/`. See `docs/agents/domain.md`.
