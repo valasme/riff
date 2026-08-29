@@ -5,6 +5,7 @@ pub mod diagnostics;
 pub mod error;
 pub mod logging;
 pub mod paths;
+pub mod practice;
 pub mod settings;
 pub mod storage;
 
@@ -23,6 +24,26 @@ const REVEAL_WATCHDOG: Duration = Duration::from_secs(3);
 /// Set once the user has confirmed quitting, so the second close attempt
 /// passes straight through instead of asking again forever.
 pub struct QuitApproved(pub std::sync::atomic::AtomicBool);
+
+/// Reveals a window whose frontend never signalled readiness.
+///
+/// One per window rather than one for `main`: a pop-out is created long after
+/// startup and needs the same guarantee, and it is the window most likely to
+/// be created while something else is already wrong.
+pub fn spawn_reveal_watchdog(handle: tauri::AppHandle, label: String) {
+    std::thread::spawn(move || {
+        std::thread::sleep(REVEAL_WATCHDOG);
+        if let Some(window) = handle.get_webview_window(&label) {
+            if !window.is_visible().unwrap_or(false) {
+                tracing::warn!(
+                    label,
+                    "frontend never signalled readiness; revealing anyway"
+                );
+                let _ = window.show();
+            }
+        }
+    });
+}
 
 /// Set once during `setup`, so the panic notifier can reach a window without
 /// threading a handle through the panic hook.
@@ -114,6 +135,10 @@ pub fn run() {
         }
     }
     let store = Arc::new(store);
+    // Before the first flush, so the clear rides along with it: the panes the
+    // last session left in their own windows are read out and removed from
+    // the file, and the frontend is offered them once.
+    let pending_reopen = practice::take_pending_reopen(&store);
     if let Err(err) = store.flush_if_dirty() {
         tracing::error!(%err, "could not write initial settings");
     }
@@ -190,6 +215,10 @@ pub fn run() {
         .manage(Arc::clone(&store))
         .manage(Arc::clone(&scheduler))
         .manage(QuitApproved(std::sync::atomic::AtomicBool::new(false)))
+        .manage(practice::ShuttingDown(std::sync::atomic::AtomicBool::new(
+            false,
+        )))
+        .manage(practice::PendingReopen(pending_reopen))
         // Honours `confirmOnQuit`. Without this the setting is decorative.
         .on_window_event({
             let store = Arc::clone(&store);
@@ -197,19 +226,33 @@ pub fn run() {
                 let tauri::WindowEvent::CloseRequested { api, .. } = event else {
                     return;
                 };
-                if !store.get().general.confirm_on_quit {
+                let app = window.app_handle();
+
+                // Every window raises this. A pop-out's `×` means "dock this
+                // pane back", so it must reach neither the quit confirmation
+                // — which would ask "Really quit?" over a dock-back — nor the
+                // shutdown below.
+                if !practice::quit_confirmation_applies_to(window.label()) {
+                    practice::on_popout_closed(app, window.label());
                     return;
                 }
-                if window
-                    .state::<QuitApproved>()
-                    .0
-                    .load(std::sync::atomic::Ordering::SeqCst)
+
+                if store.get().general.confirm_on_quit
+                    && !window
+                        .state::<QuitApproved>()
+                        .0
+                        .load(std::sync::atomic::Ordering::SeqCst)
                 {
+                    api.prevent_close();
+                    use tauri::Emitter;
+                    let _ = window.emit("app://confirm-quit", ());
                     return;
                 }
-                api.prevent_close();
-                use tauri::Emitter;
-                let _ = window.emit("app://confirm-quit", ());
+
+                // Main is going, so Riff is going. Left alone the pop-outs
+                // would outlive the only window that can bring them back, and
+                // the process would never exit because windows remain.
+                practice::close_every_popout(app);
             }
         })
         .setup({
@@ -219,6 +262,13 @@ pub fn run() {
                 let watcher = settings::watcher::spawn(Arc::clone(&store), move |settings| {
                     use tauri::Emitter;
                     let _ = handle.emit("settings://changed", settings);
+                    // A hand edit is as good a way to move a pane as the
+                    // button is. Without this, editing `practice.poppedOut`
+                    // in a text editor changes the file and nothing else,
+                    // which makes the file a liar about the running windows.
+                    if let Err(err) = practice::sync_windows(&handle) {
+                        tracing::error!(%err, "could not follow a hand edit to the popped-out set");
+                    }
                 });
                 match watcher {
                     // Held for the process lifetime; dropping it stops watching.
@@ -235,16 +285,7 @@ pub fn run() {
                     "boot"
                 );
 
-                let handle = app.handle().clone();
-                std::thread::spawn(move || {
-                    std::thread::sleep(REVEAL_WATCHDOG);
-                    if let Some(window) = handle.get_webview_window("main") {
-                        if !window.is_visible().unwrap_or(false) {
-                            tracing::warn!("frontend never signalled readiness; revealing anyway");
-                            let _ = window.show();
-                        }
-                    }
-                });
+                spawn_reveal_watchdog(app.handle().clone(), practice::MAIN.to_owned());
                 Ok(())
             }
         })

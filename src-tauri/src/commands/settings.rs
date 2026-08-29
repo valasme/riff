@@ -39,11 +39,18 @@ pub fn settings_patch(
 #[tauri::command]
 pub fn settings_reset(
     section: Option<Section>,
+    app: tauri::AppHandle,
     store: tauri::State<'_, Arc<SettingsStore>>,
     scheduler: tauri::State<'_, Arc<FlushScheduler>>,
 ) -> RiffResult<Settings> {
     let next = store.reset(section)?;
     schedule_write(&scheduler);
+    // The reset emptied `practice.poppedOut`; the windows have to follow it.
+    // Leaving three of them open over a file that says none are out is a
+    // reset that lied about what it did.
+    if let Err(err) = crate::practice::sync_windows(&app) {
+        tracing::error!(%err, "panes could not be docked back after a reset");
+    }
     Ok(next)
 }
 
@@ -106,10 +113,14 @@ pub fn import_from(store: &SettingsStore, source: &Path) -> RiffResult<Settings>
 
     crate::settings::migrate::run(&mut document);
 
-    // Onboarding is not a preference and is not importable: someone else's
-    // exported settings must not drop this user back into a first-run wizard.
+    // Neither of these is a preference, and neither is importable.
+    // Onboarding: someone else's exported settings must not drop this user
+    // back into a first-run wizard. Practice: which panes were in their own
+    // windows is a fact about one machine's monitors, which is the entire
+    // premise of the feature — carrying it across is carrying the wrong half.
     if let Some(object) = document.as_object_mut() {
         object.remove("onboarding");
+        object.remove("practice");
     }
 
     let next = store.patch(&document)?;
@@ -162,6 +173,23 @@ mod tests {
             Some("2026-08-28T10:00:00Z"),
             "importing preferences must not restart first run"
         );
+    }
+
+    #[test]
+    fn import_does_not_carry_someone_elses_popped_out_panes() {
+        // Which panes were in their own windows describes one machine's
+        // monitors. Importing it would open windows this machine has nowhere
+        // to put, and silently move panes the user never touched.
+        let (s, tmp) = store();
+        let incoming = tmp.path().join("exported.json");
+        std::fs::write(
+            &incoming,
+            br#"{"version":1,"practice":{"poppedOut":["score","video"]}}"#,
+        )
+        .expect("write");
+
+        let result = import_from(&s, &incoming).expect("import");
+        assert!(result.practice.popped_out.is_empty());
     }
 
     #[test]

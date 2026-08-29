@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
+  "description": "Riff's windows: `main` and one pop-out per practice pane. The opener, dialog and window-state plugins are driven only from Rust and therefore need no JS permission, and there is no log plugin — frontend diagnostics go through our own log_write command. NOTE: Riff's own commands are NOT gated by this file. There is no src-tauri/permissions/, so Tauri's ACL check does not apply to them and every window can call every riff_handlers! command regardless of what is listed here. Adding a permissions manifest would make this file load-bearing overnight — the pop-out windows would lose IPC entirely unless they were granted the commands by name.",
   "identifier": "default",
-  "description": "Riff's main window. The opener, dialog and window-state plugins are driven only from Rust and therefore need no JS permission, and there is no log plugin — frontend diagnostics go through our own log_write command.",
-  "windows": ["main"],
+  "windows": ["main", "popout-*"],
   "permissions": ["core:default"]
 }

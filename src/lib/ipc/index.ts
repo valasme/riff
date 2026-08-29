@@ -6,6 +6,7 @@ import type {
   ExternalLink,
   LicenseEntry,
   LogLevel,
+  Pane,
   PathKind,
   RiffError,
   Section,
@@ -51,4 +52,16 @@ export const ipc = {
   windowQuitConfirmed: () => invoke<void>("window_quit_confirmed"),
   windowSetDecorations: (enabled: boolean) =>
     invoke<boolean>("window_set_decorations", { enabled }),
+  /**
+   * Each of these answers with the whole popped-out set rather than an
+   * acknowledgement: Rust owns it, and a reply saying only "done" would leave
+   * the caller guessing at what became of the other two panes.
+   */
+  practiceState: () => invoke<Pane[]>("practice_state"),
+  practicePopOut: (pane: Pane) => invoke<Pane[]>("practice_pop_out", { pane }),
+  practiceDockBack: (pane: Pane) => invoke<Pane[]>("practice_dock_back", { pane }),
+  practiceDockAll: () => invoke<Pane[]>("practice_dock_all"),
+  practiceFocus: (pane: Pane) => invoke<void>("practice_focus", { pane }),
+  practicePendingReopen: () => invoke<Pane[]>("practice_pending_reopen"),
+  practiceReopen: () => invoke<Pane[]>("practice_reopen"),
 } as const;

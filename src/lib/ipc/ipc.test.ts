@@ -59,6 +59,23 @@ describe("ipc facade", () => {
       "window_set_decorations",
       { enabled: true },
     ],
+    ["practiceState", () => ipc.practiceState(), "practice_state", undefined],
+    ["practicePopOut", () => ipc.practicePopOut("score"), "practice_pop_out", { pane: "score" }],
+    [
+      "practiceDockBack",
+      () => ipc.practiceDockBack("video"),
+      "practice_dock_back",
+      { pane: "video" },
+    ],
+    ["practiceDockAll", () => ipc.practiceDockAll(), "practice_dock_all", undefined],
+    ["practiceFocus", () => ipc.practiceFocus("audio"), "practice_focus", { pane: "audio" }],
+    [
+      "practicePendingReopen",
+      () => ipc.practicePendingReopen(),
+      "practice_pending_reopen",
+      undefined,
+    ],
+    ["practiceReopen", () => ipc.practiceReopen(), "practice_reopen", undefined],
   ];
 
   it.each(calls)("%s calls the right rust command", async (_name, call, command, args) => {
