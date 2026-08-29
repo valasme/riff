@@ -69,7 +69,15 @@ export function SettingsLayout() {
           overflow needs it in a column, or it grows to its content instead and
           pushes the scrollbar onto the window. */}
         <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-[46rem] p-[var(--content-padding)]">
+          {/* Not `mx-auto`. Centring a fixed-width column in an unbounded pane
+            put 348px of empty surface between the sub-navigation and the
+            settings it belongs to at 1920px wide, and 668px at 2560 — the
+            column read as an unrelated card floating in the middle of the
+            window rather than as the content of the section next to it. Left
+            aligned, the gap is one `--content-padding` at every window size.
+            No auto margin means it follows the writing direction on its own,
+            so this stays correct under `dir="rtl"`. */}
+          <div className="w-full max-w-[46rem] p-[var(--content-padding)]">
             <PageHeader
               title={t(`settings:sections.${current}`)}
               description={t(`settings:sectionDescriptions.${current}`)}

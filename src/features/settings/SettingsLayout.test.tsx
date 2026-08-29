@@ -43,10 +43,10 @@ describe("SettingsLayout", () => {
     expect(screen.getByRole("heading", { name: /general/i })).toBeInTheDocument();
   });
 
-  // jsdom has no layout engine, so this cannot measure a box — it asserts the
-  // class contract the measurement came from instead. The regression was found
-  // against real WebKit at 960x640 and is one deleted utility away from
-  // returning.
+  // jsdom has no layout engine, so these cannot measure a box — they assert
+  // the class contract the measurements came from instead. Both regressions
+  // were found against real WebKit, and both are one deleted utility away
+  // from returning.
   it("stacks the panes at the same width the sub-navigation turns horizontal", () => {
     // A `w-full` nav inside a row flex leaves its sibling at `width: 0`, so
     // every setting on the screen stayed in the DOM and none of it was
@@ -60,6 +60,17 @@ describe("SettingsLayout", () => {
     expect(breakpoint).toBeDefined();
     expect(nav?.className).toContain(`${breakpoint}:w-full`);
     expect(outer?.className).toContain(`${breakpoint}:flex-col`);
+  });
+
+  it("aligns the content column with the sub-navigation rather than centring it", () => {
+    // `mx-auto` put 348px of empty surface between the sub-navigation and the
+    // settings it belongs to at 1920px wide, and 668px at 2560.
+    pathname = "/settings/general";
+    const { container } = renderLayout();
+    const column = container.querySelector("header")?.parentElement;
+
+    expect(column?.className).toContain("max-w-[46rem]");
+    expect(column?.className).not.toContain("mx-auto");
   });
 
   it("has no accessibility violations", async () => {
