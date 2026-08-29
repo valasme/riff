@@ -34,6 +34,12 @@ export function PracticePane({
   const { t } = useTranslation("common");
   const Icon = PANE_ICONS[pane];
   const title = t(`panes.${pane}`);
+  // Resolved to a handler-or-nothing *before* it reaches the button, so a
+  // pane given `popped` but no `onDockBack` draws a disabled control rather
+  // than a live one that quietly does nothing when clicked. Wrapping the call
+  // in an arrow first would make `onClick` always defined and defeat
+  // `PaneButton`'s only test for whether it works.
+  const travel = popped ? onDockBack : onPopOut;
 
   return (
     <section
@@ -54,7 +60,7 @@ export function PracticePane({
               a second control beside it would be two ways to say one thing. */}
           <PaneButton
             label={popped ? t("paneActions.dockBack") : t("paneActions.popOut")}
-            onClick={() => (popped ? onDockBack?.(pane) : onPopOut?.(pane))}
+            onClick={travel ? () => travel(pane) : undefined}
           >
             <PictureInPicture2 size={15} aria-hidden />
           </PaneButton>
