@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
+import type { KeymapScope } from "./keymap";
 import { createKeymap } from "./keymap";
 
-function context() {
+function context(scope: KeymapScope = "main") {
   return {
+    scope,
+    pane: "score" as const,
     navigate: vi.fn(),
     togglePalette: vi.fn(),
     toggleSidebar: vi.fn(),
@@ -15,6 +18,9 @@ function context() {
       },
     },
     openPath: vi.fn(),
+    popOut: vi.fn(),
+    dockBack: vi.fn(),
+    dockAll: vi.fn(),
     quit: vi.fn(),
     closeOverlay: vi.fn(),
   };
@@ -71,6 +77,51 @@ describe("createKeymap", () => {
       seen.push(theme);
     }
     expect(seen).toEqual(["darker", "light", "dark"]);
+  });
+
+  it("gives a pop-out no way to navigate away from its pane", () => {
+    // A score window that turned into the Settings screen would have no
+    // sidebar to escape by. The binding is removed rather than disabled, so
+    // the chord is dead rather than silently doing nothing.
+    const popout = createKeymap(context("popout"));
+    expect(popout.filter((b) => b.id.startsWith("nav."))).toHaveLength(0);
+    expect(popout.map((b) => b.chord)).not.toContain("alt+3");
+    expect(popout.find((b) => b.id === "ui.toggleSidebar")).toBeUndefined();
+  });
+
+  it("keeps appearance, the folders and quit available in a pop-out", () => {
+    const ids = createKeymap(context("popout")).map((b) => b.id);
+    for (const id of [
+      "appearance.toggleTheme",
+      "appearance.toggleDensity",
+      "appearance.toggleContrast",
+      "app.openConfig",
+      "app.openLogs",
+      "ui.togglePalette",
+      "app.quit",
+    ]) {
+      expect(ids).toContain(id);
+    }
+  });
+
+  it("offers dock-back only where there is a pane to dock", () => {
+    const ctx = context("popout");
+    const popout = createKeymap(ctx);
+    popout.find((b) => b.id === "practice.dockBack")?.run();
+    expect(ctx.dockBack).toHaveBeenCalledWith("score");
+
+    const main = createKeymap(context("main"));
+    expect(main.find((b) => b.id === "practice.dockBack")).toBeUndefined();
+    expect(main.find((b) => b.id === "practice.popOut.score")).toBeDefined();
+    expect(main.find((b) => b.id === "practice.dockAll")).toBeDefined();
+  });
+
+  it("pops out the pane its command names", () => {
+    const ctx = context();
+    createKeymap(ctx)
+      .find((b) => b.id === "practice.popOut.video")
+      ?.run();
+    expect(ctx.popOut).toHaveBeenCalledWith("video");
   });
 
   it("gives every command an icon, so the palette never renders a blank slot", () => {

@@ -13,7 +13,9 @@ import { createKeymap } from "@/features/keybindings/keymap";
 import { useKeybindings } from "@/features/keybindings/useKeybindings";
 import { ONBOARDING_VERSION, shouldShowOnboarding } from "@/features/onboarding/gate";
 import { CommandPalette } from "@/features/palette/CommandPalette";
+import { popoutPaneFrom } from "@/features/practice/layout";
 import { PANE_ICONS } from "@/features/practice/PracticePane";
+import { PopoutQuitDialog } from "@/features/window/PopoutQuitDialog";
 import { QuitConfirmation } from "@/features/window/QuitConfirmation";
 import { TitleBar } from "@/features/window/TitleBar";
 import { ipc } from "@/lib/ipc";
@@ -60,8 +62,9 @@ export function RootLayout() {
   const [sessionCollapsed, setSessionCollapsed] = useState(false);
   const effectiveCollapsed = rememberCollapsed ? collapsed : sessionCollapsed;
   const onboardingActive = pathname === "/onboarding";
-  const popoutPane = isPopout(pathname) ? pathname.split("/")[2] : undefined;
+  const popoutPane = popoutPaneFrom(pathname);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [quitPromptOpen, setQuitPromptOpen] = useState(false);
   const navigate = useNavigate();
 
   const toggleSidebar = useCallback(() => {
@@ -95,16 +98,25 @@ export function RootLayout() {
   const bindings = useMemo(
     () =>
       createKeymap({
+        scope: popoutPane ? "popout" : "main",
+        pane: popoutPane,
         navigate,
         togglePalette: () => setPaletteOpen((v) => !v),
         toggleSidebar,
         patch: (p) => void patch(p),
         settings,
         openPath: (kind) => void ipc.openPath(kind),
-        quit: () => void ipc.windowClose(),
+        popOut: (pane) => void ipc.practicePopOut(pane),
+        dockBack: (pane) => void ipc.practiceDockBack(pane),
+        dockAll: () => void ipc.practiceDockAll(),
+        // In a pop-out, Ctrl+Q is ambiguous. It is muscle memory for "close
+        // the application", and a command labelled "Quit Riff" that silently
+        // folds a pane back into a grid is a mislabelled action — so the
+        // dialog asks rather than picking a side.
+        quit: () => (popoutPane ? setQuitPromptOpen(true) : void ipc.windowClose()),
         closeOverlay: () => setPaletteOpen(false),
       }),
-    [navigate, toggleSidebar, patch, settings],
+    [navigate, toggleSidebar, patch, settings, popoutPane],
   );
 
   useKeybindings(bindings);
@@ -159,11 +171,8 @@ export function RootLayout() {
           sidebarCollapsed={effectiveCollapsed}
           onOpenPalette={() => setPaletteOpen(true)}
           badge={
-            popoutPane && popoutPane in PANE_ICONS
-              ? {
-                  icon: PANE_ICONS[popoutPane as keyof typeof PANE_ICONS],
-                  label: t(`common:panes.${popoutPane}`),
-                }
+            popoutPane
+              ? { icon: PANE_ICONS[popoutPane], label: t(`common:panes.${popoutPane}`) }
               : undefined
           }
         />
@@ -183,7 +192,15 @@ export function RootLayout() {
         {announcement}
       </div>
       <CommandPalette open={paletteOpen} bindings={bindings} onOpenChange={setPaletteOpen} />
-      <QuitConfirmation />
+      {popoutPane ? (
+        <PopoutQuitDialog
+          pane={popoutPane}
+          open={quitPromptOpen}
+          onOpenChange={setQuitPromptOpen}
+        />
+      ) : (
+        <QuitConfirmation />
+      )}
     </div>
   );
 }

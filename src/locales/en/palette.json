@@ -3,7 +3,11 @@
   "description": "Search every Riff command and jump to any screen.",
   "placeholder": "Search or jump to…",
   "empty": "Nothing matches that.",
-  "hints": { "navigate": "Navigate", "run": "Run", "close": "Close" },
+  "hints": {
+    "navigate": "Navigate",
+    "run": "Run",
+    "close": "Close"
+  },
   "groups": {
     "navigation": "Navigation",
     "appearance": "Appearance",
@@ -21,6 +25,15 @@
     "appearance.toggleContrast": "Toggle high contrast",
     "app.openConfig": "Open the settings folder",
     "app.openLogs": "Open the log folder",
+    "practice": {
+      "popOut": {
+        "score": "Pop out the Score pane",
+        "video": "Pop out the Video pane",
+        "audio": "Pop out the Audio pane"
+      },
+      "dockAll": "Bring every pane back into Riff",
+      "dockBack": "Dock this pane back into Riff"
+    },
     "ui.closeOverlay": "Close the topmost overlay",
     "app.quit": "Quit Riff"
   }

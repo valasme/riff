@@ -26,3 +26,14 @@ export function gridShape(docked: readonly Pane[]): "empty" | "full" | "columns"
 export function dockedPanes(poppedOut: readonly Pane[]): Pane[] {
   return PANES.filter((pane) => !poppedOut.includes(pane));
 }
+
+/**
+ * The pane a `/popout/{pane}` path names, or `undefined` for any other route.
+ * Hash history is user-editable in a way a command argument is not, so the
+ * segment is matched against the known panes rather than trusted.
+ */
+export function popoutPaneFrom(pathname: string): Pane | undefined {
+  const [, section, pane] = pathname.split("/");
+  if (section !== "popout") return undefined;
+  return PANES.find((known) => known === pane);
+}

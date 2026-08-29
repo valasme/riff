@@ -245,7 +245,11 @@ pub fn run() {
                 {
                     api.prevent_close();
                     use tauri::Emitter;
-                    let _ = window.emit("app://confirm-quit", ());
+                    // `emit_to`, not `emit`. `emit` broadcasts to every
+                    // webview, so with pop-outs open one quit would raise
+                    // three modals — and two of them in windows that cannot
+                    // quit anything.
+                    let _ = window.emit_to(window.label(), "app://confirm-quit", ());
                     return;
                 }
 

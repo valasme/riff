@@ -8,15 +8,25 @@ import {
   LogOut,
   Music4,
   PanelLeft,
+  PictureInPicture2,
   Rows3,
   Search,
   Settings,
   SunMoon,
+  Undo2,
   X,
 } from "lucide-react";
-import type { DeepPartial, PathKind, Settings as SettingsShape, Theme } from "@/lib/ipc";
+import { PANES } from "@/features/practice/layout";
+import type { DeepPartial, Pane, PathKind, Settings as SettingsShape, Theme } from "@/lib/ipc";
+
+/** Which window is asking. A pop-out is a pane, not a second copy of the
+ *  application. */
+export type KeymapScope = "main" | "popout";
 
 export interface KeymapContext {
+  scope: KeymapScope;
+  /** The pane this window shows. Only meaningful when `scope` is "popout". */
+  pane?: Pane;
   navigate: (options: { to: string }) => void;
   togglePalette: () => void;
   toggleSidebar: () => void;
@@ -29,6 +39,9 @@ export interface KeymapContext {
     };
   };
   openPath: (kind: PathKind) => void;
+  popOut: (pane: Pane) => void;
+  dockBack: (pane: Pane) => void;
+  dockAll: () => void;
   quit: () => void;
   closeOverlay: () => void;
 }
@@ -45,6 +58,12 @@ export interface Keybinding {
   icon: LucideIcon;
   /** An alternative chord for an action already listed. Bound, not shown. */
   hidden?: boolean;
+  /** Which windows this command exists in. Absent means all of them.
+   *  Scoping removes the binding entirely rather than disabling it, so the
+   *  chord is dead in a window the command does not belong to — `Alt+3` in a
+   *  score window would otherwise replace the score with Settings, in a
+   *  window with no sidebar to navigate back out by. */
+  scope?: KeymapScope;
   run: () => void;
 }
 
@@ -68,9 +87,10 @@ export function nextTheme(current: Theme): Theme {
 export function createKeymap(ctx: KeymapContext): Keybinding[] {
   const { appearance } = ctx.settings;
 
-  return [
+  const bindings: Keybinding[] = [
     {
       id: "nav.practice",
+      scope: "main",
       chord: "alt+1",
       group: "navigation",
       icon: Music4,
@@ -79,6 +99,7 @@ export function createKeymap(ctx: KeymapContext): Keybinding[] {
     },
     {
       id: "nav.history",
+      scope: "main",
       chord: "alt+2",
       group: "navigation",
       icon: History,
@@ -87,6 +108,7 @@ export function createKeymap(ctx: KeymapContext): Keybinding[] {
     },
     {
       id: "nav.settings",
+      scope: "main",
       chord: "alt+3",
       group: "navigation",
       icon: Settings,
@@ -98,6 +120,7 @@ export function createKeymap(ctx: KeymapContext): Keybinding[] {
     // duplicate values make cmdk select both at once.
     {
       id: "nav.settingsAlt",
+      scope: "main",
       chord: "ctrl+,",
       group: "navigation",
       icon: Settings,
@@ -107,6 +130,7 @@ export function createKeymap(ctx: KeymapContext): Keybinding[] {
     },
     {
       id: "nav.about",
+      scope: "main",
       chord: "",
       group: "navigation",
       icon: Info,
@@ -124,6 +148,7 @@ export function createKeymap(ctx: KeymapContext): Keybinding[] {
     },
     {
       id: "ui.toggleSidebar",
+      scope: "main",
       chord: "ctrl+b",
       group: "application",
       icon: PanelLeft,
@@ -157,6 +182,38 @@ export function createKeymap(ctx: KeymapContext): Keybinding[] {
       icon: Contrast,
       descriptionKey: "palette:commands.appearance.toggleContrast",
       run: () => ctx.patch({ appearance: { highContrast: !appearance.highContrast } }),
+    },
+
+    ...PANES.map(
+      (pane): Keybinding => ({
+        id: `practice.popOut.${pane}`,
+        chord: "",
+        group: "application",
+        scope: "main",
+        icon: PictureInPicture2,
+        descriptionKey: `palette:commands.practice.popOut.${pane}`,
+        run: () => ctx.popOut(pane),
+      }),
+    ),
+    {
+      id: "practice.dockAll",
+      chord: "",
+      group: "application",
+      scope: "main",
+      icon: Undo2,
+      descriptionKey: "palette:commands.practice.dockAll",
+      run: ctx.dockAll,
+    },
+    {
+      id: "practice.dockBack",
+      chord: "",
+      group: "application",
+      scope: "popout",
+      icon: Undo2,
+      descriptionKey: "palette:commands.practice.dockBack",
+      run: () => {
+        if (ctx.pane) ctx.dockBack(ctx.pane);
+      },
     },
 
     {
@@ -198,4 +255,6 @@ export function createKeymap(ctx: KeymapContext): Keybinding[] {
       run: ctx.closeOverlay,
     },
   ];
+
+  return bindings.filter((b) => b.scope === undefined || b.scope === ctx.scope);
 }
