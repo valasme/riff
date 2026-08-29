@@ -47,8 +47,16 @@ carry their own specs.
 | # | Plan | Spec | Delivers | Depends on |
 |---|---|---|---|---|
 | 13 | `13-pane-popout.md` | `specs/2026-08-29-pane-popout-design.md` | A practice pane can leave the grid for its own window and come back, on multi-monitor setups | 10 |
+| 14 | `14-error-handling-hardening.md` | — (audit of 2026-08-29) | No failure is silent and none destroys data: boot order, the settings file that parses but does not deserialise, the crash screen, and the ~20 unhandled IPC rejections | 13 |
 
 13 comes before §15's media rather than after it deliberately. Pop-out is a *window* feature —
 creation, capability, lifecycle, cross-window state — and none of it needs a decoded frame. Built
 first, the players in §15 drop into panes that already know how to travel; built second, they are
 retrofitted into a layout that assumed one window.
+
+14 carries no spec of its own, because it designs nothing: it is an audit of the eleven plans
+before it, and the design of record for every path it touches is already §3.1, §4, §5 and §12. It
+comes before §15's media for the same reason 13 did — a media player is the first thing in Riff
+that can fail for reasons outside the process (a codec, a corrupt file, a disc that went away
+mid-seek), and it should land on error handling that already works rather than be the thing that
+proves it does not.
