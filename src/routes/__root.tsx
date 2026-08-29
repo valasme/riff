@@ -41,8 +41,16 @@ export const Route = createRootRoute({
   },
 });
 
-/** `/popout/score` and friends. Every window shares this component, so most
- *  of what follows asks this before drawing navigation chrome. */
+/**
+ * `/popout/score` and friends. Every window shares this component, so most of
+ * what follows asks this before drawing navigation chrome.
+ *
+ * Deliberately looser than `popoutPaneFrom`, which validates the segment: a
+ * hand-typed `#/popout/bogus` is *not* a pane, so it keeps its sidebar and can
+ * be navigated away from — but it is still not somewhere `lastRoute` should
+ * remember, because `startupRoute: last-used` would then launch into a 404
+ * every time. The two questions differ, so the two functions do.
+ */
 export function isPopout(pathname: string): boolean {
   return pathname.startsWith("/popout/");
 }
