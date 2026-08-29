@@ -79,7 +79,7 @@ jobs:
               for (const key of want) if (!have.has(key)) { console.error(`missing ${file}:${key}`); missing++; }
             }
             process.exit(missing ? 1 : 0);
-          '"
+          '
 
       - name: No untranslated keys
         run: |
