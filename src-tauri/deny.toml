@@ -78,7 +78,17 @@ ignore = [
     # Tauri pins — atk, cairo-rs, gdk, gio, gtk, javascriptcore-rs, webkit2gtk
     # and wry all hold it there — so it moves when Tauri moves, not before.
     # Riff never constructs a `VariantStrIter`; nothing in `src/` mentions glib
-    # at all. Delete this entry the moment Tauri ships against gtk-rs 0.20.
+    # at all.
+    #
+    # No version bump can retire this entry. gtk-rs's GTK3 bindings are
+    # unmaintained in their own right — the `gtk` crate describes itself as
+    # "UNMAINTAINED […] use gtk4 instead" and carries RUSTSEC-2024-0415, with
+    # -0413 for atk and -0412 for gdk — and they are frozen at 0.18.2 against
+    # glib ^0.18, a line whose last release is the unsound 0.18.5. Even the
+    # newest wry still requires gtk ^0.18. The trigger is therefore Tauri
+    # leaving GTK3 for GTK4 / webkitgtk-6.0, not an upgrade within the stack.
+    # Those three unmaintained advisories do not fail the gate only because
+    # `unmaintained` below is still cargo-deny's `workspace` default.
     #
     # This sits here rather than being invisible because `unsound = "all"`
     # above widens the check from cargo-deny's `workspace` default, which only
