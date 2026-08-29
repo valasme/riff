@@ -54,7 +54,7 @@ export function RouteError({ error }: { error: unknown }) {
             />
             {t("technicalDetails")}
           </summary>
-          <pre className="mt-2 max-h-64 overflow-auto rounded-[var(--radius-control)] border border-line bg-card p-3 font-mono text-xs">
+          <pre className="mt-2 max-h-64 overflow-auto overscroll-contain rounded-[var(--radius-control)] border border-line bg-card p-3 font-mono text-xs">
             {detail}
           </pre>
         </details>

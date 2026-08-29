@@ -61,7 +61,7 @@ export function HistoryPlaceholder() {
           three rows sat above a half-screen of empty card, which reads as a
           table that failed to load rather than as a preview of one. */}
       <div className="flex min-h-0 flex-col overflow-hidden rounded-[var(--radius-card)] border border-line bg-card">
-        <div className="min-h-0 overflow-auto">
+        <div className="min-h-0 overflow-auto overscroll-contain">
           <table className="w-full border-collapse text-sm" aria-label={t("history.sessions")}>
             <thead>
               <tr className="border-b border-line bg-hover">

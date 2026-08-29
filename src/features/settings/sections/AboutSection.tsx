@@ -83,7 +83,7 @@ export function AboutSection() {
           <p className="text-[0.8125rem] text-muted-foreground">
             {t("settings:about.licenseBody")}
           </p>
-          <pre className="mt-3 max-h-64 overflow-auto rounded-[var(--radius-control)] border border-line bg-hover p-3 font-mono text-xs whitespace-pre-wrap">
+          <pre className="mt-3 max-h-64 overflow-auto overscroll-contain rounded-[var(--radius-control)] border border-line bg-hover p-3 font-mono text-xs whitespace-pre-wrap">
             {MIT_LICENSE}
           </pre>
         </Disclosure>
@@ -112,7 +112,16 @@ export function AboutSection() {
               {t("settings:about.thirdPartyEmpty")}
             </p>
           ) : (
-            <ul className="mt-3 max-h-80 divide-y divide-separator overflow-auto">
+            // `pe-2.5` is the scrollbar's own 0.625rem, reserved by hand.
+            // WebKitGTK draws overlay scrollbars, which take no layout space,
+            // so the right-aligned licence name ran underneath the bar and
+            // lost its last few characters. `scrollbar-gutter: stable` is the
+            // property for exactly this and is a no-op here — the engine
+            // reports support and still reserves nothing, because the spec
+            // exempts overlay scrollbars — so the gutter has to be padding.
+            // `overscroll-contain` keeps the settings pane still once this
+            // list reaches an end, rather than handing it the leftover scroll.
+            <ul className="mt-3 max-h-80 divide-y divide-separator overflow-auto overscroll-contain pe-2.5">
               {matches.map((entry) => (
                 <li
                   key={`${entry.ecosystem}-${entry.name}`}
