@@ -79,7 +79,8 @@ describe("OnboardingFlow", () => {
     renderFlow();
     await user.click(screen.getByRole("button", { name: /continue/i }));
     patch.mockClear();
-    await user.click(screen.getByRole("radio", { name: /^Dark/ }));
+    // Exact, not /^Dark/: "Darker" now starts with the same four letters.
+    await user.click(screen.getByRole("radio", { name: "Dark" }));
     expect(patch).toHaveBeenCalledWith({ appearance: { theme: "dark" } });
   });
 

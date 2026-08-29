@@ -1,7 +1,18 @@
 {
   "title": "Settings",
   "sections": { "general": "General", "appearance": "Appearance", "about": "About" },
+  "sectionDescriptions": {
+    "general": "How Riff starts, where it keeps things, and how to move or reset it.",
+    "appearance": "Theme, spacing, scale and the window frame.",
+    "about": "Build identity, licences and diagnostics."
+  },
   "general": {
+    "groups": {
+      "startup": "Startup",
+      "data": "Data",
+      "settingsFile": "Settings file",
+      "reset": "Start over"
+    },
     "startupRoute": {
       "label": "On launch, open",
       "description": "Which page Riff shows when it starts."
@@ -25,7 +36,7 @@
     },
     "paths": { "config": "Settings", "data": "Data", "cache": "Cache", "logs": "Logs" },
     "importExport": {
-      "label": "Settings file",
+      "label": "Move your settings",
       "description": "Copy your settings to another machine, or bring them back."
     },
     "export": "Export settings",
@@ -50,11 +61,22 @@
     }
   },
   "appearance": {
+    "groups": {
+      "theme": "Theme",
+      "layout": "Layout",
+      "accessibility": "Motion and contrast",
+      "window": "Window"
+    },
     "theme": {
       "label": "Theme",
       "description": "Riff does not follow your desktop; you chose this during setup and can change it here."
     },
-    "themeOptions": { "dark": "Dark", "light": "Light" },
+    "themeOptions": { "dark": "Dark", "darker": "Darker", "light": "Light" },
+    "themeDescriptions": {
+      "dark": "Soft charcoal. The default.",
+      "darker": "Near-black, for dim rooms.",
+      "light": "Bright, for daylight."
+    },
     "density": { "label": "Density", "description": "Adjusts spacing without changing text size." },
     "densityOptions": { "comfortable": "Comfortable", "compact": "Compact" },
     "uiScale": {
@@ -86,16 +108,26 @@
     }
   },
   "about": {
+    "groups": { "build": "Build", "legal": "Legal", "support": "Support" },
     "version": "Version",
     "tauri": "Tauri",
     "webkit": "WebKitGTK",
     "buildDate": "Build date",
     "commit": "Commit",
+    "copyAll": "Copy all",
     "repository": "Repository",
     "issues": "Report an issue",
     "license": "Licence",
     "licenseBody": "Riff is free software released under the MIT Licence.",
     "thirdParty": "Third-party licences",
+    "thirdPartyCount_one": "{{count}} package",
+    "thirdPartyCount_other": "{{count}} packages",
+    "thirdPartySearch": "Filter packages",
+    "thirdPartyEmpty": "No package matches that.",
+    "links": {
+      "label": "Project links",
+      "description": "Riff makes no network connections. These open in your browser."
+    },
     "exportDiagnostics": {
       "label": "Export diagnostics",
       "description": "Writes one text file with your logs, versions and settings. Your home directory and username are replaced before it is saved, so it is safe to attach to a bug report.",

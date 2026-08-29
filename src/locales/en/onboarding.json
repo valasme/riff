@@ -9,6 +9,7 @@
     "title": "Pick a look",
     "body": "You can change this at any time in Settings.",
     "dark": "Dark",
+    "darker": "Darker",
     "light": "Light",
     "preview": "{{name}} theme preview"
   },

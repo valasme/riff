@@ -1,13 +1,16 @@
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   CommandDialog,
   CommandEmpty,
+  CommandFooter,
   CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
   CommandShortcut,
 } from "@/components/ui/command";
+import { Kbd } from "@/components/ui/kbd";
 import { formatChord } from "@/features/keybindings/chord";
 import type { Keybinding } from "@/features/keybindings/keymap";
 
@@ -32,8 +35,8 @@ export function CommandPalette({
     <CommandDialog
       open={open}
       onOpenChange={onOpenChange}
-      title={t("placeholder")}
-      description={t("empty")}
+      title={t("title")}
+      description={t("description")}
     >
       <CommandInput placeholder={t("placeholder")} />
       <CommandList>
@@ -43,25 +46,51 @@ export function CommandPalette({
           if (items.length === 0) return null;
           return (
             <CommandGroup key={group} heading={t(`groups.${group}`)}>
-              {items.map((binding) => (
-                <CommandItem
-                  key={binding.id}
-                  // cmdk matches on this string, which is why the translated
-                  // label rather than the id is used.
-                  value={t(binding.descriptionKey, { ns: undefined })}
-                  onSelect={() => {
-                    binding.run();
-                    onOpenChange(false);
-                  }}
-                >
-                  {t(binding.descriptionKey, { ns: undefined })}
-                  {binding.chord && <CommandShortcut>{formatChord(binding.chord)}</CommandShortcut>}
-                </CommandItem>
-              ))}
+              {items.map((binding) => {
+                const Icon = binding.icon;
+                const label = t(binding.descriptionKey, { ns: undefined });
+                return (
+                  <CommandItem
+                    key={binding.id}
+                    // cmdk matches on this string, which is why the translated
+                    // label rather than the id is used.
+                    value={label}
+                    onSelect={() => {
+                      binding.run();
+                      onOpenChange(false);
+                    }}
+                  >
+                    <Icon aria-hidden />
+                    <span className="truncate">{label}</span>
+                    {binding.chord && <CommandShortcut chord={formatChord(binding.chord)} />}
+                  </CommandItem>
+                );
+              })}
             </CommandGroup>
           );
         })}
       </CommandList>
+
+      {/* The palette is a keyboard surface, so it says how the keyboard works
+          rather than leaving it to be discovered. Decorative: every key here
+          already does what it says with no help from this strip, and the row
+          is `aria-hidden` so it is not read out as three unlabelled keys. */}
+      <CommandFooter aria-hidden>
+        <Hint keys={["↑", "↓"]}>{t("hints.navigate")}</Hint>
+        <Hint keys={["↵"]}>{t("hints.run")}</Hint>
+        <Hint keys={["Esc"]}>{t("hints.close")}</Hint>
+      </CommandFooter>
     </CommandDialog>
+  );
+}
+
+function Hint({ keys, children }: { keys: string[]; children: ReactNode }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      {keys.map((key) => (
+        <Kbd key={key} chord={key} />
+      ))}
+      {children}
+    </span>
   );
 }

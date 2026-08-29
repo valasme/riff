@@ -1,20 +1,27 @@
-import { Minus, Square, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ipc } from "@/lib/ipc";
+import { useWindowMaximized } from "./useWindowMaximized";
+import { WindowGlyph } from "./WindowGlyph";
 
-const BUTTON = "grid h-8 w-11 place-items-center text-foreground transition-colors hover:bg-raised";
+/** Square, rounded, and separated from the window edge rather than welded to
+ *  it. The old controls ran flush into the right-hand border, so the close
+ *  button's hover fill bled off the corner. */
+const BUTTON =
+  "grid size-8 place-items-center rounded-[var(--radius-control)] text-muted-foreground transition-colors duration-[var(--motion-fast)] ease-(--ease-standard) hover:bg-hover hover:text-foreground";
 
-export function WindowControls({ maximized = false }: { maximized?: boolean }) {
+export function WindowControls() {
   const { t } = useTranslation("nav");
+  const maximized = useWindowMaximized();
+
   return (
-    <div className="flex items-center">
+    <div className="flex items-center gap-0.5">
       <button
         type="button"
         className={BUTTON}
         aria-label={t("minimize")}
         onClick={() => void ipc.windowMinimize()}
       >
-        <Minus size={16} aria-hidden />
+        <WindowGlyph shape="minimize" />
       </button>
       <button
         type="button"
@@ -24,7 +31,7 @@ export function WindowControls({ maximized = false }: { maximized?: boolean }) {
         aria-label={maximized ? t("restore") : t("maximize")}
         onClick={() => void ipc.windowToggleMaximize()}
       >
-        <Square size={13} aria-hidden />
+        <WindowGlyph shape={maximized ? "restore" : "maximize"} />
       </button>
       <button
         type="button"
@@ -32,7 +39,7 @@ export function WindowControls({ maximized = false }: { maximized?: boolean }) {
         aria-label={t("closeWindow")}
         onClick={() => void ipc.windowClose()}
       >
-        <X size={16} aria-hidden />
+        <WindowGlyph shape="close" />
       </button>
     </div>
   );

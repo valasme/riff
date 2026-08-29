@@ -3,6 +3,16 @@ import type * as React from "react";
 
 import { cn } from "@/lib/cn";
 
+/**
+ * On is a filled track; off is an outlined one.
+ *
+ * The previous switch styled itself with `data-checked:` / `data-unchecked:`,
+ * which Tailwind compiles to `[data-checked]` — an attribute Radix does not
+ * emit. It emits `data-state="checked"`. So neither rule ever matched, the
+ * track never took a background at all, and every switch in Settings rendered
+ * as a single dark dot with no on state and no off state. This is the fix, and
+ * it is why every `data-*` variant in this directory is written out in full.
+ */
 function Switch({
   className,
   size = "default",
@@ -15,14 +25,34 @@ function Switch({
       data-slot="switch"
       data-size={size}
       className={cn(
-        "peer group/switch relative inline-flex shrink-0 items-center rounded-full border border-transparent transition-all outline-none group-has-[:focus-visible]/field-label:border-transparent group-has-[:focus-visible]/field-label:ring-0 after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-border-subtle aria-invalid:ring-3 aria-invalid:ring-border-subtle/40 data-[size=default]:h-[18.4px] data-[size=default]:w-[32px] data-[size=sm]:h-[14px] data-[size=sm]:w-[24px] data-checked:bg-raised data-unchecked:bg-border-subtle data-disabled:cursor-not-allowed data-disabled:opacity-50",
+        "group/switch peer relative inline-flex shrink-0 items-center rounded-full p-0.5",
+        "border transition-colors duration-[var(--motion-fast)] ease-(--ease-standard) outline-none",
+        "data-[size=default]:h-5 data-[size=default]:w-9 data-[size=sm]:h-4 data-[size=sm]:w-7",
+        // Neutral by necessity — §7.1 admits no accent hue — so the two states
+        // are told apart by fill and by which of the two colours is on the
+        // outside, which is a larger difference than any hue would have been.
+        "data-[state=checked]:border-foreground data-[state=checked]:bg-foreground",
+        "data-[state=unchecked]:border-border-subtle data-[state=unchecked]:bg-transparent",
+        "data-disabled:opacity-50",
         className,
       )}
       {...props}
     >
       <SwitchPrimitive.Thumb
         data-slot="switch-thumb"
-        className="pointer-events-none block rounded-full bg-surface ring-0 transition-transform group-data-[size=default]/switch:size-4 group-data-[size=sm]/switch:size-3 group-data-[size=default]/switch:data-checked:translate-x-[calc(100%-2px)] group-data-[size=sm]/switch:data-checked:translate-x-[calc(100%-2px)] group-data-[size=default]/switch:data-unchecked:translate-x-0 group-data-[size=sm]/switch:data-unchecked:translate-x-0"
+        className={cn(
+          "pointer-events-none block rounded-full transition-transform duration-[var(--motion-fast)] ease-(--ease-standard)",
+          "group-data-[size=default]/switch:size-4 group-data-[size=sm]/switch:size-3",
+          "group-data-[state=checked]/switch:bg-surface group-data-[state=unchecked]/switch:bg-muted-foreground",
+          // Physical translate with an RTL mirror: `dir` is set from the
+          // active locale (§10), and a thumb that slides the wrong way is the
+          // kind of bug that only shows up in the locale nobody tests.
+          "group-data-[state=unchecked]/switch:translate-x-0",
+          "group-data-[size=default]/switch:group-data-[state=checked]/switch:translate-x-4",
+          "group-data-[size=sm]/switch:group-data-[state=checked]/switch:translate-x-3",
+          "rtl:group-data-[size=default]/switch:group-data-[state=checked]/switch:-translate-x-4",
+          "rtl:group-data-[size=sm]/switch:group-data-[state=checked]/switch:-translate-x-3",
+        )}
       />
     </SwitchPrimitive.Root>
   );

@@ -6,18 +6,30 @@
   "back": "Back",
   "continue": "Continue",
   "openFolder": "Open folder",
+  "copy": "Copy",
   "copied": "Copied to clipboard",
   "quit": { "title": "Quit Riff?", "body": "Your settings are already saved.", "action": "Quit" },
   "inDevelopment": "In development",
   "panes": { "score": "Score", "video": "Video", "audio": "Audio" },
   "paneActions": { "popOut": "Pop out", "closePane": "Close pane" },
+  "paneEmpty": {
+    "score": "A PDF score will open here.",
+    "video": "A video lesson will play here.",
+    "audio": "A backing track will play here."
+  },
   "search": "Search",
   "filter": "Filter",
   "history": {
     "name": "Name",
     "lastPractised": "Last practised",
+    "duration": "Duration",
     "rowActions": "Row actions",
     "rowMenu": "Row menu",
-    "sessions": "Practice sessions"
+    "selectAll": "Select all sessions",
+    "sessions": "Practice sessions",
+    "searchPlaceholder": "Search sessions",
+    "heading": "History",
+    "subheading": "Every practice session Riff has recorded.",
+    "preview": "Preview only. Riff records nothing yet — these rows show the shape History will take once playback lands."
   }
 }

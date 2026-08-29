@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { I18nextProvider } from "react-i18next";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -53,6 +53,25 @@ describe("AppearanceSection", () => {
     renderSection();
     await user.click(screen.getByRole("switch", { name: /high contrast/i }));
     expect(patch).toHaveBeenCalledWith({ appearance: { highContrast: true } });
+  });
+
+  it("applies a keyboard step to the interface scale immediately", () => {
+    // Radix commits on every step key, so the keyboard path is unaffected by
+    // the drag deferral below. Dragging cannot be exercised here: Radix maps
+    // the pointer through `getBoundingClientRect`, which jsdom answers with
+    // zeroes.
+    renderSection();
+    const slider = screen.getByRole("slider", { name: /interface scale/i });
+    slider.focus();
+    fireEvent.keyDown(slider, { key: "ArrowRight" });
+    expect(patch).toHaveBeenCalledWith({ appearance: { uiScale: 1.05 } });
+  });
+
+  it("offers every theme, so a new one cannot be added to the store alone", () => {
+    renderSection();
+    for (const name of ["Dark", "Darker", "Light"]) {
+      expect(screen.getByRole("radio", { name })).toBeInTheDocument();
+    }
   });
 
   it("has no accessibility violations", async () => {

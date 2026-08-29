@@ -5,7 +5,7 @@ import {
   useNavigate,
   useRouterState,
 } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { RouteError } from "@/components/RouteError";
 import { Sidebar } from "@/components/Sidebar";
@@ -41,8 +41,13 @@ export function RootLayout() {
   const titleBar = useAppearance().titleBar;
   const settings = useSettings((s) => s.settings);
   const patch = useSettings((s) => s.patch);
-  const [transientCollapsed, setTransientCollapsed] = useState(collapsed);
-  const effectiveCollapsed = rememberCollapsed ? collapsed : transientCollapsed;
+  // The sidebar's state for this session only, used when the user has asked
+  // Riff *not* to remember. It starts expanded rather than seeded from
+  // `collapsed`: seeding it from the persisted value is what made "don't
+  // remember" remember, so every launch reopened however the sidebar happened
+  // to be left, which is the behaviour the setting exists to switch off.
+  const [sessionCollapsed, setSessionCollapsed] = useState(false);
+  const effectiveCollapsed = rememberCollapsed ? collapsed : sessionCollapsed;
   const onboardingActive = pathname === "/onboarding";
   const [paletteOpen, setPaletteOpen] = useState(false);
   const navigate = useNavigate();
@@ -51,9 +56,29 @@ export function RootLayout() {
     if (rememberCollapsed) {
       void patch({ appearance: { sidebar: { collapsed: !collapsed } } });
     } else {
-      setTransientCollapsed((v) => !v);
+      setSessionCollapsed((v) => !v);
     }
   }, [rememberCollapsed, collapsed, patch]);
+
+  // Flipping "Remember sidebar state" must not move the sidebar. Whichever
+  // value stops being the live one has to adopt what is currently on screen
+  // first, or the switch resurrects a stale value from whenever that side was
+  // last in charge — collapsing a sidebar the user had just opened, or the
+  // reverse. Only the flip itself does this, which is why the previous value
+  // is tracked in a ref: on mount the two agree and nothing is written.
+  const rememberWas = useRef(rememberCollapsed);
+  useEffect(() => {
+    const was = rememberWas.current;
+    rememberWas.current = rememberCollapsed;
+    if (was === rememberCollapsed) return;
+    if (rememberCollapsed) {
+      if (collapsed !== sessionCollapsed) {
+        void patch({ appearance: { sidebar: { collapsed: sessionCollapsed } } });
+      }
+    } else {
+      setSessionCollapsed(collapsed);
+    }
+  }, [rememberCollapsed, collapsed, sessionCollapsed, patch]);
 
   const bindings = useMemo(
     () =>
@@ -101,18 +126,27 @@ export function RootLayout() {
     <div className="flex h-screen flex-col bg-surface text-foreground">
       <a
         href="#main"
-        className="sr-only focus-visible:not-sr-only focus-visible:absolute focus-visible:z-50 focus-visible:m-2 focus-visible:rounded-md focus-visible:bg-raised focus-visible:px-3 focus-visible:py-2"
+        className="sr-only focus-visible:not-sr-only focus-visible:absolute focus-visible:z-50 focus-visible:m-2 focus-visible:rounded-[var(--radius-control)] focus-visible:border focus-visible:border-line focus-visible:bg-card focus-visible:px-3 focus-visible:py-2 focus-visible:text-sm focus-visible:font-medium"
       >
         {t("skipToContent")}
       </a>
       {/* Choosing System decorations has to hide Riff's own bar live, or the
           window ends up with two title bars stacked. */}
       {titleBar === "custom" && (
-        <TitleBar onToggleSidebar={toggleSidebar} onOpenPalette={() => setPaletteOpen(true)} />
+        <TitleBar
+          onToggleSidebar={toggleSidebar}
+          // The toggle needs the state, not only the handler: without it the
+          // button showed one icon for both directions and never said which
+          // way it was about to go.
+          sidebarCollapsed={effectiveCollapsed}
+          onOpenPalette={() => setPaletteOpen(true)}
+        />
       )}
-      {/* The container the sidebar's breakpoint measures. Chrome is rem-sized,
-          so raising the UI scale shrinks this in px and the query fires —
-          which a viewport media query could never do. */}
+      {/* The container the sidebar's rail breakpoint measures. The query is
+          written in rem, so raising the UI scale grows the threshold while the
+          window stays the same number of pixels — which is what makes the rail
+          appear exactly when the chrome would otherwise crowd the content. A
+          viewport media query could not respond to scale at all. */}
       <div className="@container/shell flex min-h-0 flex-1">
         {!onboardingActive && <Sidebar collapsed={effectiveCollapsed} />}
         <main id="main" className="min-w-0 flex-1 overflow-auto">

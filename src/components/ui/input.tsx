@@ -8,7 +8,16 @@ function Input({ className, type, ...props }: React.ComponentProps<"input">) {
       type={type}
       data-slot="input"
       className={cn(
-        "h-8 w-full min-w-0 rounded-lg border border-border-subtle bg-transparent px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-raised/50 disabled:opacity-50 aria-invalid:border-border-subtle aria-invalid:ring-3 aria-invalid:ring-border-subtle/40 md:text-sm",
+        "h-8 w-full min-w-0 rounded-[var(--radius-control)] border border-border-subtle bg-transparent px-2.5 text-sm",
+        "transition-colors duration-[var(--motion-fast)] ease-(--ease-standard) outline-none",
+        "placeholder:text-muted-foreground hover:border-foreground/40",
+        // The 2px ring from globals.css is the focus indicator everywhere
+        // else in the application; a field does not get a second, different
+        // one. `focus-visible:border-foreground` only sharpens the boundary
+        // underneath it.
+        "focus-visible:border-foreground",
+        "disabled:bg-hover disabled:opacity-60 read-only:text-muted-foreground",
+        "[&::-webkit-search-cancel-button]:hidden",
         className,
       )}
       {...props}

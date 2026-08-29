@@ -27,18 +27,22 @@ function Slider({
       min={min}
       max={max}
       className={cn(
-        "relative flex w-full touch-none items-center select-none data-disabled:opacity-50 data-vertical:h-full data-vertical:min-h-40 data-vertical:w-auto data-vertical:flex-col",
+        "relative flex w-full touch-none items-center select-none",
+        // Radix reports orientation as `data-orientation`, so the previous
+        // `data-vertical:` / `data-horizontal:` rules matched nothing — see
+        // switch.tsx for the same mistake and the same fix.
+        "data-disabled:opacity-50 data-[orientation=vertical]:h-full data-[orientation=vertical]:min-h-40 data-[orientation=vertical]:w-auto data-[orientation=vertical]:flex-col",
         className,
       )}
       {...props}
     >
       <SliderPrimitive.Track
         data-slot="slider-track"
-        className="relative grow overflow-hidden rounded-full bg-raised data-horizontal:h-1 data-horizontal:w-full data-vertical:h-full data-vertical:w-1"
+        className="relative grow overflow-hidden rounded-full bg-active-fill data-[orientation=horizontal]:h-1.5 data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-1.5"
       >
         <SliderPrimitive.Range
           data-slot="slider-range"
-          className="absolute bg-foreground select-none data-horizontal:h-full data-vertical:w-full"
+          className="absolute bg-foreground select-none data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full"
         />
       </SliderPrimitive.Track>
       {Array.from({ length: _values.length }, (_, index) => (
@@ -47,7 +51,15 @@ function Slider({
           // biome-ignore lint/suspicious/noArrayIndexKey: thumb count is fixed by min/max/value at mount and never reordered.
           key={index}
           aria-label={thumbLabel}
-          className="relative block size-3 shrink-0 rounded-full border border-ring bg-surface ring-ring/50 transition-[color,box-shadow] select-none after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:opacity-50"
+          className={cn(
+            "relative block size-4 shrink-0 rounded-full border-2 border-foreground bg-surface select-none",
+            "transition-[box-shadow] duration-[var(--motion-fast)] ease-(--ease-standard) outline-none",
+            // The invisible hit area, so the thumb is a 32px target without
+            // being a 32px dot (WCAG 2.5.8).
+            "after:absolute after:-inset-2",
+            "hover:shadow-[0_0_0_0.25rem_var(--hover)] active:shadow-[0_0_0_0.25rem_var(--active-fill)]",
+            "data-disabled:pointer-events-none",
+          )}
         />
       ))}
     </SliderPrimitive.Root>

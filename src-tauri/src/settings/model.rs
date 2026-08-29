@@ -170,7 +170,11 @@ kebab_enum!(StartupRoute {
     History,
     LastUsed
 });
-kebab_enum!(Theme { Dark, Light });
+kebab_enum!(Theme {
+    Dark,
+    Darker,
+    Light
+});
 kebab_enum!(Density {
     Comfortable,
     Compact

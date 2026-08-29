@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { History, Music4, Power } from "lucide-react";
 import { I18nextProvider } from "react-i18next";
 import { describe, expect, it, vi } from "vitest";
 import i18n from "@/app/i18n";
@@ -12,6 +13,7 @@ const bindings: Keybinding[] = [
     id: "nav.practice",
     chord: "alt+1",
     group: "navigation",
+    icon: Music4,
     descriptionKey: "palette:commands.nav.practice",
     run,
   },
@@ -19,6 +21,7 @@ const bindings: Keybinding[] = [
     id: "nav.history",
     chord: "alt+2",
     group: "navigation",
+    icon: History,
     descriptionKey: "palette:commands.nav.history",
     run,
   },
@@ -26,6 +29,7 @@ const bindings: Keybinding[] = [
     id: "app.quit",
     chord: "ctrl+q",
     group: "application",
+    icon: Power,
     descriptionKey: "palette:commands.app.quit",
     run,
   },
@@ -43,7 +47,10 @@ describe("CommandPalette", () => {
   it("lists every command with its shortcut", () => {
     renderPalette();
     expect(screen.getByText("Go to Practice")).toBeInTheDocument();
-    expect(screen.getByText("Alt+1")).toBeInTheDocument();
+    // One <kbd> per key, not one string per chord: "Alt+1" is two keys.
+    const shortcut = screen.getByText("Go to Practice").closest("[data-slot='command-item']");
+    expect(shortcut?.textContent).toContain("Alt");
+    expect(shortcut?.textContent).toContain("1");
   });
 
   it("filters as you type", async () => {

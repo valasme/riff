@@ -7,7 +7,13 @@ function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
     <textarea
       data-slot="textarea"
       className={cn(
-        "flex field-sizing-content min-h-16 w-full rounded-lg border border-border-subtle bg-transparent px-2.5 py-2 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:bg-raised/50 disabled:opacity-50 aria-invalid:border-border-subtle aria-invalid:ring-3 aria-invalid:ring-border-subtle/40 md:text-sm",
+        "field-sizing-content min-h-16 w-full rounded-[var(--radius-control)] border border-border-subtle bg-transparent px-2.5 py-2 text-sm",
+        "transition-colors duration-[var(--motion-fast)] ease-(--ease-standard) outline-none",
+        "placeholder:text-muted-foreground hover:border-foreground/40 focus-visible:border-foreground",
+        // No `cursor-not-allowed`: §11 — the pointing hand and its refusal
+        // twin are both browser cursors, and a dimmed control has already
+        // said it is unavailable.
+        "disabled:bg-hover disabled:opacity-60",
         className,
       )}
       {...props}

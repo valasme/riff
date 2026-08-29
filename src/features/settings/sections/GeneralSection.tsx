@@ -1,4 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
+import { Download, FolderOpen, RotateCcw, Upload, Wand2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
@@ -11,8 +12,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { SettingRow } from "@/features/settings/SettingRow";
+import { SettingRow, SettingsGroup } from "@/features/settings/SettingRow";
 import { ipc, type StartupRoute } from "@/lib/ipc";
 import { PATH_KINDS, pathFor } from "@/lib/paths";
 import { useGeneral, useSettings } from "@/stores/settings";
@@ -30,124 +38,161 @@ export function GeneralSection() {
   const navigate = useNavigate();
 
   return (
-    <section className="py-2">
-      <SettingRow
-        label={t("settings:general.startupRoute.label")}
-        description={t("settings:general.startupRoute.description")}
-        htmlFor="startup-route"
-      >
-        <select
-          id="startup-route"
-          className="h-9 rounded-md border border-border-subtle bg-raised px-2 text-sm"
-          value={general.startupRoute}
-          onChange={(e) =>
-            void patch({ general: { startupRoute: e.target.value as StartupRoute } })
-          }
+    <div className="flex flex-col gap-[var(--section-gap)]">
+      <SettingsGroup title={t("settings:general.groups.startup")}>
+        <SettingRow
+          label={t("settings:general.startupRoute.label")}
+          description={t("settings:general.startupRoute.description")}
+          htmlFor="startup-route"
         >
-          {STARTUP_ROUTES.map((route) => (
-            <option key={route} value={route}>
-              {t(`settings:general.startupOptions.${route}`)}
-            </option>
-          ))}
-        </select>
-      </SettingRow>
+          {/* Not `<select>`. GTK draws the native popup, so it ignored every
+              token here and rendered as light-on-light on the dark themes —
+              a control the user could operate but not read. */}
+          <Select
+            value={general.startupRoute}
+            onValueChange={(startupRoute) =>
+              void patch({ general: { startupRoute: startupRoute as StartupRoute } })
+            }
+          >
+            <SelectTrigger id="startup-route" className="w-[13rem]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {STARTUP_ROUTES.map((route) => (
+                <SelectItem key={route} value={route}>
+                  {t(`settings:general.startupOptions.${route}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </SettingRow>
 
-      <SettingRow
-        label={t("settings:general.restoreWindow.label")}
-        description={t("settings:general.restoreWindow.description")}
-        htmlFor="restore-window"
-      >
-        <Switch
-          id="restore-window"
-          checked={general.restoreWindowState}
-          onCheckedChange={(restoreWindowState) => void patch({ general: { restoreWindowState } })}
-        />
-      </SettingRow>
+        <SettingRow
+          label={t("settings:general.restoreWindow.label")}
+          description={t("settings:general.restoreWindow.description")}
+          htmlFor="restore-window"
+        >
+          <Switch
+            id="restore-window"
+            checked={general.restoreWindowState}
+            onCheckedChange={(restoreWindowState) =>
+              void patch({ general: { restoreWindowState } })
+            }
+          />
+        </SettingRow>
 
-      <SettingRow
-        label={t("settings:general.confirmOnQuit.label")}
-        description={t("settings:general.confirmOnQuit.description")}
-        htmlFor="confirm-quit"
-      >
-        <Switch
-          id="confirm-quit"
-          checked={general.confirmOnQuit}
-          onCheckedChange={(confirmOnQuit) => void patch({ general: { confirmOnQuit } })}
-        />
-      </SettingRow>
+        <SettingRow
+          label={t("settings:general.confirmOnQuit.label")}
+          description={t("settings:general.confirmOnQuit.description")}
+          htmlFor="confirm-quit"
+        >
+          <Switch
+            id="confirm-quit"
+            checked={general.confirmOnQuit}
+            onCheckedChange={(confirmOnQuit) => void patch({ general: { confirmOnQuit } })}
+          />
+        </SettingRow>
+      </SettingsGroup>
 
-      <div className="border-b border-separator py-4">
-        <p className="text-[0.9375rem] font-medium">{t("settings:general.dataLocations.label")}</p>
-        <p className="mt-1 text-[0.8125rem] text-muted-foreground">
-          {t("settings:general.dataLocations.description")}
-        </p>
-        <ul className="mt-3 flex flex-col gap-2">
-          {PATH_KINDS.map((kind) => (
-            <li key={kind} className="flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <span className="text-sm">{t(`settings:general.paths.${kind}`)}</span>
-                <code className="ms-2 truncate font-mono text-xs text-muted-foreground">
+      <SettingsGroup title={t("settings:general.groups.data")}>
+        <SettingRow
+          label={t("settings:general.dataLocations.label")}
+          description={t("settings:general.dataLocations.description")}
+          stacked
+        >
+          <ul className="flex flex-col gap-1.5">
+            {PATH_KINDS.map((kind) => (
+              <li
+                key={kind}
+                className="flex items-center gap-3 rounded-[var(--radius-control)] border border-line bg-hover ps-3 pe-1.5 py-1.5"
+              >
+                <span id={`path-${kind}`} className="w-16 shrink-0 text-[0.8125rem] font-medium">
+                  {t(`settings:general.paths.${kind}`)}
+                </span>
+                {/* `dir=ltr` and `text-start`: a path is not prose, and in an
+                    RTL locale it must not be reordered around its slashes. */}
+                <code
+                  dir="ltr"
+                  className="min-w-0 flex-1 truncate text-start font-mono text-xs text-muted-foreground"
+                >
                   {pathFor(kind, paths)}
                 </code>
-              </div>
-              <Button variant="secondary" size="sm" onClick={() => void ipc.openPath(kind)}>
-                {t("common:openFolder")}
-              </Button>
-            </li>
-          ))}
-        </ul>
-      </div>
+                {/* Four buttons with the same name is fine when each is
+                    described by the row it sits in — the announcement becomes
+                    "Open folder, Settings". */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={t("common:openFolder")}
+                  aria-describedby={`path-${kind}`}
+                  onClick={() => void ipc.openPath(kind)}
+                >
+                  <FolderOpen aria-hidden />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </SettingRow>
+      </SettingsGroup>
 
-      <SettingRow
-        label={t("settings:general.importExport.label")}
-        description={t("settings:general.importExport.description")}
-      >
-        <div className="flex gap-2">
+      <SettingsGroup title={t("settings:general.groups.settingsFile")}>
+        <SettingRow
+          label={t("settings:general.importExport.label")}
+          description={t("settings:general.importExport.description")}
+        >
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              onClick={async () => {
+                const path = await ipc.settingsExport();
+                if (path) toast.success(t("settings:general.exported", { path }));
+              }}
+            >
+              <Download aria-hidden />
+              {t("settings:general.export")}
+            </Button>
+            {/* Guarded, and Reset is too. Import is the more destructive of the
+                two — Reset goes to known defaults, Import goes to arbitrary
+                values from a file — so leaving it as the unguarded one had it
+                backwards. There is no undo for either. */}
+            <Button variant="secondary" onClick={() => setConfirmingImport(true)}>
+              <Upload aria-hidden />
+              {t("settings:general.import")}
+            </Button>
+          </div>
+        </SettingRow>
+      </SettingsGroup>
+
+      <SettingsGroup title={t("settings:general.groups.reset")}>
+        <SettingRow
+          label={t("settings:general.rerunOnboarding.label")}
+          description={t("settings:general.rerunOnboarding.description")}
+        >
           <Button
             variant="secondary"
             onClick={async () => {
-              const path = await ipc.settingsExport();
-              if (path) toast.success(t("settings:general.exported", { path }));
+              await reset("onboarding");
+              // The guard lives in the root route's beforeLoad, which only runs
+              // on navigation. Without this the button clears completedAt and
+              // the screen does not change — it looks broken.
+              await navigate({ to: "/onboarding" });
             }}
           >
-            {t("settings:general.export")}
+            <Wand2 aria-hidden />
+            {t("settings:general.rerunOnboarding.action")}
           </Button>
-          {/* Guarded, and Reset is too. Import is the more destructive of the
-              two — Reset goes to known defaults, Import goes to arbitrary
-              values from a file — so leaving it as the unguarded one had it
-              backwards. There is no undo for either. */}
-          <Button variant="secondary" onClick={() => setConfirmingImport(true)}>
-            {t("settings:general.import")}
-          </Button>
-        </div>
-      </SettingRow>
+        </SettingRow>
 
-      <SettingRow
-        label={t("settings:general.rerunOnboarding.label")}
-        description={t("settings:general.rerunOnboarding.description")}
-      >
-        <Button
-          variant="secondary"
-          onClick={async () => {
-            await reset("onboarding");
-            // The guard lives in the root route's beforeLoad, which only runs
-            // on navigation. Without this the button clears completedAt and
-            // the screen does not change — it looks broken.
-            await navigate({ to: "/onboarding" });
-          }}
+        <SettingRow
+          label={t("settings:general.reset.label")}
+          description={t("settings:general.reset.description")}
         >
-          {t("settings:general.rerunOnboarding.action")}
-        </Button>
-      </SettingRow>
-
-      <SettingRow
-        label={t("settings:general.reset.label")}
-        description={t("settings:general.reset.description")}
-      >
-        <Button variant="secondary" onClick={() => setConfirmingReset(true)}>
-          {t("settings:general.reset.action")}
-        </Button>
-      </SettingRow>
+          <Button variant="secondary" onClick={() => setConfirmingReset(true)}>
+            <RotateCcw aria-hidden />
+            {t("settings:general.reset.action")}
+          </Button>
+        </SettingRow>
+      </SettingsGroup>
 
       <Dialog open={confirmingImport} onOpenChange={setConfirmingImport}>
         <DialogContent role="alertdialog">
@@ -196,6 +241,6 @@ export function GeneralSection() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </section>
+    </div>
   );
 }

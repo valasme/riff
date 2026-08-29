@@ -35,7 +35,9 @@ pub fn render_script(payload: &Bootstrap) -> String {
   if (!root) {{ requestAnimationFrame(apply); return; }}
   var b = window.__RIFF_BOOTSTRAP__;
   var a = (b && b.settings && b.settings.appearance) || {{}};
-  root.dataset.theme = a.theme === "light" ? "light" : "dark";
+  // Whitelist, not a chain of ternaries: a hand-edited settings.json can
+  // carry any string at all, and the pre-paint frame must not act on it.
+  root.dataset.theme = ["dark", "darker", "light"].indexOf(a.theme) >= 0 ? a.theme : "dark";
   root.dataset.density = a.density === "compact" ? "compact" : "comfortable";
   root.dataset.contrast = a.highContrast ? "high" : "normal";
   // Also before first paint: without it a user who set "always reduce" still
@@ -81,6 +83,19 @@ mod tests {
         let script = render_script(&sample());
         assert!(script.contains("window.__RIFF_BOOTSTRAP__ ="));
         assert!(script.contains("\"theme\":\"dark\""));
+    }
+
+    #[test]
+    fn the_script_recognises_every_theme_the_settings_model_allows() {
+        // A theme added to the model but not to this script paints one frame
+        // of the wrong colours on every launch for whoever picked it.
+        let script = render_script(&sample());
+        for theme in ["dark", "darker", "light"] {
+            assert!(
+                script.contains(&format!("\"{theme}\"")),
+                "the bootstrap script does not know about the {theme} theme"
+            );
+        }
     }
 
     #[test]

@@ -10,12 +10,13 @@ function RadioGroup({
   return (
     <RadioGroupPrimitive.Root
       data-slot="radio-group"
-      className={cn("grid w-full gap-2", className)}
+      className={cn("grid gap-2", className)}
       {...props}
     />
   );
 }
 
+/** A dot. Radix emits `data-state`, never `data-checked` — see switch.tsx. */
 function RadioGroupItem({
   className,
   ...props
@@ -24,19 +25,86 @@ function RadioGroupItem({
     <RadioGroupPrimitive.Item
       data-slot="radio-group-item"
       className={cn(
-        "group/radio-group-item peer relative flex aspect-square size-4 shrink-0 rounded-full border border-border-subtle outline-none group-has-[:focus-visible]/field-label:ring-0 group-has-[:focus-visible]/field-label:not-data-checked:border-border-subtle after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-border-subtle aria-invalid:ring-3 aria-invalid:ring-border-subtle/40 aria-invalid:aria-checked:border-raised data-checked:border-raised data-checked:bg-raised data-checked:text-foreground group-has-[:focus-visible]/field-label:data-checked:border-raised",
+        "group/radio-group-item relative flex aspect-square size-[1.125rem] shrink-0 items-center justify-center rounded-full",
+        "border border-border-subtle transition-colors duration-[var(--motion-fast)] ease-(--ease-standard) outline-none",
+        "hover:border-foreground/60",
+        "data-[state=checked]:border-foreground data-[state=checked]:bg-foreground",
+        "data-disabled:opacity-50",
         className,
       )}
       {...props}
     >
       <RadioGroupPrimitive.Indicator
         data-slot="radio-group-indicator"
-        className="flex size-4 items-center justify-center"
+        className="flex items-center justify-center"
       >
-        <span className="absolute top-1/2 left-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground" />
+        <span className="block size-1.5 rounded-full bg-surface" />
       </RadioGroupPrimitive.Indicator>
     </RadioGroupPrimitive.Item>
   );
 }
 
-export { RadioGroup, RadioGroupItem };
+/**
+ * The same radio group, drawn as one control instead of a row of dots.
+ *
+ * Every mutually-exclusive setting in Riff has two or three short options, and
+ * a segmented control shows all of them, shows which is active, and takes one
+ * click — where a row of loose dots and labels reads as a form to be filled
+ * in and submitted. It is still a Radix radio group underneath, so arrow-key
+ * navigation, the roving tabindex and the group's accessible name are the
+ * primitive's behaviour rather than something re-implemented here.
+ */
+function SegmentedGroup<T extends string>({
+  value,
+  onValueChange,
+  options,
+  className,
+  ...props
+}: Omit<React.ComponentProps<typeof RadioGroupPrimitive.Root>, "value" | "onValueChange"> & {
+  value: T;
+  onValueChange: (value: T) => void;
+  options: { value: T; label: string }[];
+}) {
+  return (
+    <RadioGroupPrimitive.Root
+      data-slot="segmented-group"
+      value={value}
+      onValueChange={(next) => onValueChange(next as T)}
+      // `orientation` makes Left/Right the arrow keys rather than Up/Down,
+      // matching how the control reads.
+      orientation="horizontal"
+      // An outlined track with nothing in it, so the selected chip is the only
+      // fill in the control. Filling the track as well put an 8%-white recess
+      // behind a chip painted with the solid `raised` colour — and in the
+      // darker theme `raised` is the *darker* of the two, so the selected
+      // segment came out recessed and the unselected ones looked chosen.
+      className={cn(
+        "inline-flex items-center gap-0.5 rounded-[var(--radius-control)] border border-line p-0.5",
+        className,
+      )}
+      {...props}
+    >
+      {options.map((option) => (
+        <RadioGroupPrimitive.Item
+          key={option.value}
+          value={option.value}
+          data-slot="segmented-item"
+          className={cn(
+            "rounded-[calc(var(--radius-control)-0.1875rem)] px-2.5 py-1 text-[0.8125rem] font-medium whitespace-nowrap",
+            "text-muted-foreground transition-colors duration-[var(--motion-fast)] ease-(--ease-standard) outline-none",
+            "hover:text-foreground",
+            // `active-fill` is mixed from the foreground, so the chip is
+            // lighter than its surroundings in the dark themes and darker in
+            // light — legible in all three without a hard-coded colour.
+            "data-[state=checked]:bg-active-fill data-[state=checked]:font-semibold data-[state=checked]:text-foreground",
+            "data-disabled:opacity-50",
+          )}
+        >
+          {option.label}
+        </RadioGroupPrimitive.Item>
+      ))}
+    </RadioGroupPrimitive.Root>
+  );
+}
+
+export { RadioGroup, RadioGroupItem, SegmentedGroup };

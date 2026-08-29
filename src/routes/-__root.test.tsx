@@ -92,6 +92,46 @@ describe("the shell", () => {
     expect(screen.getByRole("combobox")).toBeInTheDocument();
   });
 
+  it("reopens with the sidebar as it was left, when remembering is on", () => {
+    settings.appearance.sidebar = { collapsed: true, rememberCollapsed: true };
+    renderShell();
+    // Collapsed to the rail: reachable by name, but showing no label.
+    expect(screen.getByRole("link", { name: "Practice" })).toBeInTheDocument();
+    expect(screen.queryByText("Practice")).toBeNull();
+    settings.appearance.sidebar = { collapsed: false, rememberCollapsed: true };
+  });
+
+  it("ignores the remembered state when remembering is off", () => {
+    // The bug this pins: the session state was seeded from the persisted
+    // value, so "don't remember" reopened however the sidebar was last left —
+    // which is precisely the behaviour the setting exists to switch off.
+    settings.appearance.sidebar = { collapsed: true, rememberCollapsed: false };
+    renderShell();
+    expect(screen.getByText("Practice")).toBeInTheDocument();
+    settings.appearance.sidebar = { collapsed: false, rememberCollapsed: true };
+  });
+
+  it("does not move the sidebar when remembering is switched on", async () => {
+    // Turning it on adopts what is on screen. Without that the persisted value
+    // — stale since the last time remembering was on — snaps the sidebar shut
+    // under a user who had just opened it.
+    settings.appearance.sidebar = { collapsed: true, rememberCollapsed: false };
+    const { rerender } = renderShell();
+    patch.mockClear();
+
+    settings.appearance.sidebar = { collapsed: true, rememberCollapsed: true };
+    rerender(
+      <I18nextProvider i18n={i18n}>
+        <RootLayout />
+      </I18nextProvider>,
+    );
+
+    await waitFor(() =>
+      expect(patch).toHaveBeenCalledWith({ appearance: { sidebar: { collapsed: false } } }),
+    );
+    settings.appearance.sidebar = { collapsed: false, rememberCollapsed: true };
+  });
+
   it("hides riffs own title bar when system decorations are chosen", async () => {
     settings.appearance.titleBar = "system";
     const { container } = renderShell();

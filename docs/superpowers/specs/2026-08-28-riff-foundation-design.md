@@ -43,10 +43,10 @@ Settled during brainstorming. Each entry is binding for implementation.
 | # | Decision | Rationale |
 |---|---|---|
 | D1 | Settings sections: **General, Appearance, About** | Matches the mockup's sub-navigation plus About. Shortcuts and Playback sections are deferred. |
-| D2 | Themes: **Dark and Light. No "System" option.** Chosen during onboarding. | The user makes one explicit choice rather than inheriting an ambiguous desktop setting. |
+| D2 | Themes: **Dark, Darker and Light. No "System" option.** Chosen during onboarding. | The user makes one explicit choice rather than inheriting an ambiguous desktop setting. Darker was added after the foundation shipped: Dark's `#242424` is a soft charcoal, and a near-black step down is a different answer to a different room, not a preference slider. |
 | D3 | Type: **Outfit** (UI), **Playfair Display Italic** (wordmark), **JetBrains Mono** (paths, diagnostics) | Matched pixel-by-pixel against the mockups. All OFL, all self-hosted. |
 | D4 | Locales: **English only**, full i18n plumbing in place | No machine-translated locales shipping as if reviewed. |
-| D5 | Onboarding: **welcome + theme + privacy**, full-window, three steps | Theme needs room for two preview cards; the privacy step is the trust statement for a local-first app. |
+| D5 | Onboarding: **welcome + theme + privacy**, full-window, three steps | Theme needs room for three preview cards; the privacy step is the trust statement for a local-first app. |
 | D6 | History storage: **`history.jsonl`, append-only** | Appending a session is one atomic write instead of rewriting the file, so a crash cannot corrupt earlier sessions. Still plain text. |
 | D7 | Network: **none, ever** | No HTTP client is compiled in. CSP forbids outbound connections. No update check. |
 | D8 | Practice and History: **completely static placeholders** | Pixel-faithful, inert. Layout and table engines are not installed until they are needed. |
@@ -62,7 +62,7 @@ Settled during brainstorming. Each entry is binding for implementation.
 
 Two, both deliberate.
 
-1. **Command palette affordance in the title bar.** Alt+K needs a mouse-reachable equivalent. A compact icon button, styled identically to the existing `panel-left` button, sits immediately to the right of the `riff` wordmark. Chosen over a wide centred command bar because it preserves the title bar's austerity and keeps the drag region large for floating window managers.
+1. **Command palette affordance in the title bar.** Alt+K needs a mouse-reachable equivalent. This began as a bare `search` icon beside the wordmark and became a centred, field-shaped trigger carrying the placeholder text and an `Alt K` key hint. The icon-button form failed for a reason worth recording: at the gap an icon button wants, it read as part of the wordmark rather than as a control, and a 16px glyph is not a discoverable home for the application's search. The centred trigger names itself, and the drag region stays large because the two flanking clusters — which is what centres it — are themselves drag regions.
 2. **High contrast toggle in Appearance.** See §7.3. The source palette's `#4d4d4d` borders measure 1.8:1 against the surface, below the 3:1 that WCAG 1.4.11 requires for control boundaries. Rather than repaint the design for everyone, an opt-in toggle raises borders and muted text for users who need it.
 
 ---
@@ -149,7 +149,7 @@ Defaults follow the specification: `~/.config`, `~/.local/share`, `~/.local/stat
     "language": "en"
   },
   "appearance": {
-    "theme": "dark",                   // "dark" | "light"
+    "theme": "dark",                   // "dark" | "darker" | "light"
     "density": "comfortable",          // "comfortable" | "compact"
     "uiScale": 1.0,                    // 0.8 – 1.5, step 0.05
     "reduceMotion": "system",          // "system" | "always" | "never"
@@ -301,10 +301,16 @@ Persisted settings are read through **primitive** selector hooks — `useTheme()
 Tailwind CSS v4, CSS-first `@theme`. Themes are attribute-scoped, not class-scoped, so `data-theme`, `data-density` and `data-contrast` compose independently:
 
 ```css
-@theme { --color-surface: #242424; /* … */ }
-[data-theme="light"]     { --color-surface: #fafafa; /* … */ }
-[data-contrast="high"]   { --color-border: #6d6d6d; --color-muted-foreground: #b0b0b0; }
+:root, [data-theme="dark"] { --surface: #242424; /* … */ }
+[data-theme="darker"]      { --surface: #101010; /* … */ }
+[data-theme="light"]       { --surface: #fafafa; /* … */ }
+
+/* Derived tokens re-resolve inside any themed subtree — see §7.1. */
+:root, [data-theme]        { --line: color-mix(in srgb, var(--fg) 11%, transparent); /* … */ }
+[data-contrast="high"]     { --border-subtle: #6d6d6d; --fg-muted: #b0b0b0; /* … */ }
 ```
+
+The dark palette is declared on `:root, [data-theme="dark"]` rather than `:root` alone so that a `data-theme="dark"` subtree inside a light-themed document still resolves to dark values; without the second selector the theme previews would inherit whatever the root happened to be.
 
 UI scale is one variable: `html { font-size: calc(16px * var(--ui-scale)); }`. Every dimension in the application is expressed in `rem`, so the slider scales the entire interface proportionally rather than only text. Density adjusts spacing tokens only, never font size — the two controls stay orthogonal.
 
@@ -320,33 +326,67 @@ Application components live in `src/components/`; feature-owned components live 
 
 ### 7.1 Colour
 
-Sampled directly from the mockups.
+Dark and Light are sampled directly from the mockups. Darker is a computed
+near-black step below Dark (D2).
 
-| Token | Dark | Light | Usage |
-|---|---|---|---|
-| `surface` | `#242424` | `#fafafa` | Title bar, sidebar and content — one flat shade, as designed |
-| `card` | `#323232` | `#f2f2f2` | Settings panels |
-| `raised` | `#3c3c3c` | `#eaeaea` | Active nav pill, placeholder panes, buttons, table, skeletons |
-| `border` | `#4d4d4d` | `#d4d4d4` | Input and table outlines |
-| `separator` | `#313131` | `#e6e6e6` | Row dividers |
-| `foreground` | `#e4e4e4` | `#1c1c1c` | Primary text and icons |
-| `muted-foreground` | `#9a9a9a` | `#5f5f5f` | Secondary text |
-| `ring` | `#e4e4e4` | `#1c1c1c` | Focus indicator |
+| Token | Dark | Darker | Light | Usage |
+|---|---|---|---|---|
+| `surface` | `#242424` | `#101010` | `#fafafa` | Title bar, sidebar and page background |
+| `card` | `#323232` | `#191919` | `#f2f2f2` | Settings groups, panes, dialogs, popovers |
+| `raised` | `#3c3c3c` | `#232323` | `#eaeaea` | Secondary buttons, select triggers |
+| `border-subtle` | `#4d4d4d` | `#3a3a3a` | `#d4d4d4` | Control outlines: inputs, unchecked radios, checkbox shapes |
+| `foreground` | `#e4e4e4` | `#e8e8e8` | `#1c1c1c` | Primary text and icons |
+| `muted-foreground` | `#9a9a9a` | `#9e9e9e` | `#5f5f5f` | Secondary text |
+| `ring` | `#e4e4e4` | `#e8e8e8` | `#1c1c1c` | Focus indicator |
 
-High contrast overrides: `border` → `#6d6d6d` / `#8a8a8a`, `muted-foreground` → `#b0b0b0` / `#4a4a4a`.
+High contrast overrides `border-subtle` and `muted-foreground` per theme:
+`#6d6d6d`/`#b0b0b0` on Dark, `#606060`/`#b8b8b8` on Darker, `#8a8a8a`/`#4a4a4a`
+on Light. Each border value is the computed 3.0:1 point on that theme's own
+surface.
 
-Deliberately absent: any accent hue. The mockups are purely neutral and stay that way. Focus is communicated by a two-pixel neutral ring at 12.2:1, which reads clearly without introducing a colour the design does not have.
+**Lines and fills are mixed from `foreground`, not written as hex.** Three
+weights, and every rule in the application uses one of them:
+
+| Token | Value | Usage |
+|---|---|---|
+| `line` | `foreground` at 11% | Structural chrome: title bar rule, sidebar and sub-nav edges, card and dialog outlines, table frame |
+| `separator` | `foreground` at 7% | Row dividers *inside* a list, table or settings card |
+| `hover` | `foreground` at 8% | Hover fills, recessed strips, key chips |
+| `active-fill` | `foreground` at 13% | The current nav item, the selected segment, the highlighted palette row |
+
+The reason they are mixes rather than hexes is the failure they replaced. A
+flat `separator: #313131` is invisible on `#323232` cards and nearly invisible
+on `#242424`, while a flat `#4d4d4d` chrome edge glares on the same surface —
+so the sidebar's edge and the settings sub-navigation's edge, the same kind of
+boundary, were drawn in two different colours and neither at the intended
+strength. Mixing from `foreground` makes a rule keep the same *relative*
+strength wherever it sits, which is the property that actually reads as
+consistency. High contrast raises `line` to 28% and `separator` to 20%.
+
+These derived tokens are declared on `:root, [data-theme]` rather than `:root`
+alone. A custom property containing `var()` is substituted where it is
+*declared*, so a single root declaration would keep resolving against the root
+theme's `foreground` inside a `[data-theme]` subtree — and the theme previews
+in Settings and onboarding, which are real shells rendered under their own
+`data-theme`, would draw the wrong rules.
+
+Deliberately absent: any accent hue. The mockups are purely neutral and stay
+that way. Focus is communicated by a two-pixel neutral ring at 12.2:1, and the
+one emphatic button in the design inverts `foreground` and `surface` rather
+than introducing a colour the palette does not have.
 
 ### 7.2 Typography
 
 | Role | Face | Size / weight |
 |---|---|---|
-| Wordmark | Playfair Display Italic 700 | 22px |
+| Wordmark | Playfair Display Italic 500 | 22px, +0.025em tracking |
 | UI | Outfit Variable | 15px / 500 nav, 14px / 400 body, 13px descriptions |
 | Section headings | Outfit Variable | 16px / 600 |
 | Paths, versions, diagnostics | JetBrains Mono Variable | 12.5px |
 
-Self-hosted through Fontsource with `font-display: swap`. Only the cuts in use are imported — Playfair contributes italic 700 alone, because importing the family would ship eight faces to render four letters. No `<link rel="preload">`: the window stays hidden until first paint, so there is no visible flash for preloading to prevent, and preload hints for fonts that may not be used on the first screen cost more than they save. No network at runtime — a hard requirement, not a performance preference.
+The wordmark is 500, not 700, and that is a correction rather than a taste. In Playfair's italic the double-f carries both a tall ascender and a deep descender while `ri` sits entirely at x-height, so weight lands almost entirely on the f's and the mark reads as two large letters with something small in front of them. Dropping one step of weight and adding tracking fixes the balance without touching the letterforms. Trailing padding, not a parent `gap`, separates it from what follows: the italic leans right, so the final f overhangs its own advance width and no gap measured from that width ever looks even.
+
+Self-hosted through Fontsource with `font-display: swap`. Only the cuts in use are imported — Playfair contributes italic 500 alone, because importing the family would ship eight faces to render four letters. No `<link rel="preload">`: the window stays hidden until first paint, so there is no visible flash for preloading to prevent, and preload hints for fonts that may not be used on the first screen cost more than they save. No network at runtime — a hard requirement, not a performance preference.
 
 ### 7.3 Contrast audit
 
@@ -356,13 +396,27 @@ Measured against WCAG 2.2, and recorded because it drove a design decision.
 |---|---|---|---|
 | `#e4e4e4` on `#242424` | 12.2:1 | 4.5:1 text | Pass |
 | `#9a9a9a` on `#242424` | 5.3:1 | 4.5:1 text | Pass — `#8a8a8a` is the exact floor, so this keeps margin |
+| `#e8e8e8` on `#101010` | 15.5:1 | 4.5:1 text | Pass (Darker) |
+| `#9e9e9e` on `#101010` | 7.1:1 | 4.5:1 text | Pass (Darker) |
 | `#4d4d4d` on `#242424` | 1.8:1 | 3:1 boundaries | **Fail** |
+| `#3a3a3a` on `#101010` | 1.7:1 | 3:1 boundaries | **Fail** (Darker, by the same design choice) |
 | `#3c3c3c` on `#242424` | 1.4:1 | 3:1 boundaries | **Fail** |
 | Ring `#e4e4e4` on `#3c3c3c` | 8.6:1 | 3:1 | Pass |
 
 Riff also honours `prefers-contrast: more` by default, for the same reason it honours `prefers-reduced-motion`: it is an unambiguous accessibility declaration the desktop makes on the user's behalf. Theme has no System option because colour scheme is a taste question the user was asked once (D2); contrast is not a taste question. The explicit setting still wins.
 
-Resolution: controls remain identifiable without relying on their borders — every one carries a text label or an `aria-label` plus a tooltip, and hover and focus states change fill, not only outline. The High contrast toggle raises borders to `#6d6d6d` (3.0:1) for users who need boundary contrast. The default keeps the design intact; nobody is locked out.
+Resolution: controls remain identifiable without relying on their borders — every one carries a text label or an `aria-label` plus a tooltip, and hover and focus states change fill, not only outline. The High contrast toggle raises borders to the computed 3.0:1 point on each theme's own surface (`#6d6d6d` on Dark, `#606060` on Darker, `#8a8a8a` on Light) for users who need boundary contrast. The default keeps the design intact; nobody is locked out.
+
+Two states that carry meaning are drawn so they survive the low-contrast
+default. A switch is a *filled* track when on and an *outlined* one when off,
+so the difference is fill and not a shade of grey; a segmented control fills
+only the selected chip and leaves its track outlined, for the same reason. The
+earlier switch styled both states with `data-checked:`/`data-unchecked:` —
+which Tailwind compiles to `[data-checked]`, an attribute Radix never emits
+(it emits `data-state="checked"`) — so neither rule matched, the track took no
+background at all, and every switch in Settings rendered as one dark dot with
+no on state and no off state. Every `data-*` variant in `components/ui` is
+therefore written out in full.
 
 ### 7.4 Layout metrics
 
@@ -371,21 +425,42 @@ The mockups are drawn on a 1920×1089 canvas at a scale larger than a real windo
 | Element | Value |
 |---|---|
 | Window default / minimum | 1280×832 / 960×640 |
-| Title bar height | 44px |
-| Sidebar width | 224px expanded, 56px icon rail collapsed |
-| Settings sub-navigation width | 240px |
-| Nav item | 40px tall, 12px radius, 12px padding, 18px icon, 12px gap |
+| Title bar height | 52px, with a `line` rule along its bottom edge |
+| Sidebar width | 240px expanded, 56px icon rail collapsed |
+| Settings sub-navigation width | 248px |
+| Settings content column | 736px maximum, centred |
+| Nav item | 40px tall, 10px radius, 10px padding, 18px icon, 12px gap |
 | Content padding | 24px |
-| Card radius / pane radius | 12px / 10px |
+| Card / pane / control radius | 12px / 10px / 8px |
 | Focus ring | 2px, 2px offset |
+| Motion | 110ms and 170ms, `cubic-bezier(0.2, 0, 0, 1)` — two durations, one curve, for everything that moves |
 
-Because UI scale multiplies the root font size and every dimension is in `rem`, the chrome grows with it: at 1.5× the sidebar and settings sub-navigation together claim roughly 700px of a 960px minimum window, leaving the settings content column unusably narrow. Two container-query breakpoints handle it, keyed to available width rather than window width so they behave correctly at any scale: below 900px the sidebar drops to its 56px icon rail; below 700px the settings sub-navigation becomes a horizontal segmented control above the content. Neither is a mobile layout — they are the honest response to a legitimate combination of settings.
+Nothing that changes the size of a layout container is animated, and the
+sidebar is the case that proves the rule. Transitioning its width drags the
+entire content column along for the duration: the practice panes reflow frame
+by frame and the text being read slides sideways. A width change is not a
+thing worth watching, it is a thing worth having already happened. Only
+colours transition — hover, active and focus states on the items themselves.
 
-Collapsing the sidebar yields an icon-only rail rather than hiding it entirely, so navigation and `aria-current` remain available. Tooltips supply the labels.
+The title bar gained 8px and a bottom rule together. At 44px with no rule it
+was the same flat `surface` as the content below it with nothing between them,
+so the window read as one undifferentiated slab; the extra height is what lets
+the toggle tile, the wordmark and the search trigger sit on a common baseline
+without crowding.
+
+Because UI scale multiplies the root font size and every dimension is in `rem`, the chrome grows with it: at 1.5× the sidebar and settings sub-navigation together claim roughly 700px of a 960px minimum window, leaving the settings content column unusably narrow. Two container-query breakpoints handle it: below **56rem** of available width the sidebar drops to its 56px icon rail, and below **44rem** the settings sub-navigation becomes a horizontal strip above the content. Neither is a mobile layout — they are the honest response to a legitimate combination of settings.
+
+The thresholds are in `rem`, and that is the entire mechanism rather than a formatting choice. A container query written in `px` measures the same window width at every UI scale, so `@max-[900px]` could only ever fire below the 960px minimum window — that is, never. In `rem` the threshold *grows* with the scale while the window stays the same number of pixels, which is what makes the rail appear exactly when the chrome would otherwise crowd the content.
+
+Collapsing the sidebar yields an icon-only rail rather than hiding it entirely, so navigation and `aria-current` remain available. Tooltips supply the labels, and the transition between the two widths is instant.
 
 ### 7.5 Icons
 
-`lucide-react`, confirmed as the mockups' source. `panel-left` (sidebar toggle), `search` (palette), `audio-waveform` (Practice), `folder-clock` (History), `settings` (Settings), `house` (General), `palette` (Appearance), `info` (About), `filter`, `file-text`, `clock`, `picture-in-picture-2`, `menu` (row actions), `copy`, `x`, `minus`, `square`.
+`lucide-react`. `panel-left-close` / `panel-left-open` (sidebar toggle, one per direction), `search` (palette), `music-4` (Practice), `history` (History), `settings` (Settings), `sliders-horizontal` (General), `palette` (Appearance), `info` (About), `file-music` / `video` / `audio-lines` (the three practice panes), `filter`, `file-text`, `clock`, `timer`, `ellipsis-vertical` (row actions), `folder-open`, `download`, `upload`, `rotate-ccw`, `wand-2`, `external-link`, `file-down`, `chevron-right`, `chevron-down`, `check`, `copy`, `x`.
+
+Three choices changed after the foundation shipped, each because the glyph described the wrong thing. `audio-waveform` and `folder-clock` named the file formats Practice will open and the folder History will list rather than what either screen is *for*; `music-4` and `history` name the screens. `house` for General meant "home", and General is not the home of anything — it is the section full of switches, so `sliders-horizontal`. And `panel-left` was a single glyph for a two-state control, so the sidebar toggle never said which way it was about to go.
+
+The window controls are the deliberate exception: minimise, maximise, restore and close are drawn as four inline SVG paths on a 12px grid rather than imported. Lucide draws on a 24px grid with a 2px stroke, and scaled to the 12px a window control wants, `square` becomes a heavy blob and `minus` a short fat bar. Real title bars use hairlines.
 
 ---
 
@@ -393,31 +468,63 @@ Collapsing the sidebar yields an icon-only rail rather than hiding it entirely, 
 
 ### 8.1 Title bar
 
-`decorations: false`. Layout: `[panel-left] riff [search] · · · drag region · · · [− □ ✕]`.
+`decorations: false`. Layout, in three parts:
 
-The drag region uses `data-tauri-drag-region`. Double-click-to-maximise is verified against Tauri 2.11's built-in drag-region behaviour first, and only hand-implemented if it turns out not to be covered — writing the handler unconditionally risks toggling maximise twice per double-click. Window controls are 44×32 hit targets with `aria-label`s. Setting `appearance.titleBar` to `system` calls `set_decorations(true)` and hides the custom bar live, with no restart — this matters on GNOME and KDE, where users expect their own decorations. Under Wayland, whether a compositor honours the request is up to the compositor; Hyprland and others may ignore it entirely. Riff therefore reads `is_decorated()` back after the call, and if the window manager refused, reverts to the custom bar and says so in a toast rather than leaving the user with a window that has no title bar at all and a setting that claims otherwise.
+```
+[ ⟨toggle⟩ riff  · · · ]  [ ⌕ Search or jump to…  Alt K ]  [ · · ·  − □ ✕ ]
+```
+
+The two flanking clusters are `flex: 1 1 0`, so they take an equal share of
+the free space and centre the search trigger between them without a magic
+margin — and both are themselves drag regions, which is what keeps the
+draggable area large. Below 44rem of title-bar width the trigger collapses to
+its icon alone.
+
+The sidebar toggle sits on a filled tile rather than floating as a bare glyph:
+a lone icon in the corner reads as decoration, and a tile gives hover and
+focus something to land on. Its icon and its label both follow the sidebar's
+state (`panel-left-close` / `panel-left-open`, "Collapse" / "Expand"), and it
+carries `aria-expanded`.
+
+The drag region uses `data-tauri-drag-region`. Double-click-to-maximise is verified against Tauri 2.11's built-in drag-region behaviour first, and only hand-implemented if it turns out not to be covered — writing the handler unconditionally risks toggling maximise twice per double-click. Window controls are 32×32 rounded hit targets with `aria-label`s, inset 8px from the window edge — flush controls put the close button's hover fill on the window corner. The maximise control subscribes to the real window state through `is_maximized` and a resize listener (both inside `core:default`, so no new capability), because the window manager can maximise the window without the button: a double-click on the drag region, a keyboard shortcut, a tiling rule. Its glyph and its label follow. Setting `appearance.titleBar` to `system` calls `set_decorations(true)` and hides the custom bar live, with no restart — this matters on GNOME and KDE, where users expect their own decorations. Under Wayland, whether a compositor honours the request is up to the compositor; Hyprland and others may ignore it entirely. Riff therefore reads `is_decorated()` back after the call, and if the window manager refused, reverts to the custom bar and says so in a toast rather than leaving the user with a window that has no title bar at all and a setting that claims otherwise.
 
 ### 8.2 Onboarding
 
 Full window, title bar retained so the window can still be closed. Three steps with progress dots and Back/Next.
 
 1. **Welcome** — the Playfair wordmark, one line of description.
-2. **Theme** — two large cards, each a miniature static render of the real interface in dark and light. The card matching the desktop's `prefers-color-scheme` is pre-selected as a courtesy and is applied on arrival, so the step opens already looking like the recommendation rather than describing it. Clicking the other card applies it instantly. Continuing without touching either commits whatever is currently applied — the pre-selection is a real answer, not a hint the user can accidentally skip past into a default they never saw.
+2. **Theme** — three large cards, each a miniature render of the real interface in dark, darker and light. The miniature is built from the same tokens as the application under its own `data-theme`, so it cannot drift from what choosing that theme actually does, and a fourth theme would need no work there. The card matching the desktop's `prefers-color-scheme` is pre-selected as a courtesy and is applied on arrival, so the step opens already looking like the recommendation rather than describing it. Clicking another card applies it instantly. Continuing without touching either commits whatever is currently applied — the pre-selection is a real answer, not a hint the user can accidentally skip past into a default they never saw.
 3. **Privacy** — plain statement: everything stays on this machine, no telemetry, no accounts, no network connections at all. Lists the exact directories, each with an Open button.
 
 Finishing writes `onboarding.completedAt` and routes to `general.startupRoute`. Re-runnable from Settings → General.
 
 ### 8.3 Practice — static placeholder
 
-Faithful to the mockup: one tall pane on the left, two stacked on the right, each with a header carrying `picture-in-picture-2` and `x` icons. Panes are `raised` on `surface` with 10px radii. Nothing is interactive. Each pane centres a muted label naming its future content — Score, Video, Audio — and the route carries a single "In development" marker so the state is honest rather than broken-looking.
+Faithful to the mockup: one tall pane on the left, two stacked on the right, each with a header carrying `picture-in-picture-2` and `x` icons. Panes are `raised` on `surface` with 10px radii. Nothing is interactive. Each pane centres a glyph, one sentence naming what will eventually open there, and an "In development" chip — a bare chip on an empty rectangle said the feature was unfinished but not what the feature was.
 
 ### 8.4 History — static placeholder
 
-Search input with `search` icon, `filter` button, and a table with checkbox, document, and clock columns plus a per-row menu affordance. Skeleton rows exactly as drawn. Inert: the input is `readOnly`, controls are `disabled` with `aria-disabled`, and the skeletons carry `aria-hidden` so screen readers are not read a wall of nothing.
+A heading, a search input with a `search` icon, a `filter` button, and a table with select, name, last-practised and duration columns plus a per-row menu affordance. Inert: the input is `readOnly`, controls are `disabled` with `aria-disabled`, and the skeletons carry `aria-hidden` so screen readers are not read a wall of nothing.
+
+Three revisions to the mockup, all in service of the same thing — a table that reads as a preview rather than as a table that failed:
+
+- **Three skeleton rows, not eight rows of which five are empty.** The empty checkbox rows existed to make the grid fill the panel; they read as five sessions that did not load.
+- **The card takes its height from its contents.** Stretched to the viewport, three rows sat above half a screen of empty card.
+- **The header carries words, not only glyphs.** The mockup's icon-only header meant the one thing a table has to tell you — what each column is — was a guess. The icons stay as anchors for the eye.
+
+A strip along the bottom of the card states plainly that Riff records nothing yet and that the rows show the shape History will take when playback lands.
 
 ### 8.5 Settings
 
-Three-column shell: sidebar, 240px sub-navigation (General, Appearance, About), content card at `#323232`.
+Three-column shell: sidebar, 248px sub-navigation (General, Appearance, About), and a centred content column of grouped cards.
+
+The content is **grouped**, not one long card. General splits into Startup / Data / Settings file / Start over; Appearance into Theme / Layout / Motion and contrast / Window; About into Build / Legal / Support. Fifteen undifferentiated rows in a single panel made "where is the title bar setting" a scanning problem; one small heading per three or four rows makes it a reading problem.
+
+Three control types carry the sections:
+
+- **Segmented controls** for every two- or three-way choice (density, reduce motion, title bar). A row of loose radio dots and labels reads as a form to be filled in and submitted, which is exactly wrong for a screen with no Save button. It is still a Radix radio group underneath, so arrow keys, the roving tabindex and the group name are the primitive's behaviour rather than a re-implementation.
+- **Theme cards** with live miniatures, shared with onboarding (§8.2). Theme is the one setting whose effect can be shown instead of described.
+- **A themed listbox**, never `<select>`. GTK draws the native popup, not Riff, so it ignored every token in the design system and rendered as light-on-light on the dark themes — a control the user could operate but not read. There is no CSS that fixes that, because the popup is not in the document.
 
 Every control writes through `useSettings.patch()` and takes effect immediately. There is no Save button and no dirty state — a settings screen that can be abandoned half-applied is a settings screen with a bug in it.
 
@@ -427,11 +534,15 @@ The sections are written by hand, **not generated** from the JSON Schema. Fiftee
 
 Window *position* restore is a request, not a guarantee: under Wayland the compositor owns placement and Hyprland, the primary development target, ignores it outright. Size is honoured everywhere. The control's description says so plainly rather than promising behaviour the user's desktop will quietly discard — the same honesty the title bar setting applies in §8.1.
 
-**Appearance** — Theme (Dark / Light); Density; UI scale slider with live preview and a Reset affordance; Reduce motion; High contrast; Title bar style; Remember sidebar state.
+**Appearance** — Theme (Dark / Darker / Light); Density; UI scale slider with a Reset affordance; Reduce motion; High contrast; Title bar style; Remember sidebar state.
+
+The UI scale slider applies **when the gesture ends**, not on every pointer move, and that is forced by the control's own subject matter. Radix caches the slider's bounding rect on pointer-down and maps the pointer through it for the whole drag; applying the scale live changes the root font size, which changes the slider's own width *and* its position — the settings column is centred and the sub-navigation grows beside it. From the first pixel of the drag the cached rect describes an element that has moved, so the thumb (placed by percentage of the new track) separates from the cursor: the handle stops following the pointer while the percentage keeps climbing, which reads as a broken control. Holding the value locally until release breaks the loop. The thumb and the readout both follow the draft, so the drag is still live feedback; the interface resizes once, on release. Arrow keys are unaffected — Radix commits on every step key — so the keyboard path applies immediately.
+
+**Remember sidebar state** governs the *next launch*, not the current one. With it off, Riff opens with the sidebar expanded and the toggle is session-only; seeding that session value from the persisted one made "don't remember" remember. Flipping the setting never moves the sidebar: whichever value stops being the live one adopts what is currently on screen first, or the switch resurrects a stale value from whenever that side was last in charge.
 
 Reduce motion offers a System option although Theme deliberately does not (D2), and the asymmetry is intentional: `prefers-reduced-motion` is an unambiguous accessibility declaration that the desktop makes on the user's behalf and that Riff should honour by default, whereas colour scheme is a taste question the user was already asked once, during onboarding.
 
-**About** — Version, Tauri and WebKitGTK versions, build date and git SHA, each copyable; MIT licence text in full; third-party notices generated from npm and cargo, searchable, rendered as collapsed rows that expand one licence at a time — several hundred entries of full licence text mounted at once would be the only place in this application capable of janking, and it would do so on the one screen nobody profiles; repository and issue links; a Copy diagnostics button producing a paste-ready report for bug reports, with the home directory rewritten to `$HOME` so pasting it into a public issue does not disclose the user's account name. A privacy-first application should not leak identity through its own bug-report affordance.
+**About** — Version, Tauri and WebKitGTK versions, build date and git SHA, each copyable individually plus one Copy all; MIT licence text in full; third-party notices generated from npm and cargo, filterable by name or licence, rendered as collapsed rows that expand one licence at a time — several hundred entries of full licence text mounted at once would be the only place in this application capable of janking, and it would do so on the one screen nobody profiles; repository and issue links; a Copy diagnostics button producing a paste-ready report for bug reports, with the home directory rewritten to `$HOME` so pasting it into a public issue does not disclose the user's account name. A privacy-first application should not leak identity through its own bug-report affordance.
 
 The language selector is intentionally absent: a picker with one option is noise. `general.language` exists in the schema and is honoured; the control appears when a second locale ships.
 
@@ -444,10 +555,12 @@ One registry in `src/features/keybindings/keymap.ts`:
 ```ts
 type Keybinding = {
   id: string;                       // "nav.practice"
-  chord: string;                    // "alt+1"
-  scope: "global" | "dialog";
+  chord: string;                    // "alt+1"; empty means palette-only
+  group: "navigation" | "appearance" | "application";
   descriptionKey: string;           // i18n key
-  run: (ctx: KeybindingContext) => void;
+  icon: LucideIcon;                 // rendered by the palette
+  hidden?: boolean;                 // bound, but not listed
+  run: () => void;
 };
 ```
 
@@ -462,7 +575,16 @@ type Keybinding = {
 
 A single window-level `keydown` listener resolves chords against the registry. Bindings are suppressed while focus is in a text input or `contenteditable`, except `Escape`. A development-time assertion fails on duplicate chords. The registry is what the palette displays and what a future Shortcuts settings page will render — building it once now is why that page will be nearly free.
 
-The palette is `cmdk` inside a Radix dialog: fuzzy search, arrow-key navigation, correct ARIA combobox semantics, focus trap, focus restored to the invoking element on close. Groups: **Navigation** (Practice, History, Settings, About), **Appearance** (switch theme, toggle density, toggle high contrast), **Application** (open config folder, open log folder, quit). Each row shows its shortcut, read from the registry.
+The icon lives in the registry rather than in a lookup table beside the palette, so that this file stays the whole answer to "what can Riff do" — a command added here arrives complete.
+
+The palette is `cmdk` inside a Radix dialog: fuzzy search, arrow-key navigation, correct ARIA combobox semantics, focus trap, focus restored to the invoking element on close. Groups: **Navigation** (Practice, History, Settings, About), **Appearance** (cycle theme, toggle density, toggle high contrast), **Application** (open config folder, open log folder, quit). Each row carries its icon and, read from the registry, its shortcut — rendered as one key chip per key, because "Alt+1" is two keys and a run of mono-spaced punctuation beside a 15px label reads as a typo. A footer states the keyboard model rather than leaving it to be discovered.
+
+The theme command **cycles** Dark → Darker → Light rather than flipping between two. With three themes a two-way toggle has no meaning, and an order that skipped one would feel broken to whoever chose the one it skipped.
+
+Two details of the palette's presentation are load-bearing:
+
+- **The search field has no border and no focus ring of its own.** It spans the dialog and takes focus the instant the dialog opens, so a ring on it painted a white box around the palette on every single use, with no key pressed. The dialog is the focused thing; keyboard focus stays completely visible because the highlighted command row is what moves.
+- **The backdrop dims to 66%** (42% in Light, where the same veil over a near-white surface reads far heavier). At the original 10% the whole application stayed legible behind the palette, so it read as a floating card rather than as the thing with focus.
 
 ---
 
@@ -491,6 +613,8 @@ Radix supplies keyboard behaviour and ARIA for every primitive; the work is not 
 - No information conveyed by colour alone
 - The UI-scale slider is operable by keyboard with announced values
 - Disabled placeholder controls use `aria-disabled` with an explanatory label rather than vanishing from the accessibility tree
+- Riff is a desktop application, so **no control shows the pointing-hand cursor.** The arrow is correct over a button and the I-beam is correct only where there is text to select or type; the hand is the browser tell that makes a Tauri application feel like a web page. `not-allowed` goes with it — a control that is dimmed and unresponsive has already said so. This is set once at the root rather than per component, because one component forgetting is exactly how the hand comes back
+- Where a control's visible text is a fragment of its accessible name — an icon-only Open button in a row labelled "Settings" — the name comes from `aria-label` and the row supplies `aria-describedby`, so the announcement is "Open folder, Settings" rather than four identically-named buttons
 
 `axe-core` 4.13 asserts zero violations on every route and every dialog in component tests, driven by a ~15-line local Vitest matcher. Not `vitest-axe`: it sits at 0.1.0 with a `vitest >=0.16` peer range, and taking an unmaintained wrapper as a dependency to save fifteen lines is a bad trade against Vitest 4. Biome's a11y rules run on every commit. The two catch different classes of problem, which is why both are present.
 

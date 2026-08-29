@@ -9,11 +9,18 @@
    variable line, so this is already the minimal cut. */
 @import "@fontsource-variable/outfit/wght.css";
 
-/* Wordmark only. Italic 700, latin subset, is the single cut the mark uses;
-   `700-italic.css` (no subset prefix) bundles latin, latin-ext, cyrillic and
+/* Wordmark only. Italic 500, latin subset, is the single cut the mark uses;
+   `500-italic.css` (no subset prefix) bundles latin, latin-ext, cyrillic and
    vietnamese into one file — importing the whole family would ship far more
-   than the four letters the mark needs. */
-@import "@fontsource/playfair-display/latin-700-italic.css";
+   than the four letters the mark needs.
+
+   500 rather than 700: in Playfair's italic the double-f carries a tall
+   ascender and a deep descender while `ri` sits entirely at x-height, so at
+   700 the mark reads as two large f's with something small in front of them.
+   Dropping one step of weight takes mass off the f's without touching the
+   letterforms, which is the actual imbalance. Letter-spacing does the rest —
+   see the Wordmark component. */
+@import "@fontsource/playfair-display/latin-500-italic.css";
 
 /* Paths, versions and diagnostics. Upright only — diagnostics text is never
    italic — so `wght.css`, not `wght-italic.css`. */

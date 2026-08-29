@@ -18,6 +18,9 @@ import { Toaster as Sonner, type ToasterProps } from "sonner";
  * owns the answer to.
  */
 function readDomTheme(): "light" | "dark" {
+  // `darker` maps to dark here on purpose: sonner only needs to know which of
+  // its two built-in schemes to start from, and every colour that matters is
+  // overridden below by a Riff token anyway.
   return document.documentElement.dataset.theme === "light" ? "light" : "dark";
 }
 
@@ -51,7 +54,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
         {
           "--normal-bg": "var(--card)",
           "--normal-text": "var(--fg)",
-          "--normal-border": "var(--border-subtle)",
+          // `--line` rather than `--border-subtle`: a toast is a floating
+          // panel, so its edge is chrome, and chrome uses the chrome line.
+          "--normal-border": "var(--line)",
           "--border-radius": "var(--radius-card)",
         } as React.CSSProperties
       }

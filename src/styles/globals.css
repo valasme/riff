@@ -3,53 +3,127 @@
 @import "tw-animate-css";
 
 /* ---------------------------------------------------------------------------
-   Raw values. Four independent axes vary these: theme, contrast, density and
-   scale. Components never read them directly — they use the Tailwind
-   utilities below, which point at these variables by reference.
+   Raw values. Five independent axes vary these: theme, contrast, density,
+   scale and motion. Components never read them directly — they use the
+   Tailwind utilities below, which point at these variables by reference.
    --------------------------------------------------------------------------- */
 
-:root {
+:root,
+[data-theme="dark"] {
   --surface: #242424;
   --card: #323232;
   --raised: #3c3c3c;
-  --border-subtle: #4d4d4d;
-  --separator: #313131;
   --fg: #e4e4e4;
   --fg-muted: #9a9a9a;
+  --border-subtle: #4d4d4d;
   --ring: #e4e4e4;
+}
 
-  /* Density-driven spacing. Adjusts space, never font size, so density and
-     UI scale stay orthogonal controls.
-     These three are the ONLY things Compact changes, so every component that
-     has a row, a gap or page padding must read them. A hardcoded `h-10` or
-     `py-4` is a component opting out of the density setting, which is how a
-     control ends up persisting perfectly and doing nothing. */
+/* Not colour, and therefore not repeated per theme: a theme preview carries
+   its own `data-theme` and must not also reset the density the user chose.
+
+   Density-driven spacing adjusts space, never font size, so density and UI
+   scale stay orthogonal controls. These are the ONLY things Compact changes,
+   so every component that has a row, a gap or page padding must read them. A
+   hardcoded `h-10` or `py-4` is a component opting out of the density
+   setting, which is how a control ends up persisting perfectly and doing
+   nothing. */
+:root {
   --row-height: 2.5rem;
   --row-gap: 0.25rem;
   --content-padding: 1.5rem;
   --section-gap: 1.5rem;
+  --field-padding: 1rem;
 
   --ui-scale: 1;
+
+  /* Motion. Two durations and one curve, used by everything that moves.
+     A single vocabulary is what keeps the interface from feeling like four
+     people animated it — and it makes `prefers-reduced-motion` a one-line
+     override rather than an audit. */
+  --motion-fast: 110ms;
+  --motion: 170ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Darker. Not "dark, dimmed" — a genuine near-black step down, so choosing it
+   is unmistakable at a glance. The three surfaces stay far enough apart that
+   panels remain distinguishable without leaning on their borders. */
+[data-theme="darker"] {
+  --surface: #101010;
+  --card: #191919;
+  --raised: #232323;
+  --fg: #e8e8e8;
+  --fg-muted: #9e9e9e;
+  --border-subtle: #3a3a3a;
+  --ring: #e8e8e8;
 }
 
 [data-theme="light"] {
   --surface: #fafafa;
   --card: #f2f2f2;
   --raised: #eaeaea;
-  --border-subtle: #d4d4d4;
-  --separator: #e6e6e6;
   --fg: #1c1c1c;
   --fg-muted: #5f5f5f;
+  --border-subtle: #d4d4d4;
   --ring: #1c1c1c;
+}
+
+/* Derived from the palette above, and redeclared on every element carrying a
+   `data-theme` rather than only on the root.
+   A custom property that contains `var()` is substituted where it is
+   *declared*, not where it is used — so a `--line` written once on `:root`
+   would keep resolving against the root's `--fg` inside a `[data-theme]`
+   subtree, and the theme previews in Settings and onboarding would draw
+   dark-theme rules on a light-theme card. Matching `[data-theme]` makes each
+   preview recompute its own.
+
+   Lines come in three weights and every rule in the application uses one:
+
+     --line       structural chrome: title bar, sidebar, sub-nav, card edges
+     --separator  row dividers inside a list, table or settings card
+     --border-subtle  control outlines: inputs, unchecked switches, tables
+
+   The first two are mixed from `--fg` so a rule keeps the same *relative*
+   strength whether it sits on surface, card or raised. Hard-coded hexes were
+   what made the sidebar's edge invisible on #242424 while the settings
+   sub-navigation's edge glared on the same shade — the same kind of boundary,
+   two different colours. `--border-subtle` stays a flat hex because §7.3
+   audits it by ratio and High contrast raises it to a computed value. */
+:root,
+[data-theme] {
+  --line: color-mix(in srgb, var(--fg) 11%, transparent);
+  --separator: color-mix(in srgb, var(--fg) 7%, transparent);
+
+  /* Hover and pressed fills, for the same reason: one strength everywhere,
+     legible on any of the three backgrounds. */
+  --hover: color-mix(in srgb, var(--fg) 8%, transparent);
+  --active-fill: color-mix(in srgb, var(--fg) 13%, transparent);
+  --scrollbar: color-mix(in srgb, var(--fg) 20%, transparent);
+  --overlay: color-mix(in srgb, #000 66%, transparent);
+}
+
+/* Over a near-white surface the same veil reads as far heavier, so light gets
+   a lighter one. */
+[data-theme="light"] {
+  --overlay: color-mix(in srgb, #000 42%, transparent);
 }
 
 /* The source palette's borders measure 1.8:1 against the surface, below the
    3:1 WCAG 1.4.11 wants for control boundaries. Rather than repaint the
-   design for everyone, this raises them for users who ask. #6d6d6d is exactly
-   3.0:1 on #242424 — computed, not guessed. */
+   design for everyone, this raises them for users who ask. Each value is the
+   computed 3.0:1 point on that theme's own surface — measured, not guessed:
+   #6d6d6d on #242424, #606060 on #101010, #8a8a8a on #fafafa. */
 [data-contrast="high"] {
   --border-subtle: #6d6d6d;
   --fg-muted: #b0b0b0;
+  --line: color-mix(in srgb, var(--fg) 28%, transparent);
+  --separator: color-mix(in srgb, var(--fg) 20%, transparent);
+}
+
+[data-theme="darker"][data-contrast="high"] {
+  --border-subtle: #606060;
+  --fg-muted: #b8b8b8;
 }
 
 [data-theme="light"][data-contrast="high"] {
@@ -66,6 +140,12 @@
   :root:not([data-contrast="normal"]) {
     --border-subtle: #6d6d6d;
     --fg-muted: #b0b0b0;
+    --line: color-mix(in srgb, var(--fg) 28%, transparent);
+    --separator: color-mix(in srgb, var(--fg) 20%, transparent);
+  }
+  [data-theme="darker"]:not([data-contrast="normal"]) {
+    --border-subtle: #606060;
+    --fg-muted: #b8b8b8;
   }
   [data-theme="light"]:not([data-contrast="normal"]) {
     --border-subtle: #8a8a8a;
@@ -78,6 +158,7 @@
   --row-gap: 0.125rem;
   --content-padding: 1rem;
   --section-gap: 1rem;
+  --field-padding: 0.6875rem;
 }
 
 /* ---------------------------------------------------------------------------
@@ -90,11 +171,16 @@
   --color-surface: var(--surface);
   --color-card: var(--card);
   --color-raised: var(--raised);
-  --color-border-subtle: var(--border-subtle);
-  --color-separator: var(--separator);
   --color-foreground: var(--fg);
   --color-muted-foreground: var(--fg-muted);
   --color-ring: var(--ring);
+
+  --color-line: var(--line);
+  --color-separator: var(--separator);
+  --color-border-subtle: var(--border-subtle);
+  --color-hover: var(--hover);
+  --color-active-fill: var(--active-fill);
+  --color-overlay: var(--overlay);
 
   --font-sans: "Outfit Variable", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Playfair Display", ui-serif, Georgia, serif;
@@ -105,16 +191,19 @@
      sub-navigation frozen while the text inside them grew — large type in a
      fixed frame, which is worse than either extreme. §6.3 requires every
      dimension in rem; these are the ones it is easiest to get wrong.
-     At the 16px default: 0.625rem = 10px, 2.75rem = 44px, 14rem = 224px,
-     3.5rem = 56px, 15rem = 240px. */
+     At the 16px default: 0.5rem = 8px, 3.25rem = 52px, 15rem = 240px,
+     3.5rem = 56px, 15.5rem = 248px. */
+  --radius-control: 0.5rem;
   --radius-pane: 0.625rem;
   --radius-card: 0.75rem;
-  --radius-nav: 0.75rem;
+  --radius-nav: 0.625rem;
 
-  --spacing-titlebar: 2.75rem;
-  --spacing-sidebar: 14rem;
+  --spacing-titlebar: 3.25rem;
+  --spacing-sidebar: 15rem;
   --spacing-sidebar-rail: 3.5rem;
-  --spacing-subnav: 15rem;
+  --spacing-subnav: 15.5rem;
+
+  --ease-standard: var(--ease);
 }
 
 /* ---------------------------------------------------------------------------
@@ -135,7 +224,101 @@ body {
   font-size: 0.875rem;
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
   overflow: hidden; /* the shell scrolls its own panes */
+}
+
+/* Riff is a desktop application, not a web page. Desktop toolkits do not swap
+   in a pointing hand over every button, and the hand is the browser tell that
+   makes an Electron-shaped app feel like a website. The arrow is the correct
+   cursor for a control; the I-beam is correct only where there is text to
+   select or type. Set here rather than per component, because one component
+   forgetting is exactly how the hand comes back. */
+:root,
+button,
+a,
+label,
+summary,
+[role="button"],
+[role="link"],
+[role="option"],
+[role="tab"],
+[role="radio"],
+[role="switch"],
+[role="checkbox"],
+[role="menuitem"],
+[role="slider"],
+[data-slot="command-item"],
+[data-slot="slider-thumb"],
+select {
+  cursor: default;
+}
+
+/* Including the disabled case: `not-allowed` is a mouse cursor too, and a
+   control that is dimmed and unresponsive has already said so. */
+:disabled,
+[aria-disabled="true"],
+[data-disabled] {
+  cursor: default;
+}
+
+input:where(
+  [type="text"],
+  [type="search"],
+  [type="email"],
+  [type="password"],
+  [type="number"],
+  [type="tel"],
+  [type="url"],
+  :not([type])
+),
+textarea,
+[contenteditable="true"] {
+  cursor: text;
+}
+
+/* Text people actually read and copy — licence bodies, stack traces, paths. */
+pre,
+code,
+p,
+dd,
+li {
+  cursor: auto;
+}
+
+::selection {
+  background-color: color-mix(in srgb, var(--fg) 22%, transparent);
+}
+
+/* Thin, neutral, and the same in every pane. The default WebKitGTK scrollbar
+   is a light grey slab that reads as a bug on a #101010 surface. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 0.625rem;
+  height: 0.625rem;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar);
+  border: 3px solid transparent;
+  border-radius: 9999px;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--fg) 32%, transparent);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* Focus is never removed, only restyled. The ring is 12.2:1 on the dark
@@ -144,8 +327,19 @@ body {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
   /* No `border-radius` here. The outline already follows the element's own
-     radius; setting one would snap a 12px nav pill to 4px on keyboard focus,
+     radius; setting one would snap a 10px nav pill to 4px on keyboard focus,
      changing the shape of the thing being focused. */
+}
+
+/* The one exception, and it is not an exception to the rule so much as an
+   application of it: a search field that fills its dialog and takes focus the
+   instant that dialog opens draws the ring around itself every single time it
+   is used — a white box round the palette, on open, with no key pressed. The
+   dialog is the focused thing; the field inside it does not also need to say
+   so. Keyboard focus remains completely visible, because the highlighted
+   command row is what moves. */
+[data-slot="command-input"]:focus-visible {
+  outline: none;
 }
 
 /* Honour the desktop's declaration, and let the setting force it either way. */

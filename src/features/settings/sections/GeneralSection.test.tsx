@@ -53,6 +53,16 @@ describe("GeneralSection", () => {
     openPath.mockClear();
   });
 
+  it("draws the startup route as its own listbox, never a native select", () => {
+    // GTK paints `<select>` and its popup itself, so on the dark themes the
+    // options came out unreadable and no stylesheet could reach them.
+    renderSection();
+    const trigger = screen.getByRole("combobox", { name: /on launch, open/i });
+    expect(trigger.tagName).toBe("BUTTON");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(document.querySelector("select")).toBeNull();
+  });
+
   it("has no language picker while english is the only locale", () => {
     renderSection();
     expect(screen.queryByRole("combobox", { name: /language/i })).not.toBeInTheDocument();

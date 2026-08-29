@@ -8,7 +8,11 @@ function context() {
     toggleSidebar: vi.fn(),
     patch: vi.fn(),
     settings: {
-      appearance: { theme: "dark" as const, density: "comfortable" as const, highContrast: false },
+      appearance: {
+        theme: "dark" as "dark" | "darker" | "light",
+        density: "comfortable" as const,
+        highContrast: false,
+      },
     },
     openPath: vi.fn(),
     quit: vi.fn(),
@@ -51,11 +55,30 @@ describe("createKeymap", () => {
     expect(ctx.navigate).toHaveBeenCalledWith({ to: "/practice" });
   });
 
-  it("flips the theme from whatever is current", () => {
-    const ctx = context();
-    createKeymap(ctx)
-      .find((b) => b.id === "appearance.toggleTheme")
-      ?.run();
-    expect(ctx.patch).toHaveBeenCalledWith({ appearance: { theme: "light" } });
+  it("cycles the theme from whatever is current, visiting all three", () => {
+    // Dark → Darker → Light → Dark. A two-way flip would silently skip
+    // whichever theme it was not written for.
+    const seen: string[] = [];
+    let theme: "dark" | "darker" | "light" = "dark";
+    for (let i = 0; i < 3; i++) {
+      const ctx = context();
+      ctx.settings.appearance.theme = theme;
+      createKeymap(ctx)
+        .find((b) => b.id === "appearance.toggleTheme")
+        ?.run();
+      const [call] = ctx.patch.mock.calls;
+      theme = call?.[0].appearance.theme;
+      seen.push(theme);
+    }
+    expect(seen).toEqual(["darker", "light", "dark"]);
+  });
+
+  it("gives every command an icon, so the palette never renders a blank slot", () => {
+    for (const binding of createKeymap(context())) {
+      // A lucide icon is a forwardRef object, not a plain function, so the
+      // assertion is that one is present at all — a missing icon renders as
+      // an empty 16px gap the palette silently keeps.
+      expect(binding.icon).toBeDefined();
+    }
   });
 });

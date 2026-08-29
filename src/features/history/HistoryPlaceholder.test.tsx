@@ -37,6 +37,18 @@ describe("HistoryPlaceholder", () => {
     }
   });
 
+  it("names every column rather than leaving the header as bare icons", () => {
+    renderHistory();
+    for (const name of [/name/i, /last practised/i, /duration/i]) {
+      expect(screen.getByRole("columnheader", { name })).toBeInTheDocument();
+    }
+  });
+
+  it("says the rows are a preview rather than leaving them to be read as data", () => {
+    renderHistory();
+    expect(screen.getByText(/records nothing yet/i)).toBeInTheDocument();
+  });
+
   it("has no accessibility violations", async () => {
     const { container } = renderHistory();
     await expect(container).toHaveNoAxeViolations();

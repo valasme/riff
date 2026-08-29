@@ -1,4 +1,4 @@
-export type Theme = "dark" | "light";
+export type Theme = "dark" | "darker" | "light";
 export type Density = "comfortable" | "compact";
 export type ReduceMotion = "system" | "always" | "never";
 export type TitleBarStyle = "custom" | "system";
