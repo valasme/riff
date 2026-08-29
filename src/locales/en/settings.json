@@ -49,10 +49,10 @@
     "imported": "Settings imported",
     "reset": {
       "label": "Reset all settings",
-      "description": "Restores General and Appearance to their defaults. Your onboarding choice is kept.",
+      "description": "Restores General and Appearance to their defaults, and returns any pane in its own window to the grid. Your onboarding choice is kept.",
       "action": "Reset",
       "confirmTitle": "Reset all settings?",
-      "confirmBody": "General and Appearance return to their defaults. This cannot be undone."
+      "confirmBody": "General and Appearance return to their defaults, and any pane in its own window docks back. This cannot be undone."
     },
     "rerunOnboarding": {
       "label": "Run first-time setup again",

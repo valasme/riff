@@ -3,7 +3,8 @@ export type Density = "comfortable" | "compact";
 export type ReduceMotion = "system" | "always" | "never";
 export type TitleBarStyle = "custom" | "system";
 export type StartupRoute = "practice" | "history" | "last-used";
-export type Section = "general" | "appearance" | "onboarding";
+export type Section = "general" | "appearance" | "onboarding" | "practice";
+export type Pane = "score" | "video" | "audio";
 export type PathKind = "config" | "data" | "cache" | "logs";
 export type ExternalLink = "repository" | "issues" | "license";
 export type LogLevel = "error" | "warn" | "info" | "debug" | "trace";
@@ -36,12 +37,23 @@ export interface Onboarding {
   version: number;
 }
 
+/**
+ * Read, never patched. Rust owns which panes are popped out — a compositor can
+ * destroy a pop-out window without the webview hearing about it — so the
+ * frontend changes this set through `practicePopOut` and `practiceDockBack`
+ * and learns about it through `practice://panes-changed`.
+ */
+export interface Practice {
+  poppedOut: Pane[];
+}
+
 export interface Settings {
   $schema: string;
   version: number;
   general: General;
   appearance: Appearance;
   onboarding: Onboarding;
+  practice: Practice;
 }
 
 export interface AppPaths {

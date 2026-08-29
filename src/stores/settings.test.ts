@@ -36,6 +36,7 @@ const DEFAULTS: Settings = {
     sidebar: { collapsed: false, rememberCollapsed: true },
   },
   onboarding: { completedAt: null, version: 1 },
+  practice: { poppedOut: [] },
 };
 
 beforeEach(() => {

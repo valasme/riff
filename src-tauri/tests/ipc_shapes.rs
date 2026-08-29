@@ -10,7 +10,7 @@ use riff_lib::commands::app::{AppInfo, ExternalLink, PathKind};
 use riff_lib::commands::diagnostics::LogLevel;
 use riff_lib::commands::licenses::LicenseEntry;
 use riff_lib::error::RiffError;
-use riff_lib::settings::model::Settings;
+use riff_lib::settings::model::{Pane, Settings};
 use riff_lib::settings::store::Section;
 use serde_json::json;
 
@@ -21,7 +21,13 @@ use serde_json::json;
 fn shapes() -> serde_json::Value {
     json!({
         "Settings": Settings::default(),
-        "Section": [Section::General, Section::Appearance, Section::Onboarding],
+        "Section": [
+            Section::General,
+            Section::Appearance,
+            Section::Onboarding,
+            Section::Practice,
+        ],
+        "Pane": Pane::ALL,
         "PathKind": [PathKind::Config, PathKind::Data, PathKind::Cache, PathKind::Logs],
         "ExternalLink": [ExternalLink::Repository, ExternalLink::Issues, ExternalLink::License],
         "LogLevel": [

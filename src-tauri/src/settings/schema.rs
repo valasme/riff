@@ -32,6 +32,7 @@ mod tests {
         assert!(properties["general"].is_object());
         assert!(properties["appearance"].is_object());
         assert!(properties["onboarding"].is_object());
+        assert!(properties["practice"].is_object());
     }
 
     #[test]

@@ -32,6 +32,11 @@
     "debug",
     "trace"
   ],
+  "Pane": [
+    "score",
+    "video",
+    "audio"
+  ],
   "PathKind": [
     "config",
     "data",
@@ -77,7 +82,8 @@
   "Section": [
     "general",
     "appearance",
-    "onboarding"
+    "onboarding",
+    "practice"
   ],
   "Settings": {
     "$schema": "./settings.schema.json",
@@ -103,6 +109,9 @@
     "onboarding": {
       "completedAt": null,
       "version": 0
+    },
+    "practice": {
+      "poppedOut": []
     },
     "version": 1
   }

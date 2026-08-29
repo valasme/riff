@@ -64,6 +64,7 @@ function safeBootstrap(): BootstrapPayload {
           sidebar: { collapsed: false, rememberCollapsed: true },
         },
         onboarding: { completedAt: null, version: 1 },
+        practice: { poppedOut: [] },
       },
       paths: { configDir: "", dataDir: "", stateDir: "", cacheDir: "", logDir: "", homeDir: "" },
       appInfo: {

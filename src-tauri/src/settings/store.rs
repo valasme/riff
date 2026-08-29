@@ -13,7 +13,7 @@ use serde_json::Value;
 use crate::error::{RiffError, RiffResult};
 use crate::paths::AppPaths;
 use crate::settings::migrate;
-use crate::settings::model::{self, Appearance, General, Onboarding, Settings};
+use crate::settings::model::{self, Appearance, General, Onboarding, Practice, Settings};
 use crate::storage::atomic::write_atomic;
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -22,6 +22,7 @@ pub enum Section {
     General,
     Appearance,
     Onboarding,
+    Practice,
 }
 
 #[derive(Debug)]
@@ -140,11 +141,16 @@ impl SettingsStore {
             Some(Section::General) => next.general = General::default(),
             Some(Section::Appearance) => next.appearance = Appearance::default(),
             Some(Section::Onboarding) => next.onboarding = Onboarding::default(),
+            Some(Section::Practice) => next.practice = Practice::default(),
             // "Everything" means preferences. Onboarding completion is not a
             // preference, and replaying first run is its own explicit action.
+            // `practice` is not a preference either, but it *is* included:
+            // leaving three pop-out windows open across a reset that claims to
+            // put Riff back how it started would be a reset that lied.
             None => {
                 next.general = General::default();
                 next.appearance = Appearance::default();
+                next.practice = Practice::default();
             }
         }
         self.replace(next.clone());
@@ -510,6 +516,31 @@ mod tests {
             Some("2026-08-28T10:00:00Z"),
             "resetting preferences is not a request to redo first run"
         );
+    }
+
+    #[test]
+    fn resetting_everything_docks_every_pane_back() {
+        // A reset that leaves three pop-out windows open while writing
+        // `poppedOut: []` to the file is a reset that lied. The windows are
+        // closed by `practice::sync_windows`; this is the half that decides.
+        let (s, _outcome, _tmp) = store();
+        s.patch(&json!({ "practice": { "poppedOut": ["score", "video"] } }))
+            .expect("patch");
+        let after = s.reset(None).expect("reset");
+        assert!(after.practice.popped_out.is_empty());
+    }
+
+    #[test]
+    fn resetting_the_practice_section_leaves_the_other_sections_alone() {
+        let (s, _outcome, _tmp) = store();
+        s.patch(&json!({
+            "appearance": { "theme": "light" },
+            "practice": { "poppedOut": ["audio"] }
+        }))
+        .expect("patch");
+        let after = s.reset(Some(Section::Practice)).expect("reset");
+        assert!(after.practice.popped_out.is_empty());
+        assert_eq!(after.appearance.theme, Theme::Light);
     }
 
     #[test]

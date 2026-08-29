@@ -37,6 +37,7 @@ pub struct Settings {
     pub general: General,
     pub appearance: Appearance,
     pub onboarding: Onboarding,
+    pub practice: Practice,
     /// Keys Riff does not recognise, kept verbatim so a downgrade followed by
     /// an upgrade does not silently delete a newer version's settings.
     #[serde(flatten)]
@@ -52,6 +53,7 @@ impl Default for Settings {
             general: General::default(),
             appearance: Appearance::default(),
             onboarding: Onboarding::default(),
+            practice: Practice::default(),
             unknown: serde_json::Map::new(),
         }
     }
@@ -153,6 +155,64 @@ pub struct Onboarding {
     pub unknown: serde_json::Map<String, serde_json::Value>,
 }
 
+/// One of the three regions of Practice. The pane is the thing; whether it
+/// currently sits in the grid or in a window of its own is a separate
+/// question, answered by `Practice::popped_out`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum Pane {
+    Score,
+    Video,
+    Audio,
+}
+
+impl Pane {
+    pub const ALL: [Self; 3] = [Self::Score, Self::Video, Self::Audio];
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Practice {
+    /// Keys this build does not recognise. Present on every section, not only
+    /// the root: new settings are added *inside* sections, so root-only
+    /// preservation would protect exactly the case that never happens and
+    /// lose the one that does.
+    #[serde(flatten)]
+    #[schemars(skip)]
+    pub unknown: serde_json::Map<String, serde_json::Value>,
+    /// The panes currently in a window of their own. State rather than a
+    /// preference — written as it changes and given no control in Settings,
+    /// exactly as `general.last_route` is.
+    #[serde(deserialize_with = "lenient_panes")]
+    pub popped_out: Vec<Pane>,
+}
+
+/// Drops pane identifiers this build does not know and keeps the rest, then
+/// deduplicates. The section-wide `lenient` helper cannot do either job: it
+/// falls back to `T::default()` for the *whole* value, so one unknown pane
+/// written by a newer build would dock the other two back. The dedup is not
+/// cosmetic — the list is a set, and two entries for one pane would ask Tauri
+/// to build two windows with the same label, which it refuses.
+fn lenient_panes<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<Pane>, D::Error> {
+    let raw = serde_json::Value::deserialize(deserializer)?;
+    let Some(items) = raw.as_array() else {
+        tracing::warn!(%raw, "practice.poppedOut is not a list; ignoring it");
+        return Ok(Vec::new());
+    };
+    let mut panes = Vec::new();
+    for item in items {
+        match serde_json::from_value::<Pane>(item.clone()) {
+            Ok(pane) => {
+                if !panes.contains(&pane) {
+                    panes.push(pane);
+                }
+            }
+            Err(err) => tracing::warn!(%err, %item, "unrecognised pane; ignoring it"),
+        }
+    }
+    Ok(panes)
+}
+
 macro_rules! kebab_enum {
     ($name:ident { $default:ident, $($variant:ident),* $(,)? }) => {
         #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -240,6 +300,33 @@ mod tests {
         assert!(!s.appearance.high_contrast);
         assert_eq!(s.appearance.title_bar, TitleBar::Custom);
         assert!(s.onboarding.completed_at.is_none());
+        assert!(
+            s.practice.popped_out.is_empty(),
+            "a fresh install has every pane in the grid"
+        );
+    }
+
+    #[test]
+    fn a_practice_section_survives_a_round_trip_with_unknown_keys() {
+        // `practice` is state rather than preference, so it is rewritten far
+        // more often than any other section — which makes it the likeliest
+        // place for an older build to destroy a newer one's key.
+        let original = r#"{"version":1,"practice":{"poppedOut":["score"],"pinnedTo":"HDMI-1"}}"#;
+        let s: Settings = serde_json::from_str(original).expect("loads");
+        assert_eq!(s.practice.popped_out, vec![Pane::Score]);
+        let round_tripped = serde_json::to_value(&s).expect("serialises");
+        assert_eq!(round_tripped["practice"]["pinnedTo"], "HDMI-1");
+        assert_eq!(round_tripped["practice"]["poppedOut"][0], "score");
+    }
+
+    #[test]
+    fn an_unrecognised_pane_is_dropped_without_costing_the_others() {
+        // A downgrade after a build that added a fourth pane. Losing the pane
+        // it does not know is correct; losing the two it does is not.
+        let s: Settings =
+            serde_json::from_str(r#"{"practice":{"poppedOut":["score","metronome","audio"]}}"#)
+                .expect("loads");
+        assert_eq!(s.practice.popped_out, vec![Pane::Score, Pane::Audio]);
     }
 
     #[test]
