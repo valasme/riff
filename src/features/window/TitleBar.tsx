@@ -43,10 +43,11 @@ export function TitleBar({
                 aria-label={toggleLabel}
                 aria-expanded={!sidebarCollapsed}
                 onClick={onToggleSidebar}
-                // The rectangle behind it. A bare glyph floating in the
-                // corner read as decoration; a filled tile reads as a
-                // control, and gives hover and focus something to land on.
-                className="grid size-8 shrink-0 place-items-center rounded-[var(--radius-control)] bg-hover text-muted-foreground transition-colors duration-[var(--motion-fast)] ease-(--ease-standard) hover:bg-active-fill hover:text-foreground"
+                // The rectangle appears on hover, not at rest. A tile that is
+                // always filled reads as a permanently pressed control and is
+                // the only thing in the bar competing with the wordmark; the
+                // fill on hover is still what gives hover and focus a target.
+                className="grid size-8 shrink-0 place-items-center rounded-[var(--radius-control)] text-muted-foreground transition-colors duration-[var(--motion-fast)] ease-(--ease-standard) hover:bg-hover hover:text-foreground"
               >
                 <ToggleIcon size={17} aria-hidden />
               </button>
