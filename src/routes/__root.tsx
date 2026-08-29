@@ -152,6 +152,11 @@ export function RootLayout() {
             onClick: () => void ipc.practiceReopen(),
           },
           cancel: { label: t("common:panesOut.notNow"), onClick: () => {} },
+          // It waits. Sonner's four-second default is fine for "copied to
+          // clipboard" and wrong for a question — and this one is asked
+          // exactly once, so a prompt that times out is a prompt the user
+          // never had the chance to answer.
+          duration: Number.POSITIVE_INFINITY,
         });
       })
       // Nothing to offer is the same outcome as failing to ask, and neither
