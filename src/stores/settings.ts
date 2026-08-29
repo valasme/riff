@@ -79,7 +79,15 @@ function safeBootstrap(): BootstrapPayload {
 }
 
 interface SettingsState extends BootstrapPayload {
-  patch: (patch: DeepPartial<Settings>) => Promise<void>;
+  /**
+   * Every section but `practice`. Rust owns which panes are popped out, and
+   * `settings_patch` writes the file without reconciling the windows — so a
+   * patch that reached `practice.poppedOut` would leave the file claiming one
+   * thing and the compositor showing another, with the watcher unable to
+   * correct it (it filters out our own writes). `practicePopOut` and friends
+   * are the way in; `Omit` is what stops this being a rule nobody remembers.
+   */
+  patch: (patch: DeepPartial<Omit<Settings, "practice">>) => Promise<void>;
   reset: (section?: Section) => Promise<void>;
   adopt: (settings: Settings) => void;
 }
