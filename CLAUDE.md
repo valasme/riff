@@ -12,7 +12,9 @@ The comments in this codebase are unusually load-bearing: most non-obvious lines
 
 ## Status
 
-The foundation — onboarding, theming, navigation, keyboard palette, settings, diagnostics, CLI, packaging — is complete. **Practice and History are visual placeholders**: PDF, video and audio playback do not exist yet. §15 records that design so it drops in without a rewrite.
+The foundation — onboarding, theming, navigation, keyboard palette, settings, diagnostics, CLI, packaging — is complete. Plan 13 added **pop-out windows**: any of the three practice panes can leave the grid for a window of its own and come back (`docs/superpowers/specs/2026-08-29-pane-popout-design.md`).
+
+**Practice and History are still visual placeholders**: PDF, video and audio playback do not exist yet. §15 records that design so it drops in without a rewrite — the window seam was built first so those players arrive in panes that already know how to travel.
 
 ## Commands
 
@@ -41,6 +43,8 @@ Add `pnpm licenses:generate` before any commit touching dependencies or the CLI 
 
 The invariant everything hangs off: **the webview never touches the filesystem.** It holds one capability, `core:default` — no `fs`, no `shell`, no `http`. Everything on disk goes through a typed command, so validation, migration and atomic writes exist in exactly one place, and that place is covered by `cargo test`.
 
+Riff runs **three windows at most**: `main`, and one `popout-{pane}` per popped-out practice pane. They share one webview bundle and one capability entry, `["main", "popout-*"]`. Note what that capability does *not* do — Riff has no `src-tauri/permissions/`, so Tauri's ACL gate never applies to Riff's own commands and every window can call every one of them regardless. Adding a permissions manifest makes that file load-bearing overnight.
+
 ### Boot sequence (§3.1)
 
 `src-tauri/src/lib.rs::run()` is ordered, and the order *is* the design:
@@ -68,7 +72,9 @@ That fixture is what replaces codegen: `tests/ipc_shapes.rs` serialises one valu
 
 No caller-supplied path or URL crosses IPC. `open_path` and `open_external` take enums; `settings_import`, `settings_export` and `diagnostics_export` open the native picker **in Rust** and return only the chosen result — which is also why the webview needs no `dialog` capability.
 
-Errors are one adjacently-tagged enum, `{ code, details }`. `code` selects a localised message, `details` fills a technical panel; raw Rust prose is never primary UI text. Events run one way, Rust → webview: `settings://changed`, `settings://write-failed`, `app://confirm-quit`.
+Errors are one adjacently-tagged enum, `{ code, details }`. `code` selects a localised message, `details` fills a technical panel; raw Rust prose is never primary UI text. Events run one way, Rust → webview: `settings://changed`, `settings://write-failed`, `app://confirm-quit`, `practice://panes-changed`.
+
+**`emit` broadcasts to every webview; `emit_to` does not.** With pop-outs open that is the difference between one dialog and three. `app://confirm-quit` is targeted for exactly this reason.
 
 ### Settings, end to end (§4)
 
@@ -86,7 +92,9 @@ TanStack Router, file-based, **hash history** — the asset protocol serves no S
 
 State is one Zustand store plus local component state. The spec's `useUi` never became a file: palette visibility and transient sidebar collapse live in `__root.tsx`. Persisted values are read through **primitive** selector hooks (`useTheme()`, `useDensity()`, …) because `adopt` replaces `settings` wholesale — an object selector returns a fresh identity every time and re-renders for changes it does not care about.
 
-`src/features/keybindings/keymap.ts` is the single source of truth for what Riff can do. The palette renders that list, so a command added there arrives bound *and* discoverable.
+`src/features/keybindings/keymap.ts` is the single source of truth for what Riff can do. The palette renders that list, so a command added there arrives bound *and* discoverable. A binding may carry a `scope` — a pop-out has no navigation and no sidebar toggle, and scoping removes the binding rather than disabling it, so the chord is dead rather than silently doing nothing.
+
+**Pop-out windows are created in Rust** (`src-tauri/src/practice/`), and Rust owns which panes are out. That is forced, not stylistic: `core:default` carries no window-creation permission, and a compositor can destroy a window without the webview ever hearing about it. `practice::sync_windows` reconciles the windows to the set, which is what `settings_reset`, `settings_import` and the settings-file watcher all need. See `docs/adr/0001-pop-out-windows-are-created-in-rust.md`.
 
 ### Theming and layout (§6.3, §7)
 
@@ -120,8 +128,14 @@ Security (§12):
 6. The webview holds exactly one capability, `core:default`.
 7. Zero network at runtime. No HTTP client is compiled in, and the CSP's `connect-src` admits only the IPC origins.
 
+Windows (§5 of the pop-out design, plan 13):
+
+8. Closing a pop-out means "dock this pane back". It never asks "Really quit?", and it never quits.
+9. Closing `main` quits, and takes the pop-outs with it — without recording those closes as dock-backs, which would destroy the state the next launch offers back.
+
 ## Conventions and traps
 
+- **`h-full` is not inherited from a parent that had it.** A pane is stretched for free as a grid item and collapses to its content anywhere else; the same trap waits for anything moved out of the grid into a window.
 - **jsdom has no layout engine.** `getBoundingClientRect()` is always zero and container queries never evaluate, so the Vitest suite is blind to UI-scale and breakpoint bugs — two real ones (a settings column computing to `width: 0` at 1.5×, a 668 px centring gap at 2560 px) passed the entire suite. Measure in the real engine instead: WebKit2GTK 4.1 via PyGObject is exactly what Tauri ships on Linux. Do not add Playwright.
 - Tests mock at `@/lib/ipc`, not at `@tauri-apps/api`, so real store logic runs against a typed fake. Coverage gate: 80% lines, functions and statements, 70% branches, over `src/features`, `src/lib`, `src/stores` and `src/routes/__root.tsx`.
 - Test names are sentences stating the guarantee — `a_corrupt_file_is_quarantined_and_never_overwritten`, not `test_load_2`.
