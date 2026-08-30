@@ -298,6 +298,16 @@ describe("useSettings", () => {
     expect(options).toMatchObject({ duration: Number.POSITIVE_INFINITY });
   });
 
+  it("announces a recovery once even if the root remounts", async () => {
+    const payload = window.__RIFF_BOOTSTRAP__;
+    if (payload) payload.recovery = { state: "quarantined", kept: "/c/settings.json.corrupt-x" };
+
+    const { reportRecovery } = await import("./settings");
+    reportRecovery();
+    reportRecovery();
+    expect(toastError).toHaveBeenCalledOnce();
+  });
+
   it("says nothing when there was nothing to recover", async () => {
     const { reportRecovery } = await import("./settings");
     reportRecovery();

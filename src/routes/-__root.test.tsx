@@ -26,6 +26,8 @@ const settings = {
   onboarding: { completedAt: "2026-08-28T10:00:00Z", version: 1 },
 };
 
+const reportRecovery = vi.fn();
+let pathname = "/practice";
 vi.mock("@/stores/settings", () => ({
   useSettings: Object.assign(
     (selector: (s: Record<string, unknown>) => unknown) => selector({ settings, patch }),
@@ -34,7 +36,7 @@ vi.mock("@/stores/settings", () => ({
   useAppearance: () => settings.appearance,
   useTitleBarStyle: () => settings.appearance.titleBar,
   subscribeToBackend: () => Promise.resolve(() => {}),
-  reportRecovery: () => {},
+  reportRecovery: () => reportRecovery(),
 }));
 
 // __root.tsx renders outside a router in this test, so its router hooks and
@@ -44,7 +46,7 @@ vi.mock("@tanstack/react-router", () => ({
   Outlet: () => null,
   redirect: (options: unknown) => options,
   useNavigate: () => vi.fn(),
-  useRouterState: () => "/practice",
+  useRouterState: () => pathname,
   Link: ({ children, to, ...rest }: { children: ReactNode; to: string }) => (
     <a href={to} {...rest}>
       {children}
@@ -88,6 +90,8 @@ function renderShell() {
 
 describe("the shell", () => {
   beforeEach(() => {
+    pathname = "/practice";
+    reportRecovery.mockClear();
     toast.mockClear();
     practicePendingReopen.mockClear();
     practiceReopen.mockClear();
@@ -217,5 +221,21 @@ describe("the shell", () => {
       </I18nextProvider>,
     );
     expect(practicePendingReopen).toHaveBeenCalledTimes(1);
+  });
+
+  it("announces a recovery in the window that can act on it", () => {
+    renderShell();
+    expect(reportRecovery).toHaveBeenCalledOnce();
+  });
+
+  it("does not re-announce a recovery when a pane is popped out", () => {
+    // `recovery` is baked into the init script for the whole process
+    // lifetime, and every window mounts this component — so every pane popped
+    // out during a recovered session announced all over again that the
+    // settings file had been corrupt. The reopen prompt beside it already
+    // gets this right; this matches it.
+    pathname = "/popout/score";
+    renderShell();
+    expect(reportRecovery).not.toHaveBeenCalled();
   });
 });

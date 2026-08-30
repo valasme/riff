@@ -162,12 +162,21 @@ export const useSettings = create<SettingsState>((set, get) => ({
 }));
 
 /**
+ * Once per launch. The payload is baked into the init script for the whole
+ * process lifetime, so anything that remounts the root would announce it
+ * again; the caller's pop-out guard covers the other windows.
+ */
+let announced = false;
+
+/**
  * Tells the user what loading their settings file had to do. Recovery happens
  * before the Tauri builder exists, so it arrives in the bootstrap payload
  * rather than as an event — there is nothing to emit to yet, and emitting
  * later would race the first render.
  */
 export function reportRecovery(): void {
+  if (announced) return;
+  announced = true;
   const recovery = window.__RIFF_BOOTSTRAP__?.recovery;
   if (recovery?.state === "quarantined") {
     toast.error(i18n.t("errors:settingsRecovered", { path: recovery.kept }));

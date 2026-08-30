@@ -173,10 +173,16 @@ export function RootLayout() {
   }, [popoutPane, onboardingActive, t, i18n.language]);
 
   useEffect(() => {
-    reportRecovery();
+    // Once per launch, not once per window. `recovery` is baked into the
+    // init script for the process lifetime and every window mounts this
+    // component, so each pane popped out during a recovered session
+    // announced all over again that the settings file had been corrupt —
+    // in a window with no settings interface to do anything about it. Same
+    // shape as the reopen prompt above.
+    if (!popoutPane) reportRecovery();
     const unsubscribe = subscribeToBackend();
     return () => void unsubscribe.then((off) => off());
-  }, []);
+  }, [popoutPane]);
 
   // A client-side route change is silent to a screen reader. This is the
   // only thing that tells one the destination changed.

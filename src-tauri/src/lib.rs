@@ -256,8 +256,13 @@ pub fn run() {
             tracing::error!(%err, "settings could not be written");
             // APP_HANDLE is set in `setup`; a failure before then is still
             // logged, which is the part that must never be lost.
+            //
+            // `emit_to`, not `emit`, for the same reason `app://confirm-quit`
+            // is targeted: `emit` broadcasts to every webview, so one failed
+            // write raised three identical toasts with pop-outs open — and a
+            // pop-out is one pane with no settings interface to explain it in.
             if let Some(app) = APP_HANDLE.get() {
-                let _ = app.emit("settings://write-failed", &err);
+                let _ = app.emit_to(practice::MAIN, "settings://write-failed", &err);
             }
         },
     ));
