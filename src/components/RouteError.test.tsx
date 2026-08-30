@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { StrictMode } from "react";
 import { I18nextProvider } from "react-i18next";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/app/i18n";
@@ -94,6 +95,21 @@ describe("RouteError", () => {
     expect(copied).not.toContain("/home/dimitris");
     expect(copied).not.toContain("dimitris");
     expect(copied).toContain("$HOME");
+  });
+
+  it("still offers reload on the first crash under StrictMode", () => {
+    // StrictMode double-invokes a `useState` initialiser, which counted the
+    // first crash twice and offered the escape hatch straight away — removing
+    // Reload, which is the right first answer.
+    render(
+      <StrictMode>
+        <I18nextProvider i18n={i18n}>
+          <RouteError error={new Error("boom")} />
+        </I18nextProvider>
+      </StrictMode>,
+    );
+    expect(screen.getByRole("button", { name: "Reload" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /default settings/i })).not.toBeInTheDocument();
   });
 
   it("offers defaults rather than another reload on a second crash", async () => {

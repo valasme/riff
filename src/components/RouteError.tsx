@@ -1,5 +1,5 @@
 import { ChevronRight, ClipboardCopy, FolderOpen, RefreshCw, TriangleAlert } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { WindowControls } from "@/features/window/WindowControls";
@@ -19,10 +19,23 @@ export function RouteError({ error }: { error: unknown }) {
   const home = window.__RIFF_BOOTSTRAP__?.paths.homeDir ?? "";
   const detail = redact(String(raw), home);
 
-  // Counted on mount, before anything else can throw. A deterministic crash is
-  // Reload → crash → Reload with no way out, and the second one is where that
-  // becomes obvious.
-  const [looping] = useState(() => isInCrashLoop(recordCrash()));
+  // A deterministic crash is Reload → crash → Reload with no way out, and the
+  // second one is where that becomes obvious.
+  //
+  // Counted in a layout effect behind a ref, not in a `useState` initialiser.
+  // StrictMode double-invokes an initialiser, so the very first crash counted
+  // as two and offered the escape hatch instead of Reload — which is the right
+  // first answer. StrictMode also runs the effect twice, but it preserves refs
+  // across that simulated remount, which is what makes the guard hold. A
+  // *layout* effect so the decision lands before the browser paints, rather
+  // than swapping the button out a frame later.
+  const [looping, setLooping] = useState(false);
+  const counted = useRef(false);
+  useLayoutEffect(() => {
+    if (counted.current) return;
+    counted.current = true;
+    setLooping(isInCrashLoop(recordCrash()));
+  }, []);
 
   // A route render throwing is exactly the kind of failure a bug report
   // needs on disk — the boundary catching it is not itself a trace.
