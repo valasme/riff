@@ -42,6 +42,7 @@ describe("ipc facade", () => {
     ["appInfo", () => ipc.appInfo(), "app_info", undefined],
     ["appReady", () => ipc.appReady(), "app_ready", undefined],
     ["diagnosticsExport", () => ipc.diagnosticsExport(), "diagnostics_export", undefined],
+    ["diagnosticsCheck", () => ipc.diagnosticsCheck(), "diagnostics_check", undefined],
     [
       "logWrite",
       () => ipc.logWrite("warn", "m", { a: 1 }),

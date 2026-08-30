@@ -27,6 +27,18 @@ pub async fn diagnostics_export(
     Ok(Some(target))
 }
 
+/// What `riff doctor` reports, for people who never open a terminal.
+///
+/// `health::run_checks` was a good pure function reachable only from the CLI,
+/// so a GUI-first user whose config directory went read-only had no in-app way
+/// to learn why saving had stopped working.
+#[tauri::command]
+pub fn diagnostics_check(
+    store: tauri::State<'_, std::sync::Arc<crate::settings::store::SettingsStore>>,
+) -> Vec<crate::diagnostics::health::Check> {
+    crate::diagnostics::health::run_checks(store.paths())
+}
+
 /// Mirrors `src/lib/ipc/types.ts`'s `LogLevel`. Lowercase, not kebab-case:
 /// every variant here is already one word, so the two forms coincide, but
 /// lowercase is what the constant is named for.

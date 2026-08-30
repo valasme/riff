@@ -9,6 +9,7 @@
 use riff_lib::commands::app::{AppInfo, ExternalLink, PathKind};
 use riff_lib::commands::diagnostics::LogLevel;
 use riff_lib::commands::licenses::LicenseEntry;
+use riff_lib::diagnostics::health::{Check, Severity};
 use riff_lib::error::RiffError;
 use riff_lib::settings::model::{Pane, Settings};
 use riff_lib::settings::store::Section;
@@ -58,6 +59,19 @@ fn shapes() -> serde_json::Value {
             license: "MIT".into(),
             ecosystem: "npm".into(),
         },
+        "Check": Check {
+            id: "writable",
+            title: "Permissions",
+            severity: Severity::Error,
+            detail: "not writable: /c".into(),
+            repairable: false,
+        },
+        "Severity": [Severity::Ok, Severity::Warn, Severity::Error],
+        "Recovery": [
+            riff_lib::bootstrap::Recovery::None,
+            riff_lib::bootstrap::Recovery::Quarantined { kept: "/c/settings.json.corrupt-x".into() },
+            riff_lib::bootstrap::Recovery::WriteBlocked { path: "/c/settings.json".into() },
+        ],
         "RiffError": [
             RiffError::Io { path: "p".into(), message: "m".into() },
             RiffError::Parse { path: "p".into(), message: "m".into(), line: Some(1) },

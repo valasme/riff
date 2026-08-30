@@ -19,11 +19,50 @@ pub struct Bootstrap {
     pub settings: crate::settings::model::Settings,
     pub paths: crate::paths::AppPaths,
     pub app_info: crate::commands::app::AppInfo,
-    /// Set when `settings.json` could not be parsed and was moved aside. It
-    /// travels in the payload rather than as an event because recovery
-    /// happens before `tauri::Builder` exists — there is nothing to emit to
-    /// yet, and emitting later would race the frontend's first render.
-    pub recovered_from: Option<std::path::PathBuf>,
+    /// What loading the settings file had to do. It travels in the payload
+    /// rather than as an event because recovery happens before
+    /// `tauri::Builder` exists — there is nothing to emit to yet, and emitting
+    /// later would race the frontend's first render.
+    pub recovery: Recovery,
+}
+
+/// The three states the frontend has to be able to tell apart.
+///
+/// It used to be an `Option<PathBuf>`, which collapsed "could not keep your
+/// file, so writing is off for this session" into "nothing happened" — and
+/// the user got the generic write-failure toast instead, the one promising
+/// Riff "will try again on the next change". It will not: `write_blocked` is
+/// set and every flush returns `Denied` for the rest of the session.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(tag = "state", rename_all = "camelCase")]
+pub enum Recovery {
+    /// The file was read. Nothing to say.
+    None,
+    /// It could not be read and was renamed aside; Riff started from defaults
+    /// and the original is at `kept`.
+    Quarantined { kept: std::path::PathBuf },
+    /// It could not be read *and* could not be moved aside, so Riff refuses to
+    /// write over it. Every change this session applies in memory and is lost
+    /// on exit.
+    WriteBlocked { path: std::path::PathBuf },
+}
+
+impl Recovery {
+    pub fn of(
+        outcome: &crate::settings::store::LoadOutcome,
+        paths: &crate::paths::AppPaths,
+    ) -> Self {
+        use crate::settings::store::LoadOutcome;
+        match outcome {
+            LoadOutcome::Recovered {
+                quarantined: Some(kept),
+            } => Self::Quarantined { kept: kept.clone() },
+            LoadOutcome::Recovered { quarantined: None } => Self::WriteBlocked {
+                path: paths.settings_file(),
+            },
+            _ => Self::None,
+        }
+    }
 }
 
 pub fn render_script(payload: &Bootstrap) -> String {
@@ -77,7 +116,50 @@ mod tests {
                 home_dir: tmp.join("home"),
             },
             app_info: crate::commands::app::app_info(),
-            recovered_from: None,
+            recovery: Recovery::None,
+        }
+    }
+
+    fn paths() -> crate::paths::AppPaths {
+        sample().paths
+    }
+
+    #[test]
+    fn a_file_that_could_not_be_quarantined_tells_the_user_writing_is_off() {
+        use crate::settings::store::LoadOutcome;
+        // `Recovered { quarantined: None }` used to collapse to the same
+        // payload as a clean load, so the only thing the user saw was the
+        // generic write-failure toast — which promises Riff will try again on
+        // the next change. It will not.
+        let blocked = Recovery::of(&LoadOutcome::Recovered { quarantined: None }, &paths());
+        assert_eq!(
+            blocked,
+            Recovery::WriteBlocked {
+                path: paths().settings_file()
+            },
+            "the message has to name the file and say writing is off"
+        );
+        assert_ne!(blocked, Recovery::None);
+
+        let kept = Recovery::of(
+            &LoadOutcome::Recovered {
+                quarantined: Some("/c/settings.json.corrupt-x".into()),
+            },
+            &paths(),
+        );
+        assert_eq!(
+            kept,
+            Recovery::Quarantined {
+                kept: "/c/settings.json.corrupt-x".into()
+            }
+        );
+
+        for quiet in [
+            LoadOutcome::Fresh,
+            LoadOutcome::Loaded,
+            LoadOutcome::Migrated { from: 0 },
+        ] {
+            assert_eq!(Recovery::of(&quiet, &paths()), Recovery::None);
         }
     }
 

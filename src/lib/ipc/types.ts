@@ -74,6 +74,30 @@ export interface AppInfo {
   gitSha: string;
 }
 
+/** Mirrors `diagnostics::health::Severity`. */
+export type Severity = "ok" | "warn" | "error";
+
+/** One line of `riff doctor`, for people who never open a terminal. */
+export interface HealthCheck {
+  id: string;
+  title: string;
+  severity: Severity;
+  detail: string;
+  /** Whether `riff repair` knows how to fix this. */
+  repairable: boolean;
+}
+
+/**
+ * What loading `settings.json` had to do. Three states, not two: "could not
+ * keep your file, so writing is off" used to collapse into "nothing happened",
+ * and the user got the generic write-failure toast promising Riff would try
+ * again on the next change. It will not.
+ */
+export type Recovery =
+  | { state: "none" }
+  | { state: "quarantined"; kept: string }
+  | { state: "writeBlocked"; path: string };
+
 export interface LicenseEntry {
   name: string;
   version: string;

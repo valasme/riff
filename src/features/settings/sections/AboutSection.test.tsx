@@ -8,6 +8,7 @@ const openExternal = vi.fn().mockResolvedValue(undefined);
 const writeText = vi.fn().mockResolvedValue(undefined);
 const diagnosticsExport = vi.fn().mockResolvedValue(null);
 const licensesGet = vi.fn().mockResolvedValue([]);
+const diagnosticsCheck = vi.fn().mockResolvedValue([]);
 
 vi.mock("@/stores/settings", () => ({
   useSettings: (selector: (s: Record<string, unknown>) => unknown) =>
@@ -29,7 +30,9 @@ vi.mock("@/stores/settings", () => ({
       },
     }),
 }));
-vi.mock("@/lib/ipc", () => ({ ipc: { openExternal, diagnosticsExport, licensesGet } }));
+vi.mock("@/lib/ipc", () => ({
+  ipc: { openExternal, diagnosticsExport, licensesGet, diagnosticsCheck },
+}));
 
 const { AboutSection } = await import("./AboutSection");
 
@@ -50,6 +53,43 @@ describe("AboutSection", () => {
     writeText.mockClear();
     diagnosticsExport.mockClear();
     licensesGet.mockClear();
+    diagnosticsCheck.mockClear();
+    diagnosticsCheck.mockResolvedValue([]);
+  });
+
+  it("reports what riff doctor would report, for someone who never opens a terminal", async () => {
+    // `health::run_checks` was a good pure function reachable only from a
+    // terminal, so a GUI-first user whose config directory went read-only had
+    // no in-app way to learn why saving had stopped working.
+    diagnosticsCheck.mockResolvedValue([
+      {
+        id: "dirs",
+        title: "Directories",
+        severity: "ok",
+        detail: "all present",
+        repairable: false,
+      },
+      {
+        id: "writable",
+        title: "Permissions",
+        severity: "error",
+        detail: "not writable: /home/dimitris/.config/riff",
+        repairable: false,
+      },
+    ]);
+    renderSection();
+
+    await userEvent.click(screen.getByRole("button", { name: /run checks/i }));
+    expect(await screen.findByText(/not writable/)).toBeInTheDocument();
+    expect(screen.getByText("Directories")).toBeInTheDocument();
+  });
+
+  it("says the checks failed rather than looking like a clean bill of health", async () => {
+    diagnosticsCheck.mockRejectedValue(new Error("boom"));
+    renderSection();
+
+    await userEvent.click(screen.getByRole("button", { name: /run checks/i }));
+    expect(await screen.findByText(/could not be run/i)).toBeInTheDocument();
   });
 
   it("shows the build identity", () => {

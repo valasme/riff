@@ -1,6 +1,5 @@
 {
   "title": "Something went wrong",
-  "description": "Riff hit an unexpected problem. Your settings are safe.",
   "reload": "Reload",
   "openLogs": "Open log folder",
   "copyErrorDetails": "Copy error details",
@@ -15,5 +14,7 @@
   },
   "settingsRecovered": "Your settings file could not be read. Riff started from defaults and kept the original at {{path}}.",
   "settingsWriteFailed": "Riff could not save your settings. Your choices are still applied, and it will try again on the next change.",
-  "decorationsRefused": "Your window manager refused to draw system decorations, so Riff kept its own title bar."
+  "decorationsRefused": "Your window manager refused to draw system decorations, so Riff kept its own title bar.",
+  "settingsWriteBlocked": "Your settings file could not be read, and Riff could not move it aside — so it will not write over it. Changes you make now apply until you quit and are then lost. Rename or fix {{path}}, then restart Riff.",
+  "settingsEditInvalid": "Your edit to settings.json could not be read, so nothing changed: {{detail}}."
 }

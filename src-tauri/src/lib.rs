@@ -220,10 +220,7 @@ pub fn run() {
         settings: store.get(),
         paths: paths.clone(),
         app_info: commands::app::app_info(),
-        recovered_from: match &outcome {
-            LoadOutcome::Recovered { quarantined } => quarantined.clone(),
-            _ => None,
-        },
+        recovery: bootstrap::Recovery::of(&outcome, &paths),
     };
 
     let mut builder = tauri::Builder::default()
@@ -317,17 +314,28 @@ pub fn run() {
             let store = Arc::clone(&store);
             move |app| {
                 let handle = app.handle().clone();
-                let watcher = settings::watcher::spawn(Arc::clone(&store), move |settings| {
-                    use tauri::Emitter;
-                    let _ = handle.emit("settings://changed", settings);
-                    // A hand edit is as good a way to move a pane as the
-                    // button is. Without this, editing `practice.poppedOut`
-                    // in a text editor changes the file and nothing else,
-                    // which makes the file a liar about the running windows.
-                    if let Err(err) = practice::sync_windows(&handle) {
-                        tracing::error!(%err, "could not follow a hand edit to the popped-out set");
-                    }
-                });
+                let invalid_handle = app.handle().clone();
+                let watcher = settings::watcher::spawn(
+                    Arc::clone(&store),
+                    move |settings| {
+                        use tauri::Emitter;
+                        let _ = handle.emit("settings://changed", settings);
+                        // A hand edit is as good a way to move a pane as the
+                        // button is. Without this, editing `practice.poppedOut`
+                        // in a text editor changes the file and nothing else,
+                        // which makes the file a liar about the running windows.
+                        if let Err(err) = practice::sync_windows(&handle) {
+                            tracing::error!(%err, "could not follow a hand edit to the popped-out set");
+                        }
+                    },
+                    move |detail| {
+                        use tauri::Emitter;
+                        // `emit_to`, not `emit`: a pop-out is one pane with no
+                        // settings interface to explain a bad hand edit in.
+                        let _ =
+                            invalid_handle.emit_to(practice::MAIN, "settings://edit-invalid", detail);
+                    },
+                );
                 match watcher {
                     // Held for the process lifetime; dropping it stops watching.
                     Ok(watcher) => {

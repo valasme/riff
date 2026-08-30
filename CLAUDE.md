@@ -73,7 +73,7 @@ That fixture is what replaces codegen: `tests/ipc_shapes.rs` serialises one valu
 
 No caller-supplied path or URL crosses IPC. `open_path` and `open_external` take enums; `settings_import`, `settings_export` and `diagnostics_export` open the native picker **in Rust** and return only the chosen result — which is also why the webview needs no `dialog` capability.
 
-Errors are one adjacently-tagged enum, `{ code, details }`. `code` selects a localised message, `details` fills a technical panel; raw Rust prose is never primary UI text. Events run one way, Rust → webview: `settings://changed`, `settings://write-failed`, `app://confirm-quit`, `practice://panes-changed`.
+Errors are one adjacently-tagged enum, `{ code, details }`. `code` selects a localised message, `details` fills a technical panel; raw Rust prose is never primary UI text. Events run one way, Rust → webview: `settings://changed`, `settings://write-failed`, `settings://edit-invalid`, `app://confirm-quit`, `practice://panes-changed`.
 
 **`emit` broadcasts to every webview; `emit_to` does not.** With pop-outs open that is the difference between one dialog and three. `app://confirm-quit` is targeted for exactly this reason.
 

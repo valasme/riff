@@ -108,7 +108,7 @@
     }
   },
   "about": {
-    "groups": { "build": "Build", "legal": "Legal", "support": "Support" },
+    "groups": { "build": "Build", "legal": "Legal", "health": "Health", "support": "Support" },
     "version": "Version",
     "tauri": "Tauri",
     "webkit": "WebKitGTK",
@@ -133,6 +133,17 @@
       "description": "Writes one text file with your logs, versions and settings. Your home directory and username are replaced before it is saved, so it is safe to attach to a bug report.",
       "action": "Export",
       "done": "Diagnostics written to {{path}}"
+    },
+    "health": {
+      "label": "Installation check",
+      "description": "The same checks `riff doctor` runs. Worth a look if saving has stopped working or a folder will not open.",
+      "action": "Run checks",
+      "rerun": "Run again",
+      "checking": "Checking…",
+      "allOk": "Everything looks healthy.",
+      "failed": "The checks could not be run.",
+      "repairable": "Run `riff repair` in a terminal to fix this.",
+      "severity": { "ok": "OK", "warn": "Warning", "error": "Problem" }
     },
     "copyValue": "Copy {{label}}",
     "privacy": "Riff makes no network connections. Nothing you do here leaves this machine."

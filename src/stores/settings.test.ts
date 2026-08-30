@@ -129,12 +129,25 @@ describe("useSettings", () => {
     expect(settingsPatch).not.toHaveBeenCalled();
   });
 
-  it("subscribes to both backend events", async () => {
+  it("subscribes to every backend event", async () => {
     const { subscribeToBackend } = await import("./settings");
     await subscribeToBackend();
     const events = listen.mock.calls.map((c) => c[0]);
     expect(events).toContain("settings://changed");
     expect(events).toContain("settings://write-failed");
+    expect(events).toContain("settings://edit-invalid");
+  });
+
+  it("reports a hand edit that finished and still could not be read", async () => {
+    const { subscribeToBackend } = await import("./settings");
+    await subscribeToBackend();
+    const onEditInvalid = listen.mock.calls.find((c) => c[0] === "settings://edit-invalid")?.[1] as
+      | ((e: { payload: string }) => void)
+      | undefined;
+
+    onEditInvalid?.({ payload: "general" });
+    expect(toastError).toHaveBeenCalledOnce();
+    expect(String(toastError.mock.calls[0]?.[0])).toContain("general");
   });
 
   it("adopts a settings replacement pushed from outside the process", async () => {
@@ -162,10 +175,14 @@ describe("useSettings", () => {
     expect(toastError).toHaveBeenCalledOnce();
   });
 
-  it("stops listening for both events once unsubscribed", async () => {
+  it("stops listening for every event once unsubscribed", async () => {
     const unlistenChanged = vi.fn();
     const unlistenWriteFailed = vi.fn();
-    listen.mockResolvedValueOnce(unlistenChanged).mockResolvedValueOnce(unlistenWriteFailed);
+    const unlistenEditInvalid = vi.fn();
+    listen
+      .mockResolvedValueOnce(unlistenChanged)
+      .mockResolvedValueOnce(unlistenWriteFailed)
+      .mockResolvedValueOnce(unlistenEditInvalid);
 
     const { subscribeToBackend } = await import("./settings");
     const unsubscribe = await subscribeToBackend();
@@ -173,6 +190,7 @@ describe("useSettings", () => {
 
     expect(unlistenChanged).toHaveBeenCalledOnce();
     expect(unlistenWriteFailed).toHaveBeenCalledOnce();
+    expect(unlistenEditInvalid).toHaveBeenCalledOnce();
   });
 
   it("resets a section and adopts what rust actually stored", async () => {
@@ -236,11 +254,29 @@ describe("useSettings", () => {
         buildDate: "2026-08-28",
         gitSha: "abc1234",
       },
-      recoveredFrom: "/c/settings.json.corrupt-2026-08-28",
+      recovery: { state: "quarantined", kept: "/c/settings.json.corrupt-2026-08-28" },
     };
     const { reportRecovery } = await import("./settings");
     reportRecovery();
     expect(toastError).toHaveBeenCalledOnce();
+    expect(String(toastError.mock.calls[0]?.[0])).toContain("kept the original");
+  });
+
+  it("says writing is off, not that it will try again, when the file could not be kept", async () => {
+    // `Recovered { quarantined: None }` used to collapse into "nothing
+    // happened", so the only thing the user saw was the generic write-failure
+    // toast — which promises Riff will try again on the next change. It will
+    // not: every flush returns Denied for the rest of the session.
+    const payload = window.__RIFF_BOOTSTRAP__;
+    if (payload) payload.recovery = { state: "writeBlocked", path: "/c/settings.json" };
+
+    const { reportRecovery } = await import("./settings");
+    reportRecovery();
+    expect(toastError).toHaveBeenCalledOnce();
+    const [message, options] = toastError.mock.calls[0] ?? [];
+    expect(String(message)).toContain("/c/settings.json");
+    expect(String(message)).not.toContain("try again");
+    expect(options).toMatchObject({ duration: Number.POSITIVE_INFINITY });
   });
 
   it("says nothing when there was nothing to recover", async () => {

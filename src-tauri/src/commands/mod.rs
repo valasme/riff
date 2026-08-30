@@ -16,6 +16,7 @@ macro_rules! riff_handlers {
             $crate::commands::app::open_external,
             $crate::commands::app::open_path,
             $crate::commands::app::paths_get,
+            $crate::commands::diagnostics::diagnostics_check,
             $crate::commands::diagnostics::diagnostics_export,
             $crate::commands::diagnostics::log_write,
             $crate::commands::licenses::licenses_get,

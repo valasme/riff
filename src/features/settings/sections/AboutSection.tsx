@@ -1,11 +1,20 @@
-import { ChevronRight, Copy, ExternalLink, FileDown } from "lucide-react";
+import {
+  ChevronRight,
+  CircleAlert,
+  CircleCheck,
+  Copy,
+  ExternalLink,
+  FileDown,
+  Stethoscope,
+  TriangleAlert,
+} from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SettingRow, SettingsGroup } from "@/features/settings/SettingRow";
-import { ipc, type LicenseEntry } from "@/lib/ipc";
+import { type HealthCheck, ipc, type LicenseEntry, type Severity } from "@/lib/ipc";
 import { MIT_LICENSE } from "@/lib/license";
 import { useSettings } from "@/stores/settings";
 
@@ -138,6 +147,16 @@ export function AboutSection() {
         </Disclosure>
       </SettingsGroup>
 
+      <SettingsGroup title={t("settings:about.groups.health")}>
+        <SettingRow
+          label={t("settings:about.health.label")}
+          description={t("settings:about.health.description")}
+          stacked
+        >
+          <HealthReport />
+        </SettingRow>
+      </SettingsGroup>
+
       <SettingsGroup title={t("settings:about.groups.support")}>
         <SettingRow
           label={t("settings:about.links.label")}
@@ -172,6 +191,111 @@ export function AboutSection() {
         </SettingRow>
       </SettingsGroup>
     </div>
+  );
+}
+
+/**
+ * `riff doctor`, in the application. Run on request rather than on mount: the
+ * checks stat several directories, and About is opened far more often to read
+ * a version number than to diagnose anything.
+ *
+ * Three states, not two — a failed run must not read as a clean bill of
+ * health, which is exactly the mistake this whole plan is about.
+ */
+function HealthReport() {
+  const { t } = useTranslation(["settings", "common"]);
+  const [state, setState] = useState<"idle" | "running" | "failed">("idle");
+  const [checks, setChecks] = useState<HealthCheck[] | null>(null);
+
+  async function run() {
+    setState("running");
+    try {
+      setChecks(await ipc.diagnosticsCheck());
+      setState("idle");
+    } catch {
+      setChecks(null);
+      setState("failed");
+    }
+  }
+
+  const healthy = checks?.every((check) => check.severity === "ok") ?? false;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div>
+        <Button variant="secondary" disabled={state === "running"} onClick={() => void run()}>
+          <Stethoscope aria-hidden />
+          {state === "running"
+            ? t("settings:about.health.checking")
+            : checks || state === "failed"
+              ? t("settings:about.health.rerun")
+              : t("settings:about.health.action")}
+        </Button>
+      </div>
+
+      {state === "failed" && (
+        <p role="alert" className="text-[0.8125rem] font-medium">
+          {t("settings:about.health.failed")}
+        </p>
+      )}
+
+      {checks && (
+        <>
+          {healthy && (
+            <p className="text-[0.8125rem] text-muted-foreground">
+              {t("settings:about.health.allOk")}
+            </p>
+          )}
+          <ul className="flex flex-col gap-1.5">
+            {checks.map((check) => (
+              <li
+                key={check.id}
+                className="flex items-start gap-2.5 rounded-[var(--radius-control)] border border-line bg-hover px-3 py-2"
+              >
+                <SeverityGlyph
+                  severity={check.severity}
+                  label={t(`settings:about.health.severity.${check.severity}`)}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[0.8125rem] font-medium">{check.title}</p>
+                  <p
+                    className={
+                      check.severity === "ok"
+                        ? "text-xs text-muted-foreground"
+                        : "text-xs text-foreground"
+                    }
+                  >
+                    {check.detail}
+                  </p>
+                  {check.repairable && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t("settings:about.health.repairable")}
+                    </p>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Shape and a label, not colour. There is no red in Riff's palette — the
+ * destructive button is monochrome for the same reason — so severity is
+ * carried by the glyph and by `aria-label`, which is what a screen reader and
+ * a colour-blind reader both get either way.
+ */
+function SeverityGlyph({ severity, label }: { severity: Severity; label: string }) {
+  const Icon = severity === "ok" ? CircleCheck : severity === "warn" ? TriangleAlert : CircleAlert;
+  return (
+    <span
+      className={`mt-0.5 shrink-0 ${severity === "ok" ? "text-muted-foreground" : "text-foreground"}`}
+    >
+      <Icon size={15} aria-label={label} />
+    </span>
   );
 }
 

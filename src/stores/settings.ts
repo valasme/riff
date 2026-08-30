@@ -9,6 +9,7 @@ import {
   type DeepPartial,
   ipc,
   isRiffError,
+  type Recovery,
   type Section,
   type Settings,
 } from "@/lib/ipc";
@@ -19,8 +20,8 @@ interface BootstrapPayload {
   settings: Settings;
   paths: AppPaths;
   appInfo: AppInfo;
-  /** Present when settings.json could not be read and was moved aside. */
-  recoveredFrom?: string | null;
+  /** What loading settings.json had to do. Absent means nothing happened. */
+  recovery?: Recovery;
 }
 
 declare global {
@@ -145,17 +146,30 @@ export const useSettings = create<SettingsState>((set, get) => ({
 }));
 
 /**
- * Tells the user their settings file was unreadable and has been kept.
- * Recovery happens before the Tauri builder exists, so it arrives in the
- * bootstrap payload rather than as an event — there is nothing to emit to
- * yet, and emitting later would race the first render.
+ * Tells the user what loading their settings file had to do. Recovery happens
+ * before the Tauri builder exists, so it arrives in the bootstrap payload
+ * rather than as an event — there is nothing to emit to yet, and emitting
+ * later would race the first render.
  */
 export function reportRecovery(): void {
-  const path = window.__RIFF_BOOTSTRAP__?.recoveredFrom;
-  if (path) toast.error(i18n.t("errors:settingsRecovered", { path }));
+  const recovery = window.__RIFF_BOOTSTRAP__?.recovery;
+  if (recovery?.state === "quarantined") {
+    toast.error(i18n.t("errors:settingsRecovered", { path: recovery.kept }));
+  }
+  if (recovery?.state === "writeBlocked") {
+    // Deliberately not `settingsWriteFailed`, which promises Riff will try
+    // again on the next change. It will not: quarantine failed, so every
+    // flush returns `Denied` for the rest of the session and everything the
+    // user changes from here is lost on exit. That earns a toast that waits,
+    // like the reopen prompt — a message this consequential must not time out
+    // before it has been read.
+    toast.error(i18n.t("errors:settingsWriteBlocked", { path: recovery.path }), {
+      duration: Number.POSITIVE_INFINITY,
+    });
+  }
 }
 
-/** Call once at mount. Returns a function that removes both listeners. */
+/** Call once at mount. Returns a function that removes every listener. */
 export async function subscribeToBackend(): Promise<() => void> {
   const unlistenChanged = await listen<Settings>("settings://changed", (event) => {
     useSettings.getState().adopt(event.payload);
@@ -163,9 +177,16 @@ export async function subscribeToBackend(): Promise<() => void> {
   const unlistenWriteFailed = await listen("settings://write-failed", () => {
     toast.error(i18n.t("errors:settingsWriteFailed"));
   });
+  // A hand edit that finished and still could not be read. `settings.json` is
+  // a documented editing surface, so an edit that did nothing has to say so —
+  // it used to be a `debug` log line, and the next in-app change overwrote it.
+  const unlistenEditInvalid = await listen<string>("settings://edit-invalid", (event) => {
+    toast.error(i18n.t("errors:settingsEditInvalid", { detail: event.payload }));
+  });
   return () => {
     unlistenChanged();
     unlistenWriteFailed();
+    unlistenEditInvalid();
   };
 }
 

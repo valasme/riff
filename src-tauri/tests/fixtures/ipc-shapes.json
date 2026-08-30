@@ -14,6 +14,13 @@
     "logDir": "/s/logs",
     "stateDir": "/s"
   },
+  "Check": {
+    "detail": "not writable: /c",
+    "id": "writable",
+    "repairable": false,
+    "severity": "error",
+    "title": "Permissions"
+  },
   "ExternalLink": [
     "repository",
     "issues",
@@ -42,6 +49,19 @@
     "data",
     "cache",
     "logs"
+  ],
+  "Recovery": [
+    {
+      "state": "none"
+    },
+    {
+      "kept": "/c/settings.json.corrupt-x",
+      "state": "quarantined"
+    },
+    {
+      "path": "/c/settings.json",
+      "state": "writeBlocked"
+    }
   ],
   "RiffError": [
     {
@@ -114,5 +134,10 @@
       "poppedOut": []
     },
     "version": 1
-  }
+  },
+  "Severity": [
+    "ok",
+    "warn",
+    "error"
+  ]
 }

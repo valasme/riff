@@ -4,6 +4,7 @@ import type {
   AppPaths,
   DeepPartial,
   ExternalLink,
+  HealthCheck,
   LicenseEntry,
   LogLevel,
   Pane,
@@ -43,6 +44,7 @@ export const ipc = {
   appInfo: () => invoke<AppInfo>("app_info"),
   appReady: () => invoke<void>("app_ready"),
   diagnosticsExport: () => invoke<string | null>("diagnostics_export"),
+  diagnosticsCheck: () => invoke<HealthCheck[]>("diagnostics_check"),
   logWrite: (level: LogLevel, message: string, context?: unknown) =>
     invoke<void>("log_write", { level, message, context: context ?? null }),
   licensesGet: () => invoke<LicenseEntry[]>("licenses_get"),
