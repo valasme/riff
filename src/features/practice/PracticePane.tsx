@@ -1,21 +1,22 @@
+import { listen } from "@tauri-apps/api/event";
 import type { LucideIcon } from "lucide-react";
-import { AudioLines, FileMusic, PictureInPicture2, Video, X } from "lucide-react";
+import { PictureInPicture2, X } from "lucide-react";
 import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
-import type { Pane } from "@/lib/ipc";
-
-export const PANE_ICONS: Record<Pane, LucideIcon> = {
-  score: FileMusic,
-  video: Video,
-  audio: AudioLines,
-};
+import { fire, ipc, type Pane, type RiffError } from "@/lib/ipc";
+import { PANE_ICONS } from "./paneIcons";
+import { ScoreViewer } from "./score/ScoreViewer";
+import { scoreErrorMessage } from "./score/scoreError";
+import { useOpenScore } from "./score/useOpenScore";
 
 /**
  * One practice pane, drawn identically whether it is a cell of the grid or
- * the whole of its own window. The content is still the §8.3 placeholder —
- * this milestone builds the seam the players in §15 will travel through, not
- * the players.
+ * the whole of its own window. Video and Audio are still the §8.3
+ * placeholder; Score is the first of the three players plan 13 built this
+ * seam for.
  */
 export function PracticePane({
   pane,
@@ -31,7 +32,7 @@ export function PracticePane({
   onDockBack?: (pane: Pane) => void;
   className?: string;
 }) {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation(["common", "errors"]);
   const Icon = PANE_ICONS[pane];
   const title = t(`panes.${pane}`);
   // Resolved to a handler-or-nothing *before* it reaches the button, so a
@@ -40,6 +41,40 @@ export function PracticePane({
   // in an arrow first would make `onClick` always defined and defeat
   // `PaneButton`'s only test for whether it works.
   const travel = popped ? onDockBack : onPopOut;
+
+  const isScore = pane === "score";
+  // The hook itself is still called unconditionally — a pane's identity
+  // does not change across its lifetime, so this is not a conditional hook
+  // — but `enabled: false` skips the round trip and the listener for the
+  // two panes with nothing to read.
+  const openScore = useOpenScore(isScore);
+  const [scoreError, setScoreError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isScore) return;
+    // The Rust side of a failed drop (`lib.rs`'s `WindowEvent::DragDrop`
+    // handler) has no command promise to reject — it is not a response to a
+    // call this window made — so it is reported through this event instead.
+    const unlisten = listen<RiffError>("score://drop-failed", (event) => {
+      setScoreError(scoreErrorMessage(event.payload, t));
+    });
+    return () => void unlisten.then((off) => off());
+  }, [isScore, t]);
+
+  async function handleOpenScore() {
+    setScoreError(null);
+    try {
+      await ipc.scoreOpen();
+    } catch (error) {
+      setScoreError(scoreErrorMessage(error, t));
+    }
+  }
+
+  function handleCloseScore() {
+    fire(ipc.scoreClose(), "closing the score");
+  }
+
+  const closeScore = isScore && openScore ? handleCloseScore : undefined;
 
   return (
     <section
@@ -64,26 +99,59 @@ export function PracticePane({
           >
             <PictureInPicture2 size={15} aria-hidden />
           </PaneButton>
-          {/* Still inert, and still says so. A working × needs a way to bring
-              a *closed* pane back, which is pane management rather than
-              pop-out — §7 of the design keeps the two apart. */}
-          <PaneButton label={t("paneActions.closePane")}>
+          {/* Live for Score once a score is open — it closes the score, not
+              the pane. Still inert for Video and Audio: a working × there
+              needs a way to bring a *closed* pane back, which is pane
+              management rather than pop-out — §7 of the design keeps the
+              two apart. */}
+          <PaneButton
+            label={closeScore ? t("paneActions.closeScore") : t("paneActions.closePane")}
+            onClick={closeScore}
+          >
             <X size={15} aria-hidden />
           </PaneButton>
         </div>
       </header>
-      <div className="grid flex-1 place-items-center p-6 text-center">
-        <div className="flex flex-col items-center gap-2">
-          <Icon size={26} aria-hidden className="text-muted-foreground/50" />
-          <p className="max-w-[22ch] text-[0.8125rem] text-muted-foreground">
-            {t(`paneEmpty.${pane}`)}
-          </p>
-          <span className="rounded-full border border-line bg-hover px-2.5 py-0.5 text-[0.6875rem] font-medium text-muted-foreground">
-            {t("inDevelopment")}
-          </span>
-        </div>
-      </div>
+      {isScore && openScore ? (
+        <ScoreViewer open={openScore} onLoadError={setScoreError} />
+      ) : (
+        <EmptyPaneBody
+          icon={Icon}
+          message={isScore ? (scoreError ?? t("paneEmpty.score")) : t(`paneEmpty.${pane}`)}
+          action={
+            isScore ? (
+              <Button variant="outline" size="sm" onClick={() => void handleOpenScore()}>
+                {t("paneActions.openScore")}
+              </Button>
+            ) : (
+              <span className="rounded-full border border-line bg-hover px-2.5 py-0.5 text-[0.6875rem] font-medium text-muted-foreground">
+                {t("inDevelopment")}
+              </span>
+            )
+          }
+        />
+      )}
     </section>
+  );
+}
+
+function EmptyPaneBody({
+  icon: Icon,
+  message,
+  action,
+}: {
+  icon: LucideIcon;
+  message: string;
+  action: ReactNode;
+}) {
+  return (
+    <div className="grid flex-1 place-items-center p-6 text-center">
+      <div className="flex flex-col items-center gap-2">
+        <Icon size={26} aria-hidden className="text-muted-foreground/50" />
+        <p className="max-w-[22ch] text-[0.8125rem] text-muted-foreground">{message}</p>
+        {action}
+      </div>
+    </div>
   );
 }
 

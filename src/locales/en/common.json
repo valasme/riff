@@ -23,12 +23,19 @@
   "paneActions": {
     "popOut": "Pop out",
     "dockBack": "Dock back",
-    "closePane": "Close pane"
+    "closePane": "Close pane",
+    "closeScore": "Close score",
+    "openScore": "Open score…"
   },
   "paneEmpty": {
     "score": "A PDF score will open here.",
     "video": "A video lesson will play here.",
     "audio": "A backing track will play here."
+  },
+  "score": {
+    "loading": "Opening {{name}}…",
+    "noText": "This score has no searchable text.",
+    "workerUnavailable": "Riff could not start its PDF renderer. This requires WebKitGTK {{minimum}} or newer; this system has {{webkitVersion}}."
   },
   "panesOut": {
     "strip": "Panes in their own windows",

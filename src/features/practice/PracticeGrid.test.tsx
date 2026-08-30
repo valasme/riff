@@ -10,17 +10,35 @@ const practicePopOut = vi.fn().mockResolvedValue(undefined);
 const practiceDockBack = vi.fn().mockResolvedValue(undefined);
 const practiceDockAll = vi.fn().mockResolvedValue(undefined);
 const practiceFocus = vi.fn().mockResolvedValue(undefined);
+const scoreState = vi.fn().mockResolvedValue(null);
 vi.mock("@/lib/ipc", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/ipc")>()),
-  ipc: { practiceState, practicePopOut, practiceDockBack, practiceDockAll, practiceFocus },
+  ipc: {
+    practiceState,
+    practicePopOut,
+    practiceDockBack,
+    practiceDockAll,
+    practiceFocus,
+    scoreState,
+  },
 }));
 
+// The Score pane pulls in `useOpenScore`, a second `listen()` subscriber
+// alongside `usePoppedOut`'s — routed by event name so triggering one never
+// stands in for the other.
 let emit: ((panes: Pane[]) => void) | undefined;
 vi.mock("@tauri-apps/api/event", () => ({
-  listen: (_name: string, handler: (event: { payload: Pane[] }) => void) => {
-    emit = (panes) => handler({ payload: panes });
+  listen: (name: string, handler: (event: { payload: unknown }) => void) => {
+    if (name === "practice://panes-changed") {
+      emit = (panes: Pane[]) => handler({ payload: panes });
+    }
     return Promise.resolve(() => {});
   },
+}));
+
+// `PDFViewer` cannot run in jsdom — see `PracticePane.test.tsx`.
+vi.mock("./score/ScoreViewer", () => ({
+  ScoreViewer: () => null,
 }));
 
 const { PracticeGrid } = await import("./PracticeGrid");
@@ -50,9 +68,10 @@ describe("the practice grid", () => {
     }
   });
 
-  it("says plainly that it is not finished", async () => {
+  it("says plainly that video and audio are not finished, unlike score", async () => {
     renderGrid();
-    await waitFor(() => expect(screen.getAllByText("In development")).toHaveLength(3));
+    await waitFor(() => expect(screen.getAllByText("In development")).toHaveLength(2));
+    expect(screen.getByRole("button", { name: "Open score…" })).toBeInTheDocument();
   });
 
   it("leaves the close control inert rather than pretending it works", async () => {

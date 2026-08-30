@@ -1,0 +1,43 @@
+/**
+ * The Riff override layer on top of `pdfjs-dist/web/pdf_viewer.css`. That
+ * file is imported whole, its pixel values left alone — see ADR 0005: most
+ * of them are raster and text-layer alignment tied to `--scale-factor`, and
+ * rewriting them in rem breaks text selection at every UI scale but 1.0.
+ * Everything in *this* file is new chrome Riff is adding, so it is rem like
+ * everything else in the application.
+ */
+
+.riff-score-viewer {
+  /* The gap between pages, and the border around each one. pdf.js's own
+     `.page` already carries a box-shadow; this is Riff's page separation on
+     top of it, sized in rem so it grows with UI scale like the rest of the
+     chrome around it. */
+  --score-page-gap: 1rem;
+}
+
+.riff-score-viewer .pdfViewer .page {
+  margin: 0 auto var(--score-page-gap);
+  border: 1px solid var(--line);
+}
+
+/* An imported stylesheet is exactly how the desktop-flat cursor Riff resets
+   at the root (globals.css) comes back — see ADR 0005. `.textLayer` keeps
+   the I-beam, because there is real text to select there; every other
+   pdf.js-generated element, including the annotation layer's link anchors,
+   is reset to the arrow the rest of the application uses. */
+.riff-score-viewer :is(a, button) {
+  cursor: default;
+}
+
+.riff-score-viewer .textLayer,
+.riff-score-viewer .textLayer * {
+  cursor: text;
+}
+
+/* Dim (spec §6.2): a brightness reduction on the rendered page, applied to
+   `canvas` rather than `.page` so search highlights — drawn in the text
+   layer, above the canvas — stay at full strength while the page behind
+   them dims. Not pdf.js's `pageColors`, which inverts to light-on-dark. */
+.riff-score-viewer canvas {
+  filter: brightness(var(--score-dim-brightness, 1));
+}

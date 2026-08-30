@@ -5,9 +5,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/app/i18n";
 
 const practiceDockBack = vi.fn().mockResolvedValue(undefined);
+const scoreState = vi.fn().mockResolvedValue(null);
 vi.mock("@/lib/ipc", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/ipc")>()),
-  ipc: { practiceDockBack },
+  ipc: { practiceDockBack, scoreState },
+}));
+
+// A pop-out can host the Score pane, which pulls in `useOpenScore` and
+// hence a real `listen()` — unavailable outside a Tauri webview.
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: () => Promise.resolve(() => {}),
+}));
+
+// `PDFViewer` cannot run in jsdom — see `PracticePane.test.tsx`.
+vi.mock("./score/ScoreViewer", () => ({
+  ScoreViewer: () => null,
 }));
 
 const { PopoutPane } = await import("./PopoutPane");

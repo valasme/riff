@@ -2,7 +2,8 @@ import { PictureInPicture2, Undo2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { fire, ipc, type Pane } from "@/lib/ipc";
 import { dockedPanes, gridShape } from "./layout";
-import { PANE_ICONS, PracticePane } from "./PracticePane";
+import { PracticePane } from "./PracticePane";
+import { PANE_ICONS } from "./paneIcons";
 import { usePoppedOut } from "./usePoppedOut";
 
 /** Only `feature` is asymmetric, and only because three docked panes are

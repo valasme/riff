@@ -15,7 +15,7 @@ import { useKeybindings } from "@/features/keybindings/useKeybindings";
 import { ONBOARDING_VERSION, shouldShowOnboarding } from "@/features/onboarding/gate";
 import { CommandPalette } from "@/features/palette/CommandPalette";
 import { popoutPaneFrom } from "@/features/practice/layout";
-import { PANE_ICONS } from "@/features/practice/PracticePane";
+import { PANE_ICONS } from "@/features/practice/paneIcons";
 import { PopoutQuitDialog } from "@/features/window/PopoutQuitDialog";
 import { QuitConfirmation } from "@/features/window/QuitConfirmation";
 import { TitleBar } from "@/features/window/TitleBar";
