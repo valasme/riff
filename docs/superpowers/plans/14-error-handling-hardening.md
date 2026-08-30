@@ -62,11 +62,11 @@ Two findings cannot be reached from any of them and are verified by hand, in the
 - Modify: `src-tauri/src/lib.rs`
 - Create: `docs/adr/0002-single-instance-runs-before-anything-touches-disk.md`
 
-- [ ] **Step 1:** Decide the mechanism and record it in the ADR *before* writing code. §3.1's boot order is deliberate and documented, so changing it needs a reason on the record. The two candidates: acquire the DBus well-known name ourselves, before step 2, and keep the plugin only for argument forwarding; or keep the plugin and make steps 2–4 idempotent-and-harmless for a process that is about to exit. Prefer the first — it makes "am I the only instance?" answerable before anything touches disk, which is the actual invariant.
-- [ ] **Step 2:** Nothing that mutates state runs before that answer. In particular `take_pending_reopen` must not clear `practice.poppedOut` in a process that will not open a window, `start_session` must not create a session directory or move `latest`, and the pid file must not be written.
-- [ ] **Step 3:** A forwarded launch still focuses the running window — that behaviour is correct today and must survive.
-- [ ] **Step 4:** `riff --help` typed while Riff is open must still print. This is the reason the CLI runs early in the first place; do not regress it while moving things around.
-- [ ] **Step 5:** Update the boot sequence in `CLAUDE.md` §3.1 to match, including *why* the order changed.
+- [x] **Step 1:** Decide the mechanism and record it in the ADR *before* writing code. §3.1's boot order is deliberate and documented, so changing it needs a reason on the record. The two candidates: acquire the DBus well-known name ourselves, before step 2, and keep the plugin only for argument forwarding; or keep the plugin and make steps 2–4 idempotent-and-harmless for a process that is about to exit. Prefer the first — it makes "am I the only instance?" answerable before anything touches disk, which is the actual invariant.
+- [x] **Step 2:** Nothing that mutates state runs before that answer. In particular `take_pending_reopen` must not clear `practice.poppedOut` in a process that will not open a window, `start_session` must not create a session directory or move `latest`, and the pid file must not be written.
+- [x] **Step 3:** A forwarded launch still focuses the running window — that behaviour is correct today and must survive.
+- [x] **Step 4:** `riff --help` typed while Riff is open must still print. This is the reason the CLI runs early in the first place; do not regress it while moving things around.
+- [x] **Step 5:** Update the boot sequence in `CLAUDE.md` §3.1 to match, including *why* the order changed.
 
 **Tests:** `a_second_launch_leaves_the_popped_out_set_alone`, `a_second_launch_does_not_move_the_latest_symlink`, `a_second_launch_does_not_overwrite_the_pid_of_the_running_instance`, and the existing CLI dispatch tests still green. The end-to-end proof is by hand — the appendix has the exact commands.
 
@@ -81,10 +81,10 @@ Two findings cannot be reached from any of them and are verified by hand, in the
 **Files:**
 - Modify: `src-tauri/src/settings/store.rs`, `src-tauri/src/settings/model.rs`, `src-tauri/src/bootstrap.rs`, `src/stores/settings.ts`, `src/locales/en/errors.json`
 
-- [ ] **Step 1:** Treat a failed `from_value` exactly as a failed `from_slice`: quarantine the file, fall back to defaults, and report `Recovered`. Invariant 1 covers both failures or it covers neither.
-- [ ] **Step 2:** Prefer salvage over surrender where it is cheap. A wrong type in `general` should not cost the user `appearance`. Section-level tolerance (each section falling back independently, as `lenient` already does per field) is the smaller, more honest fix than an all-or-nothing document. Decide and record which, in a comment on the line.
-- [ ] **Step 3:** `onboarding.completedAt` is not a preference and must survive a defaulted load wherever it is readable at all — being dropped back into the welcome wizard is the most visible symptom of this bug.
-- [ ] **Step 4:** The recovery toast already exists (`errors:settingsRecovered`) and fires from the bootstrap payload. Make sure this path reaches it.
+- [x] **Step 1:** Treat a failed `from_value` exactly as a failed `from_slice`: quarantine the file, fall back to defaults, and report `Recovered`. Invariant 1 covers both failures or it covers neither.
+- [x] **Step 2:** Prefer salvage over surrender where it is cheap. A wrong type in `general` should not cost the user `appearance`. Section-level tolerance (each section falling back independently, as `lenient` already does per field) is the smaller, more honest fix than an all-or-nothing document. Decide and record which, in a comment on the line.
+- [x] **Step 3:** `onboarding.completedAt` is not a preference and must survive a defaulted load wherever it is readable at all — being dropped back into the welcome wizard is the most visible symptom of this bug.
+- [x] **Step 4:** The recovery toast already exists (`errors:settingsRecovered`) and fires from the bootstrap payload. Make sure this path reaches it.
 
 **Tests:** `a_file_that_parses_but_does_not_deserialise_is_quarantined_like_one_that_does_not_parse`, `a_wrong_type_in_one_section_does_not_cost_the_others`, `a_defaulted_load_never_silently_replays_first_run`, `the_users_file_is_never_overwritten_before_it_has_been_kept`.
 
@@ -99,9 +99,9 @@ Two findings cannot be reached from any of them and are verified by hand, in the
 **Files:**
 - Modify: `src-tauri/src/paths.rs`, `CLAUDE.md`
 
-- [ ] **Step 1:** Make the override reach `state_dir` (and therefore `log_dir`). Decide whether that means deriving state from `RIFF_DATA_HOME` or adding `RIFF_STATE_HOME`; prefer the former — two variables already fully describe "somewhere else", and a third is a third thing to forget.
-- [ ] **Step 2:** `resolve` stays pure over `XdgRoots` and `PathOverrides`, so this is a unit test, not an env-var test.
-- [ ] **Step 3:** Correct the CLAUDE.md paragraph, which currently promises something the code does not do.
+- [x] **Step 1:** Make the override reach `state_dir` (and therefore `log_dir`). Decide whether that means deriving state from `RIFF_DATA_HOME` or adding `RIFF_STATE_HOME`; prefer the former — two variables already fully describe "somewhere else", and a third is a third thing to forget.
+- [x] **Step 2:** `resolve` stays pure over `XdgRoots` and `PathOverrides`, so this is a unit test, not an env-var test.
+- [x] **Step 3:** Correct the CLAUDE.md paragraph, which currently promises something the code does not do.
 
 **Tests:** `an_override_redirects_the_state_and_log_directories_too`, `a_scratch_run_cannot_prune_the_real_log_sessions`.
 
@@ -117,13 +117,13 @@ Two findings cannot be reached from any of them and are verified by hand, in the
 - Modify: `src/components/RouteError.tsx`, `index.html`, `src/app/router.tsx`, `vite.config.ts`, `src/locales/en/errors.json`
 - Create: `src/components/RouteError.test.tsx`
 
-- [ ] **Step 1:** Static fallback markup inside `#root` in `index.html`, saying Riff failed to start and where the logs are. `createRoot().render()` clears it, so a healthy launch never shows it — and the window is `visible: false` until `app_ready()`, so the only thing that can reveal it is the three-second watchdog. No script: `script-src 'self'` stays strict, and `style-src` already permits inline.
-- [ ] **Step 2:** The crash screen keeps window controls. Either the title bar renders outside the boundary, or `RouteError` draws its own minimise/close. A window that cannot be closed from inside itself is the wrong thing to hand someone whose application has just crashed.
-- [ ] **Step 3:** `RouteError` owns its own scroll container and does not depend on an ancestor's height. Verify at the two sizes that break it today: a pop-out at its 360×320 minimum, and 1.5× UI scale.
-- [ ] **Step 4:** Redact `home_dir` and the username from anything the Copy button puts on the clipboard. `bundle::redact` already does this in Rust; mirror the rule, do not re-invent it.
-- [ ] **Step 5:** A crash-loop escape. Count crashes in `sessionStorage`; a second crash within a short window offers **Start with default settings** instead of another Reload, and names `riff repair` for the case where even that will not do. One deterministic crash must not be a locked door.
-- [ ] **Step 6:** `defaultNotFoundComponent` on the router. TanStack's fallback is a bare untranslated `<p>Not Found</p>`, and in a pop-out there is no navigation to leave by.
-- [ ] **Step 7:** Add `src/components/**` to the coverage `include`. The component that catches every crash was outside the gate that measures the code.
+- [x] **Step 1:** Static fallback markup inside `#root` in `index.html`, saying Riff failed to start and where the logs are. `createRoot().render()` clears it, so a healthy launch never shows it — and the window is `visible: false` until `app_ready()`, so the only thing that can reveal it is the three-second watchdog. No script: `script-src 'self'` stays strict, and `style-src` already permits inline.
+- [x] **Step 2:** The crash screen keeps window controls. Either the title bar renders outside the boundary, or `RouteError` draws its own minimise/close. A window that cannot be closed from inside itself is the wrong thing to hand someone whose application has just crashed.
+- [x] **Step 3:** `RouteError` owns its own scroll container and does not depend on an ancestor's height. Verify at the two sizes that break it today: a pop-out at its 360×320 minimum, and 1.5× UI scale.
+- [x] **Step 4:** Redact `home_dir` and the username from anything the Copy button puts on the clipboard. `bundle::redact` already does this in Rust; mirror the rule, do not re-invent it.
+- [x] **Step 5:** A crash-loop escape. Count crashes in `sessionStorage`; a second crash within a short window offers **Start with default settings** instead of another Reload, and names `riff repair` for the case where even that will not do. One deterministic crash must not be a locked door.
+- [x] **Step 6:** `defaultNotFoundComponent` on the router. TanStack's fallback is a bare untranslated `<p>Not Found</p>`, and in a pop-out there is no navigation to leave by.
+- [x] **Step 7:** Add `src/components/**` to the coverage `include`. The component that catches every crash was outside the gate that measures the code.
 
 **Tests:** `a_crash_leaves_a_window_that_can_still_be_closed`, `the_reload_button_is_reachable_in_a_popout_sized_window`, `copied_error_details_carry_no_home_directory_and_no_username`, `a_second_crash_offers_defaults_rather_than_another_reload`, `an_unknown_route_gets_riffs_own_screen_not_the_routers`, plus the axe pass every other screen has.
 
@@ -138,11 +138,11 @@ Every IPC call in the frontend is `void ipc.x()` or a bare `async` handler with 
 **Files:**
 - Modify: `src/lib/ipc/index.ts`, `src/features/settings/sections/GeneralSection.tsx`, `src/features/settings/sections/AboutSection.tsx`, `src/features/settings/sections/AppearanceSection.tsx`, `src/features/practice/PracticeGrid.tsx`, `src/features/practice/PopoutPane.tsx`, `src/features/practice/usePoppedOut.ts`, `src/features/window/WindowControls.tsx`, `src/routes/__root.tsx`, `src/features/onboarding/OnboardingFlow.tsx`
 
-- [ ] **Step 1:** One helper, next to `isRiffError`, that turns a rejection into the right localised toast — `errors:code.*` keyed by `RiffError.code`, falling back to `code.unknown` for the string rejections Tauri produces for a panicking or missing command. The mapping already exists in `stores/settings.ts`; lift it rather than copy it.
-- [ ] **Step 2:** Apply it to every call site. A deliberate silence stays silent but says why in a comment — `appReady` and `logWrite` are the two that genuinely have nowhere to report to, and both already say so.
-- [ ] **Step 3:** `licensesGet` gets a loading and an error state. An empty list and a failed fetch currently render identically.
-- [ ] **Step 4:** `setTitleBar` handles a rejection as well as a `false` return. `errors:decorationsRefused` exists and is unreachable when the command errors rather than answering.
-- [ ] **Step 5:** Consider making the lint enforce it, so call site twenty-one does not reintroduce this. If Biome cannot express it cheaply, skip it and say so — a rule nobody can read is worse than the convention.
+- [x] **Step 1:** One helper, next to `isRiffError`, that turns a rejection into the right localised toast — `errors:code.*` keyed by `RiffError.code`, falling back to `code.unknown` for the string rejections Tauri produces for a panicking or missing command. The mapping already exists in `stores/settings.ts`; lift it rather than copy it.
+- [x] **Step 2:** Apply it to every call site. A deliberate silence stays silent but says why in a comment — `appReady` and `logWrite` are the two that genuinely have nowhere to report to, and both already say so.
+- [x] **Step 3:** `licensesGet` gets a loading and an error state. An empty list and a failed fetch currently render identically.
+- [x] **Step 4:** `setTitleBar` handles a rejection as well as a `false` return. `errors:decorationsRefused` exists and is unreachable when the command errors rather than answering.
+- [x] **Step 5:** Consider making the lint enforce it, so call site twenty-one does not reintroduce this. If Biome cannot express it cheaply, skip it and say so — a rule nobody can read is worse than the convention.
 
 **Tests:** `a_rejected_import_tells_the_user_and_changes_nothing`, `a_failed_export_says_so_rather_than_looking_like_success`, `a_folder_that_cannot_be_opened_reports_it`, `the_licence_list_distinguishes_empty_from_failed`.
 
@@ -157,10 +157,10 @@ Every IPC call in the frontend is `void ipc.x()` or a bare `async` handler with 
 **Files:**
 - Modify: `src-tauri/src/practice/mod.rs`
 
-- [ ] **Step 1:** Reconcile every pane, collect failures, and broadcast the set that actually exists. `sync_windows` is a reconciler; a reconciler that stops at the first problem is a reconciler that leaves the world half-corrected.
-- [ ] **Step 2:** A pane whose window could not be built comes out of the set, so the file and the compositor agree again.
-- [ ] **Step 3:** Report the failure — it reaches the frontend as a rejection, which Task 5 has by then given a voice.
-- [ ] **Step 4:** `let _ = window.close()` in the same loop deserves the same treatment: a window that refuses to close means the pane is both docked and open.
+- [x] **Step 1:** Reconcile every pane, collect failures, and broadcast the set that actually exists. `sync_windows` is a reconciler; a reconciler that stops at the first problem is a reconciler that leaves the world half-corrected.
+- [x] **Step 2:** A pane whose window could not be built comes out of the set, so the file and the compositor agree again.
+- [x] **Step 3:** Report the failure — it reaches the frontend as a rejection, which Task 5 has by then given a voice.
+- [x] **Step 4:** `let _ = window.close()` in the same loop deserves the same treatment: a window that refuses to close means the pane is both docked and open.
 
 **Tests:** `a_pane_whose_window_cannot_be_built_does_not_strand_the_other_two`, `the_set_and_the_windows_agree_after_a_failed_reconcile`.
 
@@ -175,10 +175,10 @@ Two states are correct in Rust and invisible in the interface. When quarantine i
 **Files:**
 - Modify: `src-tauri/src/lib.rs`, `src-tauri/src/bootstrap.rs`, `src-tauri/src/settings/watcher.rs`, `src/stores/settings.ts`, `src/locales/en/errors.json`
 
-- [ ] **Step 1:** The bootstrap payload distinguishes "recovered and kept your file", "recovered but could not keep your file, so writing is off", and "nothing happened". Three states, three messages; the second one names the file and says what to do about it.
-- [ ] **Step 2:** The watcher tells the difference between a half-written save and a finished invalid one. A short settle before deciding is enough, and the second case earns a toast naming the field — the settings file is a documented editing surface, so an edit that did nothing must say so.
-- [ ] **Step 3:** The watcher runs `migrate::run` like the load path does, so a hand edit that also lowers `version` is migrated rather than read raw.
-- [ ] **Step 4:** While here: surface `health::run_checks` somewhere in the interface. It is a good pure function reachable only from a terminal, and a GUI-first user whose config directory went read-only has no in-app way to learn why saving stopped working. About is the obvious home.
+- [x] **Step 1:** The bootstrap payload distinguishes "recovered and kept your file", "recovered but could not keep your file, so writing is off", and "nothing happened". Three states, three messages; the second one names the file and says what to do about it.
+- [x] **Step 2:** The watcher tells the difference between a half-written save and a finished invalid one. A short settle before deciding is enough, and the second case earns a toast naming the field — the settings file is a documented editing surface, so an edit that did nothing must say so.
+- [x] **Step 3:** The watcher runs `migrate::run` like the load path does, so a hand edit that also lowers `version` is migrated rather than read raw.
+- [x] **Step 4:** While here: surface `health::run_checks` somewhere in the interface. It is a good pure function reachable only from a terminal, and a GUI-first user whose config directory went read-only has no in-app way to learn why saving stopped working. About is the obvious home.
 
 **Tests:** `a_file_that_could_not_be_quarantined_tells_the_user_writing_is_off`, `an_invalid_hand_edit_is_reported_rather_than_ignored`, `a_half_written_save_is_still_ignored`.
 
@@ -193,8 +193,8 @@ Two states are correct in Rust and invisible in the interface. When quarantine i
 **Files:**
 - Modify: `src-tauri/src/lib.rs`, `src/routes/__root.tsx`, `src/stores/settings.ts`
 
-- [ ] **Step 1:** `settings://write-failed` goes to `main`, like `app://confirm-quit`. A pop-out is one pane and has no settings interface to explain the failure in. `settings://changed` stays a broadcast — every window must adopt it.
-- [ ] **Step 2:** The recovery toast is announced once per launch, not once per window. The reopen prompt beside it already gets this right (`offered` ref plus a `popoutPane` guard); match it.
+- [x] **Step 1:** `settings://write-failed` goes to `main`, like `app://confirm-quit`. A pop-out is one pane and has no settings interface to explain the failure in. `settings://changed` stays a broadcast — every window must adopt it.
+- [x] **Step 2:** The recovery toast is announced once per launch, not once per window. The reopen prompt beside it already gets this right (`offered` ref plus a `popoutPane` guard); match it.
 
 **Tests:** `a_failed_write_raises_one_toast_no_matter_how_many_windows_are_open`, `popping_out_a_pane_does_not_re_announce_a_recovery`.
 
@@ -204,19 +204,19 @@ Two states are correct in Rust and invisible in the interface. When quarantine i
 
 **Findings:** F16 and the two loose ends.
 
-- [ ] **Step 1:** `FlushScheduler::flush_now` is defined and never called — the exit path calls `store.flush_if_dirty()` directly. Delete it and `Message::FlushNow`, or call it. Clippy cannot see it because both are `pub`.
-- [ ] **Step 2:** `errors:description` is in the catalogue and read by nothing. Remove it.
-- [ ] **Step 3:** `binding.run()` (`useKeybindings.ts:16`) throws into the event loop, not into the boundary, so a broken shortcut fails silently. Wrap it, or record why not.
-- [ ] **Step 4:** Re-read `lib.rs` and `practice/mod.rs` for `let _ =` on anything now worth reporting, given Tasks 5–7 gave the frontend somewhere to put it.
+- [x] **Step 1:** `FlushScheduler::flush_now` is defined and never called — the exit path calls `store.flush_if_dirty()` directly. Delete it and `Message::FlushNow`, or call it. Clippy cannot see it because both are `pub`.
+- [x] **Step 2:** `errors:description` is in the catalogue and read by nothing. Remove it.
+- [x] **Step 3:** `binding.run()` (`useKeybindings.ts:16`) throws into the event loop, not into the boundary, so a broken shortcut fails silently. Wrap it, or record why not.
+- [x] **Step 4:** Re-read `lib.rs` and `practice/mod.rs` for `let _ =` on anything now worth reporting, given Tasks 5–7 gave the frontend somewhere to put it.
 
 ---
 
 ## Final verification
 
-- [ ] `pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build`
-- [ ] `cd src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test && cargo deny check`
-- [ ] Walk the two hand-verified reproductions in the appendix and confirm both are fixed.
-- [ ] `pnpm app`, then deliberately break things: rename `settings.json` to something unparseable, make the config directory read-only, and force a render throw. Each one should produce a screen you can read and leave.
+- [x] `pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build`
+- [x] `cd src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test && cargo deny check`
+- [x] Walk the two hand-verified reproductions in the appendix and confirm both are fixed.
+- [x] `pnpm app`, then deliberately break things: rename `settings.json` to something unparseable, make the config directory read-only, and force a render throw. Each one should produce a screen you can read and leave.
 
 ---
 
@@ -263,4 +263,59 @@ theme = "dark"   startupRoute = "practice"   onboarding = null
 
 ## What the plan did not predict
 
-_(Fill in as it is built, as plan 13 did. Each surprise that changed the shape of the result goes here rather than being lost.)_
+**Task 1 removed a dependency rather than adding a mechanism.** The plan offered two candidates and
+preferred "acquire the DBus name ourselves, keep the plugin for argument forwarding". Riff's
+single-instance callback ignores `argv` and `cwd` entirely — it unminimizes and focuses `main`, and
+nothing else — so there was no forwarding to keep. Worse, a process that exits at the gate never
+reaches `.build()`, which is where the plugin makes its DBus call, so keeping the plugin would have
+meant the running window never got focused. An abstract Unix socket does detection *and* the focus
+message in fifty lines, needs no crate, and leaves no stale lock after a `kill -9`. See ADR 0002.
+
+**The same bug had a second victim nobody had counted.** `riff doctor` typed while Riff is open was
+also a second process, so it also created a log session, took `latest`, and pruned. Moving
+`logging::start_session` below `cli::dispatch` — which the plan's Task 1 needed for other reasons —
+fixed that too.
+
+**Task 3's fix belonged to `cache_dir` as well.** The plan named `state_dir` and `log_dir`. The line
+above them had exactly the same shape and the same consequence, so a scratch run still wrote the
+real `~/.cache/riff`. Fixed in the same breath. Two variables, all five directories.
+
+**F3 made F1 harder to see, and it showed.** Walking the F1 reproduction *before* fixing F3 wrote
+into the real `~/.local/state/riff` even under `RIFF_DATA_HOME` — the appendix's `latest` and
+`riff.pid` observations were only reproducible there. The two findings were a pair.
+
+**Biome could not enforce Task 5, and the reason is the opposite of the obvious one.**
+`noFloatingPromises` is nursery and needs type information, but the disqualifying part is that it is
+a rule about *unhandled* promises: `void x()` is the marker that tells it "I meant this", which is
+the exact pattern the audit found twenty times. A test that reads the source catches it instead,
+following `no_template_code.rs`. It has to parse whole statements rather than lines — the reopen
+prompt puts its `.catch` nine lines and two nested statements after the `void`.
+
+**Giving every call a voice broke five test fixtures, usefully.** `fire()` calls `.catch` on what a
+command returns, so every `vi.fn()` standing in for a command had to start resolving like one. A
+stub that returns `undefined` was never a stand-in for an IPC call; it just never mattered before.
+
+**StrictMode counted the first crash twice.** `useState(() => recordCrash())` runs its initialiser
+twice under StrictMode, so the crash-loop escape hatch appeared on the *first* crash and took away
+Reload. The jsdom tests never see StrictMode and stayed green; the real window caught it in about
+four seconds. A layout effect behind a ref fixes it, and one test now renders inside `<StrictMode>`.
+This is the second time in this plan that the real engine saw something the suite could not — the
+first was the pop-out crash screen at 360×320.
+
+**Section-level salvage costs a whole section, and that is the honest limit.** Task 2 Step 2 asked
+for the smaller fix over an all-or-nothing document, which it is. But a wrong type in `general`
+still loses `startupRoute` alongside `confirmOnQuit`. That is why a salvaged load quarantines the
+file and reports `Recovered` rather than passing as a clean load: the section is recoverable from
+the file that was kept, and the user is told where it is.
+
+**Two guarantees needed a source-reading test rather than a unit test.** `emit` versus `emit_to`
+needs a running application with three real windows, and `void ipc.x()` needs the whole frontend.
+Both are in `tests/` reading text — `event_targets.rs` and `no-silent-calls.test.ts`. The former
+also asserts the two events that must *stay* broadcasts, which is the half of that rule that is easy
+to overcorrect.
+
+**Verifying the crash screen at 360×320 needed the compositor, and Hyprland had moved on.** The
+appendix's `hyprctl dispatch focuswindow address:…` no longer parses on a current build: dispatchers
+are Lua now (`hl.dsp.window.resize({x=360, y=320, window="address:0x…"})`). Recorded here so the
+next person does not re-derive it. Focus moves through the crash screen by Tab, and a focused button
+scrolls itself into view — which is what proves the scroll container works without a layout harness.
