@@ -24,8 +24,8 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; media-src 'none'; connect-src ipc: http://ipc.localhost; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'",
-      "devCsp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:; connect-src ipc: http://ipc.localhost ws://localhost:1421 http://localhost:1420",
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; media-src 'none'; connect-src ipc: http://ipc.localhost; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'",
+      "devCsp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src ipc: http://ipc.localhost ws://localhost:1421 http://localhost:1420",
       "freezePrototype": true
     }
   },
@@ -49,7 +49,7 @@
     ],
     "linux": {
       "deb": {
-        "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0"],
+        "depends": ["libwebkit2gtk-4.1-0 (>= 2.36)", "libgtk-3-0"],
         "desktopTemplate": "riff.desktop",
         "files": {
           "/usr/share/man/man1/riff.1": "dist-extra/riff.1",
@@ -60,7 +60,7 @@
         }
       },
       "rpm": {
-        "depends": ["webkit2gtk4.1", "gtk3"],
+        "depends": ["webkit2gtk4.1 >= 2.36", "gtk3"],
         "desktopTemplate": "riff.desktop",
         "files": {
           "/usr/share/man/man1/riff.1": "dist-extra/riff.1",
