@@ -92,7 +92,7 @@ pub fn popped_out(store: &SettingsStore) -> Vec<Pane> {
 /// the same 250 ms scheduler as everything else and flushed on exit.
 fn record(
     store: &SettingsStore,
-    scheduler: &FlushScheduler,
+    scheduler: &FlushScheduler<SettingsStore>,
     panes: Vec<Pane>,
 ) -> RiffResult<Vec<Pane>> {
     let next = store.patch(&serde_json::json!({ "practice": { "poppedOut": panes } }))?;
@@ -122,7 +122,7 @@ pub fn take_pending_reopen(store: &SettingsStore) -> Vec<Pane> {
 /// two panes in either sequence produces one identical file rather than two.
 pub fn record_popped_out(
     store: &SettingsStore,
-    scheduler: &FlushScheduler,
+    scheduler: &FlushScheduler<SettingsStore>,
     pane: Pane,
 ) -> RiffResult<Vec<Pane>> {
     let current = popped_out(store);
@@ -138,7 +138,7 @@ pub fn record_popped_out(
 
 pub fn record_docked_back(
     store: &SettingsStore,
-    scheduler: &FlushScheduler,
+    scheduler: &FlushScheduler<SettingsStore>,
     pane: Pane,
 ) -> RiffResult<Vec<Pane>> {
     let current = popped_out(store);
@@ -196,8 +196,8 @@ fn store_of(app: &AppHandle) -> std::sync::Arc<SettingsStore> {
     std::sync::Arc::clone(&app.state::<std::sync::Arc<SettingsStore>>())
 }
 
-fn scheduler_of(app: &AppHandle) -> std::sync::Arc<FlushScheduler> {
-    std::sync::Arc::clone(&app.state::<std::sync::Arc<FlushScheduler>>())
+fn scheduler_of(app: &AppHandle) -> std::sync::Arc<FlushScheduler<SettingsStore>> {
+    std::sync::Arc::clone(&app.state::<std::sync::Arc<FlushScheduler<SettingsStore>>>())
 }
 
 /// Makes the windows match the set, in both directions.
@@ -383,7 +383,11 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
 
-    fn fixture() -> (Arc<SettingsStore>, Arc<FlushScheduler>, tempfile::TempDir) {
+    fn fixture() -> (
+        Arc<SettingsStore>,
+        Arc<FlushScheduler<SettingsStore>>,
+        tempfile::TempDir,
+    ) {
         let tmp = tempfile::tempdir().expect("tempdir");
         let paths = crate::paths::resolve(
             &crate::paths::XdgRoots::default(),

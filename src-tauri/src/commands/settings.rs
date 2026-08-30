@@ -29,7 +29,7 @@ pub fn settings_get(store: tauri::State<'_, Arc<SettingsStore>>) -> Settings {
 pub fn settings_patch(
     patch: Value,
     store: tauri::State<'_, Arc<SettingsStore>>,
-    scheduler: tauri::State<'_, Arc<FlushScheduler>>,
+    scheduler: tauri::State<'_, Arc<FlushScheduler<SettingsStore>>>,
 ) -> RiffResult<Settings> {
     let next = store.patch(&patch)?;
     schedule_write(&scheduler);
@@ -41,7 +41,7 @@ pub fn settings_reset(
     section: Option<Section>,
     app: tauri::AppHandle,
     store: tauri::State<'_, Arc<SettingsStore>>,
-    scheduler: tauri::State<'_, Arc<FlushScheduler>>,
+    scheduler: tauri::State<'_, Arc<FlushScheduler<SettingsStore>>>,
 ) -> RiffResult<Settings> {
     let next = store.reset(section)?;
     schedule_write(&scheduler);
@@ -58,7 +58,7 @@ pub fn settings_reset(
 /// would defeat the coalescing in Plan 03 Task 8 entirely — a UI-scale drag
 /// is forty patches, and forty `fsync`ed atomic writes is not what §4.4
 /// describes. The scheduler reports its own failures, once per cause.
-fn schedule_write(scheduler: &FlushScheduler) {
+fn schedule_write(scheduler: &FlushScheduler<SettingsStore>) {
     scheduler.notify();
 }
 

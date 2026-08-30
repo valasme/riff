@@ -9,6 +9,7 @@ pub mod paths;
 pub mod practice;
 pub mod settings;
 pub mod storage;
+pub mod workspace;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -83,6 +84,8 @@ pub struct Boot {
     pub store: Arc<SettingsStore>,
     pub outcome: LoadOutcome,
     pub pending_reopen: Vec<Pane>,
+    pub workspace: Arc<workspace::WorkspaceStore>,
+    pub pending_score: Option<workspace::Score>,
 }
 
 /// Steps 2 to 4 of §3.1, behind the one question that decides whether any of
@@ -141,12 +144,25 @@ pub fn start(paths: &crate::paths::AppPaths) -> Result<Boot, instance::AlreadyRu
         tracing::warn!(%err, "could not write settings.schema.json");
     }
 
+    // 3c. The workspace, on the same "read once, clear immediately" shape as
+    // the popped-out set above. `workspace.json` is derived state with no
+    // watcher and no quarantine — see ADR 0004 — so there is no outcome to
+    // match on here the way settings has one.
+    let workspace = workspace::WorkspaceStore::load(paths.clone());
+    let pending_score = workspace::take_pending_reopen(&workspace);
+    if let Err(err) = workspace.flush_if_dirty() {
+        tracing::error!(%err, "could not write the initial workspace");
+    }
+    let workspace = Arc::new(workspace);
+
     Ok(Boot {
         instance,
         session,
         store,
         outcome,
         pending_reopen,
+        workspace,
+        pending_score,
     })
 }
 
@@ -199,6 +215,8 @@ pub fn run() {
         store,
         outcome,
         pending_reopen,
+        workspace,
+        pending_score,
     } = started;
     tracing::info!(
         phase = "paths",
@@ -276,9 +294,23 @@ pub fn run() {
         },
     ));
 
+    // No `emit_to` on failure the way settings has one: losing "which page
+    // you were on" is a much smaller thing to lose than a preference, and
+    // there is no settings panel for workspace state to explain itself in.
+    // The log line is what a bug report needs; a toast for this would be
+    // noise for a value nobody remembers choosing.
+    let workspace_scheduler = Arc::new(settings::store::FlushScheduler::spawn(
+        Arc::clone(&workspace),
+        Duration::from_millis(250),
+        |err| tracing::error!(%err, "workspace could not be written"),
+    ));
+
     builder
         .manage(Arc::clone(&store))
         .manage(Arc::clone(&scheduler))
+        .manage(Arc::clone(&workspace))
+        .manage(Arc::clone(&workspace_scheduler))
+        .manage(workspace::PendingReopen(pending_score))
         .manage(QuitApproved(std::sync::atomic::AtomicBool::new(false)))
         .manage(practice::ShuttingDown(std::sync::atomic::AtomicBool::new(
             false,
@@ -416,6 +448,9 @@ pub fn run() {
                 // is waiting 250 ms too long.
                 if let Err(err) = store.flush_if_dirty() {
                     tracing::error!(%err, "settings could not be saved on exit");
+                }
+                if let Err(err) = workspace.flush_if_dirty() {
+                    tracing::error!(%err, "workspace could not be saved on exit");
                 }
                 if let Err(err) = std::fs::remove_file(cli::pid_file(store.paths())) {
                     // A pid file left behind makes `riff repair` warn about a

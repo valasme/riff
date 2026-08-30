@@ -12,6 +12,9 @@
     "validation": "That value is not allowed.",
     "not-found": "Riff could not find what it needed.",
     "denied": "Your system refused that action.",
+    "score-missing": "This score could not be found. It may have been moved or deleted.",
+    "score-encrypted": "This score is password-protected. Riff cannot open a password-protected file.",
+    "score-unreadable": "This score could not be read. It may not be a PDF, or the file may be damaged.",
     "unknown": "An unexpected error occurred."
   },
   "settingsRecovered": "Your settings file could not be read. Riff started from defaults and kept the original at {{path}}.",

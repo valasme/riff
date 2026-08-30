@@ -272,6 +272,20 @@ fn stamp() -> String {
         .replace(':', "-")
 }
 
+/// Implemented by any store `FlushScheduler` coalesces writes for.
+/// `workspace::WorkspaceStore` is the second implementation — see plan 15
+/// Task 3 — and shares this rather than reimplementing debouncing, which is
+/// the part that used to be wrong.
+pub trait Flushable: Send + Sync + 'static {
+    fn flush_if_dirty(&self) -> RiffResult<()>;
+}
+
+impl Flushable for SettingsStore {
+    fn flush_if_dirty(&self) -> RiffResult<()> {
+        SettingsStore::flush_if_dirty(self)
+    }
+}
+
 /// Coalesces writes. Every mutation calls `notify()`; the worker waits for a
 /// quiet period before flushing, so a slider drag is one `fsync` rather than
 /// forty.
@@ -279,22 +293,25 @@ fn stamp() -> String {
 /// The scheduling lives here rather than in the command layer because the
 /// command layer would have to reimplement it per command, and because a
 /// write failure has to be reported from wherever the write actually happens.
-pub struct FlushScheduler {
+///
+/// Generic over `T: Flushable` rather than fixed to `SettingsStore`, so
+/// `FlushScheduler<SettingsStore>` and `FlushScheduler<WorkspaceStore>` are
+/// two distinct types — which is what lets Tauri `.manage()` one of each: a
+/// non-generic `FlushScheduler` would let a second `.manage()` call silently
+/// replace the first, since Tauri's state map holds one value per type.
+pub struct FlushScheduler<T> {
     tx: std::sync::mpsc::Sender<()>,
+    _store: std::marker::PhantomData<T>,
 }
 
-impl FlushScheduler {
-    pub fn spawn<F>(
-        store: std::sync::Arc<SettingsStore>,
-        delay: std::time::Duration,
-        on_error: F,
-    ) -> Self
+impl<T: Flushable> FlushScheduler<T> {
+    pub fn spawn<F>(store: std::sync::Arc<T>, delay: std::time::Duration, on_error: F) -> Self
     where
         F: Fn(RiffError) + Send + 'static,
     {
         let (tx, rx) = std::sync::mpsc::channel::<()>();
         std::thread::Builder::new()
-            .name("riff-settings-flush".into())
+            .name("riff-flush".into())
             .spawn(move || {
                 // One error per failure *cause*, not one per attempt: a
                 // read-only config directory would otherwise raise a toast on
@@ -317,7 +334,10 @@ impl FlushScheduler {
                 }
             })
             .ok();
-        Self { tx }
+        Self {
+            tx,
+            _store: std::marker::PhantomData,
+        }
     }
 
     pub fn notify(&self) {

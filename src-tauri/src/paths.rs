@@ -83,6 +83,13 @@ impl AppPaths {
     pub fn history_file(&self) -> PathBuf {
         self.data_dir.join("history.jsonl")
     }
+    /// Not `session.json` — see `CONTEXT.md`'s "Workspace" entry. Riff
+    /// already has log sessions and, once History exists, practice sessions;
+    /// a third meaning for the same word was the naming collision plan 15's
+    /// domain-modelling found before writing a single line of it.
+    pub fn workspace_file(&self) -> PathBuf {
+        self.data_dir.join("workspace.json")
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -199,6 +206,10 @@ mod tests {
         assert_eq!(
             p.history_file(),
             PathBuf::from("/home/u/.local/share/riff/history.jsonl")
+        );
+        assert_eq!(
+            p.workspace_file(),
+            PathBuf::from("/home/u/.local/share/riff/workspace.json")
         );
     }
 
