@@ -9,7 +9,7 @@ Riff is **single-context**: one `CONTEXT.md` at the repo root, one `docs/adr/`.
 - **`CONTEXT.md`** at the repo root
 - **`docs/adr/`**: read the ADRs that touch the area you're about to work in
 
-If either doesn't exist, **proceed silently**. Don't flag its absence; don't suggest creating it upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved. Riff has `docs/adr/` and no `CONTEXT.md` yet; that is the expected state, not a gap to fill on sight.
+If either doesn't exist, **proceed silently**. Don't flag its absence; don't suggest creating it upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved. Riff now has both, written during the score-viewer design on 2026-08-30.
 
 `CLAUDE.md` is not one of these. It is the repo map every agent already reads, and it points at `docs/superpowers/specs/` for the design of record. Domain docs sit alongside it; they do not replace it.
 

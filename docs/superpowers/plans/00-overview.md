@@ -48,6 +48,7 @@ carry their own specs.
 |---|---|---|---|---|
 | 13 | `13-pane-popout.md` | `specs/2026-08-29-pane-popout-design.md` | A practice pane can leave the grid for its own window and come back, on multi-monitor setups | 10 |
 | 14 | `14-error-handling-hardening.md` | — (audit of 2026-08-29) | No failure is silent and none destroys data: boot order, the settings file that parses but does not deserialise, the crash screen, and the ~20 unhandled IPC rejections | 13 |
+| 15 | `15-score-viewer.md` | `specs/2026-08-30-score-viewer-design.md` | The Score pane opens and reads a PDF: continuous scroll, fit, zoom, rotate, spread, search, dim, auto-scroll and pin, surviving a pop-out and a relaunch | 13, 14 |
 
 13 comes before §15's media rather than after it deliberately. Pop-out is a *window* feature —
 creation, capability, lifecycle, cross-window state — and none of it needs a decoded frame. Built
@@ -60,3 +61,9 @@ comes before §15's media for the same reason 13 did — a media player is the f
 that can fail for reasons outside the process (a codec, a corrupt file, a disc that went away
 mid-seek), and it should land on error handling that already works rather than be the thing that
 proves it does not.
+
+15 is the first of §15's media, and takes the score rather than the video because a PDF is the
+only one of the three that needs no codec: nothing about it depends on which GStreamer plugins the
+user happens to have, so it exercises the pane-as-player seam without also being a compatibility
+matrix. It narrows §15 rather than following it — the asset protocol §15 records is right for a
+four-gigabyte video and wrong for a twenty-megabyte score, which is `docs/adr/0003`.

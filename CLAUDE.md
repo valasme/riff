@@ -16,6 +16,8 @@ The foundation — onboarding, theming, navigation, keyboard palette, settings, 
 
 **Practice and History are still visual placeholders**: PDF, video and audio playback do not exist yet. §15 records that design so it drops in without a rewrite — the window seam was built first so those players arrive in panes that already know how to travel.
 
+Plan 15 — the **score viewer** — is designed and not yet built: `docs/superpowers/specs/2026-08-30-score-viewer-design.md`, `docs/superpowers/plans/15-score-viewer.md`, and ADRs 0003–0005. It narrows §15 rather than following it, so read the ADRs before assuming the asset protocol.
+
 ## Commands
 
 ```bash
@@ -165,4 +167,4 @@ The five canonical roles, each label string equal to its name. See `docs/agents/
 
 ### Domain docs
 
-Single-context — one root `CONTEXT.md` (not yet written) plus `docs/adr/`. See `docs/agents/domain.md`.
+Single-context — one root `CONTEXT.md` plus `docs/adr/`. See `docs/agents/domain.md`. `CONTEXT.md` is the glossary: use its words and not their synonyms.
