@@ -41,7 +41,12 @@ pub fn spawn_reveal_watchdog(handle: tauri::AppHandle, label: String) {
                     label,
                     "frontend never signalled readiness; revealing anyway"
                 );
-                let _ = window.show();
+                // The last line of defence against an invisible application.
+                // If even this fails there is no window to report it in, so
+                // the log is the whole of it.
+                if let Err(err) = window.show() {
+                    tracing::error!(%err, label, "could not reveal the window");
+                }
             }
         }
     });
@@ -127,7 +132,11 @@ pub fn start(paths: &crate::paths::AppPaths) -> Result<Boot, instance::AlreadyRu
     }
     // Lets `riff repair`, run from another terminal, warn that it may race
     // with a session that is already live rather than fixing things blind.
-    let _ = std::fs::write(cli::pid_file(paths), std::process::id().to_string());
+    if let Err(err) = std::fs::write(cli::pid_file(paths), std::process::id().to_string()) {
+        // Not fatal, but `riff repair` silently stops warning that it may be
+        // racing a live session — which is exactly when it matters.
+        tracing::warn!(%err, "could not write riff.pid");
+    }
     if let Err(err) = settings::schema::write(paths) {
         tracing::warn!(%err, "could not write settings.schema.json");
     }
@@ -299,14 +308,28 @@ pub fn run() {
                         .0
                         .load(std::sync::atomic::Ordering::SeqCst)
                 {
-                    api.prevent_close();
                     use tauri::Emitter;
                     // `emit_to`, not `emit`. `emit` broadcasts to every
                     // webview, so with pop-outs open one quit would raise
                     // three modals — and two of them in windows that cannot
                     // quit anything.
-                    let _ = window.emit_to(window.label(), "app://confirm-quit", ());
-                    return;
+                    //
+                    // Asked *before* the close is prevented, and only
+                    // prevented if the question got through. Preventing it
+                    // regardless left a window that could not be closed at
+                    // all whenever the emit failed: no dialog to answer, and
+                    // the × doing nothing forever.
+                    match window.emit_to(window.label(), "app://confirm-quit", ()) {
+                        Ok(()) => {
+                            api.prevent_close();
+                            return;
+                        }
+                        Err(err) => tracing::error!(
+                            %err,
+                            "could not ask for quit confirmation; quitting rather than \
+                             leaving a window that cannot be closed"
+                        ),
+                    }
                 }
 
                 // Main is going, so Riff is going. Left alone the pop-outs
@@ -324,7 +347,10 @@ pub fn run() {
                     Arc::clone(&store),
                     move |settings| {
                         use tauri::Emitter;
-                        let _ = handle.emit("settings://changed", settings);
+                        if let Err(err) = handle.emit("settings://changed", settings) {
+                            tracing::error!(%err, "could not announce a settings change; the \
+                                                   interface will show stale values");
+                        }
                         // A hand edit is as good a way to move a pane as the
                         // button is. Without this, editing `practice.poppedOut`
                         // in a text editor changes the file and nothing else,
@@ -359,7 +385,12 @@ pub fn run() {
                     instance.serve(move || {
                         if let Some(window) = handle.get_webview_window(practice::MAIN) {
                             let _ = window.unminimize();
-                            let _ = window.set_focus();
+                            if let Err(err) = window.set_focus() {
+                                // The second launch has already exited. All
+                                // the user sees is that nothing happened.
+                                tracing::warn!(%err, "could not raise the window for a \
+                                                      second launch");
+                            }
                         }
                     });
                 }
@@ -386,7 +417,11 @@ pub fn run() {
                 if let Err(err) = store.flush_if_dirty() {
                     tracing::error!(%err, "settings could not be saved on exit");
                 }
-                let _ = std::fs::remove_file(cli::pid_file(store.paths()));
+                if let Err(err) = std::fs::remove_file(cli::pid_file(store.paths())) {
+                    // A pid file left behind makes `riff repair` warn about a
+                    // process that is already gone.
+                    tracing::warn!(%err, "could not remove riff.pid");
+                }
                 // The last line of a healthy session. If it is absent, the
                 // run crashed — which makes triage a single `tail -1`.
                 tracing::info!("shutdown complete");

@@ -296,8 +296,12 @@ pub fn pop_out(app: &AppHandle, pane: Pane) -> RiffResult<Vec<Pane>> {
     record_popped_out(&store_of(app), &scheduler_of(app), pane)?;
     let panes = sync_windows(app)?;
     // Already out and merely asked for again: the palette command and the
-    // pane button both mean "put this pane in front of me".
-    let _ = focus(app, pane);
+    // pane button both mean "put this pane in front of me". Not fatal — the
+    // pane *is* out — but pressing "pop out" and seeing nothing come forward
+    // is worth a line in the log.
+    if let Err(err) = focus(app, pane) {
+        tracing::warn!(%err, pane = pane.slug(), "could not raise the pane window");
+    }
     Ok(panes)
 }
 
@@ -363,7 +367,11 @@ pub fn close_every_popout(app: &AppHandle) {
     app.state::<ShuttingDown>().0.store(true, Ordering::SeqCst);
     for pane in Pane::ALL {
         if let Some(window) = app.get_webview_window(&pane.window_label()) {
-            let _ = window.close();
+            // A pop-out that refuses to close keeps the process alive after
+            // main has gone — a Riff with no window and no way to quit it.
+            if let Err(err) = window.close() {
+                tracing::error!(%err, pane = pane.slug(), "could not close a pop-out on shutdown");
+            }
         }
     }
 }

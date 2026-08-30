@@ -280,12 +280,7 @@ fn stamp() -> String {
 /// command layer would have to reimplement it per command, and because a
 /// write failure has to be reported from wherever the write actually happens.
 pub struct FlushScheduler {
-    tx: std::sync::mpsc::Sender<Message>,
-}
-
-enum Message {
-    Changed,
-    FlushNow,
+    tx: std::sync::mpsc::Sender<()>,
 }
 
 impl FlushScheduler {
@@ -297,7 +292,7 @@ impl FlushScheduler {
     where
         F: Fn(RiffError) + Send + 'static,
     {
-        let (tx, rx) = std::sync::mpsc::channel::<Message>();
+        let (tx, rx) = std::sync::mpsc::channel::<()>();
         std::thread::Builder::new()
             .name("riff-settings-flush".into())
             .spawn(move || {
@@ -305,12 +300,10 @@ impl FlushScheduler {
                 // read-only config directory would otherwise raise a toast on
                 // every keystroke.
                 let mut reported: Option<String> = None;
-                while let Ok(first) = rx.recv() {
-                    if matches!(first, Message::Changed) {
-                        // Drain the burst: keep resetting the timer while
-                        // changes keep arriving.
-                        while rx.recv_timeout(delay).is_ok() {}
-                    }
+                while rx.recv().is_ok() {
+                    // Drain the burst: keep resetting the timer while changes
+                    // keep arriving.
+                    while rx.recv_timeout(delay).is_ok() {}
                     match store.flush_if_dirty() {
                         Ok(()) => reported = None,
                         Err(err) => {
@@ -328,13 +321,7 @@ impl FlushScheduler {
     }
 
     pub fn notify(&self) {
-        let _ = self.tx.send(Message::Changed);
-    }
-
-    /// Skips the quiet period. Used on exit, where waiting 250 ms to save is
-    /// waiting 250 ms too long.
-    pub fn flush_now(&self) {
-        let _ = self.tx.send(Message::FlushNow);
+        let _ = self.tx.send(());
     }
 }
 
