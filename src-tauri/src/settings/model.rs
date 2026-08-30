@@ -28,6 +28,79 @@ where
     }
 }
 
+/// Reads a settings document, tolerating a section it cannot understand
+/// rather than losing every preference to it. Returns the sections that had to
+/// fall back to defaults; an empty list means the document was read whole.
+///
+/// **Section-level, not field-level and not all-or-nothing.** `lenient` above
+/// already rescues a single unrecognised enum value, but it cannot help with a
+/// wrong *type* — `"confirmOnQuit": "true"` fails `General` itself, which
+/// failed `Settings`, which used to silently revert every setting the user had
+/// ever chosen. Falling back per section is the smaller fix: a mistyped
+/// `general` costs `general`, not `appearance`. It still costs the whole
+/// section, which is exactly why the caller quarantines the file and tells the
+/// user rather than treating this as a clean load.
+pub fn read(document: serde_json::Value) -> (Settings, Vec<&'static str>) {
+    // Read out first, because everything below may replace it with a default
+    // and the document is consumed on the way. `completedAt` is not a
+    // preference: losing it drops the user back into the welcome wizard, which
+    // is the most visible symptom a defaulted load has.
+    let completed_at = document
+        .pointer("/onboarding/completedAt")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_owned);
+
+    let mut document = document;
+    let mut defaulted: Vec<&'static str> = Vec::new();
+    if let Some(object) = document.as_object_mut() {
+        for (name, readable) in SECTIONS {
+            let Some(value) = object.get(name) else {
+                continue;
+            };
+            if readable(value) {
+                continue;
+            }
+            tracing::warn!(
+                section = name,
+                "settings section is unreadable; using its defaults"
+            );
+            defaulted.push(name);
+            // Removed rather than replaced: every field carries
+            // `#[serde(default)]`, so the hole fills itself.
+            object.remove(name);
+        }
+    }
+
+    let mut settings = match serde_json::from_value::<Settings>(document) {
+        Ok(settings) => settings,
+        Err(err) => {
+            // Not a section — the document is not an object at all, or a root
+            // scalar like `version` has the wrong type.
+            tracing::warn!(%err, "the settings document itself is unreadable; using defaults");
+            defaulted.push("the document");
+            Settings::default()
+        }
+    };
+    if settings.onboarding.completed_at.is_none() {
+        settings.onboarding.completed_at = completed_at;
+    }
+    (settings, defaulted)
+}
+
+fn readable<T: serde::de::DeserializeOwned>(value: &serde_json::Value) -> bool {
+    serde_json::from_value::<T>(value.clone()).is_ok()
+}
+
+/// Whether a section's own type can read this value.
+type Readable = fn(&serde_json::Value) -> bool;
+
+const SECTIONS: [(&str, Readable); 4] = [
+    ("general", readable::<General>),
+    ("appearance", readable::<Appearance>),
+    ("onboarding", readable::<Onboarding>),
+    ("practice", readable::<Practice>),
+];
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Settings {

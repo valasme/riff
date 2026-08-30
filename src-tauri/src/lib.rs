@@ -411,6 +411,7 @@ mod tests {
         // launch that reaches `take_pending_reopen` clears the set and
         // flushes it — and the live instance's watcher obeys the write, so
         // both windows close. The second process never even got a window.
+        let _lock = logging::session_lock();
         let (paths, _tmp) = scratch();
         let live = start(&paths).expect("the first launch boots");
         live.store
@@ -428,6 +429,7 @@ mod tests {
 
     #[test]
     fn a_second_launch_does_not_move_the_latest_symlink() {
+        let _lock = logging::session_lock();
         let (paths, _tmp) = scratch();
         let live = start(&paths).expect("the first launch boots");
         let latest = paths.log_dir.join("latest");
@@ -444,6 +446,7 @@ mod tests {
 
     #[test]
     fn a_second_launch_does_not_overwrite_the_pid_of_the_running_instance() {
+        let _lock = logging::session_lock();
         let (paths, _tmp) = scratch();
         let _live = start(&paths).expect("the first launch boots");
         let pid_file = cli::pid_file(&paths);
@@ -466,6 +469,7 @@ mod tests {
 
     #[test]
     fn a_second_launch_does_not_spend_one_of_the_ten_retained_log_sessions() {
+        let _lock = logging::session_lock();
         let (paths, _tmp) = scratch();
         let _live = start(&paths).expect("the first launch boots");
         let sessions = || {

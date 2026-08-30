@@ -118,7 +118,7 @@ Colour tokens are declared on `:root, [data-theme]` rather than `:root` alone, s
 
 Settings (§4, plan 03):
 
-1. A file Riff failed to parse is never overwritten — it is renamed aside and kept. If quarantine itself fails, writing is blocked entirely.
+1. A file Riff failed to **understand** is never overwritten — it is renamed aside and kept. Parsing and deserialising are two different failures and both count: one wrong *type* (`"confirmOnQuit": "true"`) is enough. If quarantine itself fails, writing is blocked entirely.
 2. A failed write never discards in-memory state and never crashes.
 3. Loading settings cannot fail. The worst outcome is defaults plus a warning.
 4. Keys Riff does not recognise survive a read-modify-write cycle — on every section, not only the root.

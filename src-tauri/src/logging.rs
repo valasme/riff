@@ -130,6 +130,25 @@ pub fn prune_sessions(log_dir: &Path, keep: usize) {
     }
 }
 
+/// The subscriber `start_session` installs is process-global, and cargo runs
+/// tests on parallel threads. A second call reloads the writer layer, so an
+/// event emitted by the first test after that point lands in the second test's
+/// file and the first one reads back an empty log — which failed roughly three
+/// runs in a hundred, and forty in a hundred once the window between starting a
+/// session and logging was widened. Every test that starts a session takes this
+/// first, including `lib.rs`'s boot-order tests.
+#[cfg(test)]
+static SESSION_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[cfg(test)]
+pub(crate) fn session_lock() -> std::sync::MutexGuard<'static, ()> {
+    // A panic inside one of these tests must surface as that test's own
+    // assertion, not as a poisoning error in whichever runs next.
+    SESSION_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 pub fn write_panic_file(session_dir: &Path, body: &str) {
     let _ = std::fs::write(session_dir.join("panic.txt"), body);
 }
@@ -169,22 +188,7 @@ pub fn install_panic_hook(session_dir: &Path) {
 mod tests {
     use super::*;
 
-    /// The subscriber `start_session` installs is process-global, and cargo
-    /// runs these tests on parallel threads. A second call reloads the writer
-    /// layer, so an event emitted by the first test after that point lands in
-    /// the second test's file and the first one reads back an empty log —
-    /// which failed roughly three runs in a hundred, and forty in a hundred
-    /// once the window between starting a session and logging was widened.
-    /// Every test that starts a session takes this first.
-    static SESSION_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
-    fn session_lock() -> std::sync::MutexGuard<'static, ()> {
-        // A panic inside one of these tests must surface as that test's own
-        // assertion, not as a poisoning error in whichever runs next.
-        SESSION_LOCK
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-    }
+    use super::session_lock;
 
     fn paths(tmp: &std::path::Path) -> crate::paths::AppPaths {
         let p = crate::paths::resolve(

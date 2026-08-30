@@ -33,8 +33,8 @@ pub enum LoadOutcome {
     Migrated {
         from: u32,
     },
-    /// The file could not be parsed and was renamed aside.
-    /// The file could not be parsed. `Some` means it was renamed aside and
+    /// The file could not be read — either it is not JSON, or it is JSON that
+    /// the model cannot understand. `Some` means it was renamed aside and
     /// defaults may be written; `None` means it could not be moved, so Riff
     /// must leave the user's file alone.
     Recovered {
@@ -83,14 +83,28 @@ impl SettingsStore {
                         );
                     }
                     let migrated_from = migrate::run(&mut document);
-                    let settings =
-                        serde_json::from_value::<Settings>(document).unwrap_or_else(|err| {
-                            tracing::warn!(%err, "settings did not deserialise; using defaults");
-                            Settings::default()
-                        });
-                    match migrated_from {
-                        Some(from) => (settings, LoadOutcome::Migrated { from }),
-                        None => (settings, LoadOutcome::Loaded),
+                    let (settings, defaulted) = model::read(document);
+                    if defaulted.is_empty() {
+                        match migrated_from {
+                            Some(from) => (settings, LoadOutcome::Migrated { from }),
+                            None => (settings, LoadOutcome::Loaded),
+                        }
+                    } else {
+                        // Parsing and deserialising are two different failures
+                        // and only one of them used to be protected. A file
+                        // Riff cannot *understand* gets the same treatment as
+                        // one it cannot parse: kept, reported, never
+                        // overwritten in place. Without this, one wrong type
+                        // reverted every setting, wiped `onboarding` — so
+                        // first run returned — and let the next ordinary
+                        // change write pure defaults over the original.
+                        tracing::error!(
+                            ?defaulted,
+                            path = %file.display(),
+                            "settings could not be read in full"
+                        );
+                        let quarantined = quarantine(&file);
+                        (settings, LoadOutcome::Recovered { quarantined })
                     }
                 }
             },
@@ -382,6 +396,117 @@ mod tests {
              to be overwritten by the next flush, so a failed copy loses it entirely"
         );
         assert_eq!(reloaded.get().appearance.theme, Theme::Dark);
+    }
+
+    /// One wrong *type* on one plain field. `lenient` covers unrecognised
+    /// enum values and `UiScale` clamps out-of-range numbers; nothing covered
+    /// this, so `from_value` failed, every setting silently reverted, and the
+    /// file was reported as `Loaded` — no toast, no quarantine, and the next
+    /// ordinary change overwrote it with pure defaults.
+    const ONE_WRONG_TYPE: &[u8] = br#"{
+  "version": 1,
+  "general": { "confirmOnQuit": "true", "startupRoute": "last-used" },
+  "appearance": { "theme": "light", "uiScale": 1.25 },
+  "onboarding": { "completedAt": "2026-01-01T00:00:00Z" }
+}"#;
+
+    #[test]
+    fn a_file_that_parses_but_does_not_deserialise_is_quarantined_like_one_that_does_not_parse() {
+        // Invariant 1 covers a file Riff failed to *understand*, not only one
+        // it failed to parse. Parsing and deserialising are two failures and
+        // only one of them was protected.
+        let (s, _outcome, _tmp) = store();
+        let path = s.paths().settings_file();
+        std::fs::write(&path, ONE_WRONG_TYPE).expect("seed");
+
+        let (_reloaded, outcome) = SettingsStore::load(s.paths().clone());
+        let LoadOutcome::Recovered {
+            quarantined: Some(kept),
+        } = outcome
+        else {
+            panic!("expected Recovered with a quarantine path, got {outcome:?}");
+        };
+        assert_eq!(
+            std::fs::read(&kept).expect("read"),
+            ONE_WRONG_TYPE,
+            "the user's file must be kept byte for byte"
+        );
+        assert!(
+            !path.is_file(),
+            "quarantine must MOVE the file, not copy it"
+        );
+    }
+
+    #[test]
+    fn a_wrong_type_in_one_section_does_not_cost_the_others() {
+        let (s, _outcome, _tmp) = store();
+        std::fs::write(s.paths().settings_file(), ONE_WRONG_TYPE).expect("seed");
+
+        let (reloaded, _outcome) = SettingsStore::load(s.paths().clone());
+        let after = reloaded.get();
+        assert_eq!(after.appearance.theme, Theme::Light, "appearance is intact");
+        assert_eq!(after.appearance.ui_scale.get(), 1.25);
+        assert!(
+            !after.general.confirm_on_quit,
+            "the section that could not be read is the only casualty"
+        );
+        assert_eq!(
+            after.general.startup_route,
+            crate::settings::model::StartupRoute::Practice,
+            "and it goes to defaults whole, rather than half-read"
+        );
+    }
+
+    #[test]
+    fn a_defaulted_load_never_silently_replays_first_run() {
+        // Being dropped back into the welcome wizard is the most visible
+        // symptom of this bug, and `completedAt` is not a preference.
+        let (s, _outcome, _tmp) = store();
+        std::fs::write(s.paths().settings_file(), ONE_WRONG_TYPE).expect("seed");
+        let (reloaded, _) = SettingsStore::load(s.paths().clone());
+        assert_eq!(
+            reloaded.get().onboarding.completed_at.as_deref(),
+            Some("2026-01-01T00:00:00Z")
+        );
+
+        // And when `onboarding` is itself the unreadable section.
+        let (s, _outcome, _tmp) = store();
+        std::fs::write(
+            s.paths().settings_file(),
+            br#"{"version":1,"onboarding":{"completedAt":"2026-01-01T00:00:00Z","version":"one"}}"#,
+        )
+        .expect("seed");
+        let (reloaded, _) = SettingsStore::load(s.paths().clone());
+        assert_eq!(
+            reloaded.get().onboarding.completed_at.as_deref(),
+            Some("2026-01-01T00:00:00Z"),
+            "first run must not return because a sibling field was mistyped"
+        );
+    }
+
+    #[test]
+    fn the_users_file_is_never_overwritten_before_it_has_been_kept() {
+        let (s, _outcome, _tmp) = store();
+        std::fs::write(s.paths().settings_file(), ONE_WRONG_TYPE).expect("seed");
+
+        let (reloaded, outcome) = SettingsStore::load(s.paths().clone());
+        // The next ordinary setting change is what used to destroy it.
+        reloaded
+            .patch(&json!({ "appearance": { "density": "compact" } }))
+            .expect("patch");
+        reloaded.flush_if_dirty().expect("flush");
+
+        let LoadOutcome::Recovered {
+            quarantined: Some(kept),
+        } = outcome
+        else {
+            panic!("expected the file to have been kept, got {outcome:?}");
+        };
+        assert_eq!(
+            std::fs::read(&kept).expect("read"),
+            ONE_WRONG_TYPE,
+            "the write must land somewhere the original is not"
+        );
     }
 
     #[test]
