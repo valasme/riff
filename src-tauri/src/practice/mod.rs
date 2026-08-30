@@ -212,21 +212,84 @@ fn scheduler_of(app: &AppHandle) -> std::sync::Arc<FlushScheduler> {
 /// Tauri documents for synchronous commands and event handlers is a WebView2
 /// issue, and Riff does not run on Windows.
 pub fn sync_windows(app: &AppHandle) -> RiffResult<Vec<Pane>> {
-    let panes = popped_out(&store_of(app));
+    let wanted = popped_out(&store_of(app));
+    let (actual, failures) = reconcile(
+        &wanted,
+        |pane| app.get_webview_window(&pane.window_label()).is_some(),
+        |pane| open_window(app, pane),
+        |pane| match app.get_webview_window(&pane.window_label()) {
+            None => Ok(()),
+            Some(window) => window.close().map_err(|e| RiffError::Denied {
+                what: e.to_string(),
+            }),
+        },
+    );
+
+    // Written back before the broadcast, so the file, the compositor and the
+    // frontend all describe the same three panes. `pop_out` records the set
+    // *before* reconciling, so without this a failed window build left the
+    // file claiming a pane was out, no window, the grid still showing it
+    // docked, and the next launch offering to reopen a pane that never left.
+    if actual != wanted {
+        record(&store_of(app), &scheduler_of(app), actual.clone())?;
+    }
+    broadcast(app, &actual);
+
+    if failures.is_empty() {
+        Ok(actual)
+    } else {
+        Err(RiffError::Denied {
+            what: failures.join("; "),
+        })
+    }
+}
+
+/// Decides and performs the whole reconciliation, and reports what actually
+/// happened rather than stopping at the first thing that did not.
+///
+/// Split out from `sync_windows` because deciding is pure and acting needs a
+/// compositor: this is the half worth testing, and the half that used to be
+/// wrong. Returns the set that exists afterwards — a pane whose window could
+/// not be built comes out of it, a pane whose window refused to close goes
+/// back into it — alongside every failure, so the caller can report them all
+/// and still leave the world consistent.
+fn reconcile(
+    wanted: &[Pane],
+    is_open: impl Fn(Pane) -> bool,
+    open: impl Fn(Pane) -> RiffResult<()>,
+    close: impl Fn(Pane) -> RiffResult<()>,
+) -> (Vec<Pane>, Vec<String>) {
+    let mut actual = Vec::new();
+    let mut failures = Vec::new();
+
     for pane in Pane::ALL {
-        match (
-            panes.contains(&pane),
-            app.get_webview_window(&pane.window_label()),
-        ) {
-            (true, None) => open_window(app, pane)?,
-            (false, Some(window)) => {
-                let _ = window.close();
-            }
-            _ => {}
+        let out = match (wanted.contains(&pane), is_open(pane)) {
+            (true, false) => match open(pane) {
+                Ok(()) => true,
+                Err(err) => {
+                    failures.push(format!("{}: {err}", pane.slug()));
+                    false
+                }
+            },
+            (false, true) => match close(pane) {
+                Ok(()) => false,
+                Err(err) => {
+                    failures.push(format!("{}: {err}", pane.slug()));
+                    // Still on screen, so still out. Recording it as docked
+                    // would hide a window the user can see from the chip
+                    // strip, which is the only way back to one that has
+                    // drifted behind another application.
+                    true
+                }
+            },
+            (already, _) => already,
+        };
+        if out {
+            actual.push(pane);
         }
     }
-    broadcast(app, &panes);
-    Ok(panes)
+
+    (actual, failures)
 }
 
 pub fn pop_out(app: &AppHandle, pane: Pane) -> RiffResult<Vec<Pane>> {
@@ -331,6 +394,75 @@ mod tests {
             |_| {},
         ));
         (store, scheduler, tmp)
+    }
+
+    fn denied(what: &str) -> RiffError {
+        RiffError::Denied {
+            what: what.to_owned(),
+        }
+    }
+
+    #[test]
+    fn a_pane_whose_window_cannot_be_built_does_not_strand_the_other_two() {
+        // `open_window(app, pane)?` returned on the first failure, skipping
+        // the remaining panes *and* the broadcast. A reconciler that stops at
+        // the first problem leaves the world half-corrected.
+        let attempted = std::cell::RefCell::new(Vec::new());
+        let (actual, failures) = reconcile(
+            &[Pane::Score, Pane::Video, Pane::Audio],
+            |_| false,
+            |pane| {
+                attempted.borrow_mut().push(pane);
+                if pane == Pane::Video {
+                    Err(denied("the compositor refused a window"))
+                } else {
+                    Ok(())
+                }
+            },
+            |_| Ok(()),
+        );
+
+        assert_eq!(
+            *attempted.borrow(),
+            Pane::ALL.to_vec(),
+            "every pane is attempted, whatever the one before it did"
+        );
+        assert_eq!(
+            actual,
+            vec![Pane::Score, Pane::Audio],
+            "the pane with no window comes out of the set"
+        );
+        assert_eq!(failures.len(), 1, "and the failure is still reported");
+    }
+
+    #[test]
+    fn the_set_and_the_windows_agree_after_a_failed_reconcile() {
+        // A window that refuses to close leaves the pane both docked and
+        // open. Recording it as docked would leave the file claiming a window
+        // that is on screen does not exist — and the chip strip, which is the
+        // only way back to a pop-out that has drifted behind something else,
+        // would not draw it.
+        let (actual, failures) = reconcile(
+            &[],
+            |pane| pane == Pane::Audio,
+            |_| Ok(()),
+            |_| Err(denied("the window would not close")),
+        );
+
+        assert_eq!(actual, vec![Pane::Audio]);
+        assert_eq!(failures.len(), 1);
+    }
+
+    #[test]
+    fn a_reconcile_with_nothing_to_do_reports_the_set_unchanged() {
+        let (actual, failures) = reconcile(
+            &[Pane::Score],
+            |pane| pane == Pane::Score,
+            |_| panic!("nothing to open"),
+            |_| panic!("nothing to close"),
+        );
+        assert_eq!(actual, vec![Pane::Score]);
+        assert!(failures.is_empty());
     }
 
     #[test]
