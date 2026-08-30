@@ -6,7 +6,59 @@
     <title>Riff</title>
   </head>
   <body>
-    <div id="root"></div>
+    <!--
+      Static fallback, inside #root. `createRoot().render()` clears the
+      container on its first commit, so a healthy launch never shows this —
+      `boot-fallback.test.tsx` mounts a real root over this exact markup to
+      prove it. The window is `visible: false` until `app_ready()`, so the only
+      thing that can reveal it is the three-second watchdog, which is to say:
+      an import-time throw, which left a blank #242424 rectangle and nothing
+      else.
+
+      No script and no i18n. `script-src 'self'` stays strict, which is the
+      whole reason the bootstrap payload is a plugin init script rather than an
+      inline tag; `style-src` already permits inline. English here for the same
+      reason `cli.rs` and `fatal()` hold English — this runs before anything
+      that could translate it exists.
+    -->
+    <div id="root">
+      <div
+        role="alert"
+        style="
+          display: flex;
+          min-height: 100vh;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 0.75rem;
+          padding: 2rem;
+          background: #242424;
+          color: #e8e8e8;
+          font-family: system-ui, sans-serif;
+          text-align: center;
+          line-height: 1.5;
+        "
+      >
+        <h1 style="margin: 0; font-size: 1.125rem; font-weight: 600">Riff could not start</h1>
+        <p style="margin: 0; max-width: 44ch; color: #9a9a9a; font-size: 0.9375rem">
+          The interface failed to load. The reason is in this launch's log.
+        </p>
+        <code
+          style="
+            font-family: ui-monospace, monospace;
+            font-size: 0.8125rem;
+            color: #9a9a9a;
+            direction: ltr;
+          "
+          >~/.local/state/riff/logs/latest/riff.log</code
+        >
+        <p style="margin: 0; max-width: 44ch; color: #9a9a9a; font-size: 0.8125rem">
+          Run <code style="font-family: ui-monospace, monospace">riff doctor</code> in a terminal to
+          check this installation, or <code style="font-family: ui-monospace, monospace">riff
+          repair</code> to fix what it finds.
+        </p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

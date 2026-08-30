@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { create } from "zustand";
 import i18n from "@/app/i18n";
 import { applyAppearance } from "@/lib/appearance";
+import { safeModeRequested } from "@/lib/crash-loop";
 import {
   type AppInfo,
   type AppPaths,
@@ -43,33 +44,47 @@ function bootstrap(): BootstrapPayload {
   throw new Error("bootstrap payload missing");
 }
 
+/**
+ * The same values `Settings::default()` holds in Rust. Used when the
+ * initialisation script never ran, and when the crash screen asks to start
+ * without whatever is on disk.
+ */
+const DEFAULTS: Settings = {
+  $schema: "./settings.schema.json",
+  version: 1,
+  general: {
+    startupRoute: "practice",
+    lastRoute: "/practice",
+    restoreWindowState: true,
+    confirmOnQuit: false,
+    language: "en",
+  },
+  appearance: {
+    theme: "dark",
+    density: "comfortable",
+    uiScale: 1,
+    reduceMotion: "system",
+    highContrast: false,
+    titleBar: "custom",
+    sidebar: { collapsed: false, rememberCollapsed: true },
+  },
+  onboarding: { completedAt: null, version: 1 },
+  practice: { poppedOut: [] },
+};
+
 function safeBootstrap(): BootstrapPayload {
   try {
-    return bootstrap();
+    const payload = bootstrap();
+    // "Start with default settings", from the crash screen. It refuses to
+    // *apply* the file for one session and does not touch it — which is what
+    // makes it safe to offer to someone whose application will not start, and
+    // reversible by closing the window. `paths` and `appInfo` are kept: Open
+    // log folder and the version numbers are exactly what that person needs.
+    if (safeModeRequested()) return { ...payload, settings: DEFAULTS };
+    return payload;
   } catch {
     return {
-      settings: {
-        $schema: "./settings.schema.json",
-        version: 1,
-        general: {
-          startupRoute: "practice",
-          lastRoute: "/practice",
-          restoreWindowState: true,
-          confirmOnQuit: false,
-          language: "en",
-        },
-        appearance: {
-          theme: "dark",
-          density: "comfortable",
-          uiScale: 1,
-          reduceMotion: "system",
-          highContrast: false,
-          titleBar: "custom",
-          sidebar: { collapsed: false, rememberCollapsed: true },
-        },
-        onboarding: { completedAt: null, version: 1 },
-        practice: { poppedOut: [] },
-      },
+      settings: DEFAULTS,
       paths: { configDir: "", dataDir: "", stateDir: "", cacheDir: "", logDir: "", homeDir: "" },
       appInfo: {
         version: "unknown",

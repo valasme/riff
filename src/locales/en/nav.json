@@ -13,6 +13,11 @@
   "maximize": "Maximize",
   "restore": "Restore",
   "closeWindow": "Close window",
+  "notFound": {
+    "title": "There is nothing here",
+    "body": "That address is not part of Riff. It was probably typed by hand or left behind by an older version.",
+    "goToPractice": "Go to Practice"
+  },
   "openPalette": "Search or jump to",
   "popoutQuit": {
     "title": "Quit Riff, or dock this pane back?",

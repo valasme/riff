@@ -236,6 +236,25 @@ describe("useSettings", () => {
     expect(useSettings.getState().settings.appearance.theme).toBe("light");
   });
 
+  it("starts from defaults, without touching the file, when safe mode was asked for", async () => {
+    // The crash screen's escape hatch. A crash caused by something persisted
+    // is Reload -> crash -> Reload with no way out, so this refuses to *apply*
+    // the file for one session — it does not rewrite it, and closing the
+    // window forgets the request.
+    const payload = window.__RIFF_BOOTSTRAP__;
+    if (payload) payload.settings.appearance.theme = "light";
+    sessionStorage.setItem("riff:safe-mode", "1");
+
+    try {
+      const { useSettings } = await import("./settings");
+      expect(useSettings.getState().settings.appearance.theme).toBe("dark");
+      expect(useSettings.getState().paths.homeDir).toBe("/home/probe");
+      expect(settingsPatch).not.toHaveBeenCalled();
+    } finally {
+      sessionStorage.clear();
+    }
+  });
+
   it("shows a toast when settings.json was quarantined and defaults were used instead", async () => {
     window.__RIFF_BOOTSTRAP__ = {
       settings: structuredClone(DEFAULTS),

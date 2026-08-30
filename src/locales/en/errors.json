@@ -4,6 +4,8 @@
   "openLogs": "Open log folder",
   "copyErrorDetails": "Copy error details",
   "technicalDetails": "Technical details",
+  "startWithDefaults": "Start with default settings",
+  "crashLoop": "Riff crashed again straight away, so reloading is unlikely to help. Starting from default settings ignores everything saved — your settings file is not changed. If that still fails, run `riff repair` in a terminal.",
   "code": {
     "io": "Riff could not read or write a file.",
     "parse": "A file on disk is not valid JSON.",

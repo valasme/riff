@@ -48,7 +48,16 @@ export default defineConfig({
       // wiring with zero conditional logic; the component or redirect
       // helper each one wires up is tested directly in `src/features/**` or
       // `src/lib/**` instead.
-      include: ["src/features/**", "src/lib/**", "src/stores/**", "src/routes/__root.tsx"],
+      // `src/components/**` is in: `RouteError` catches every crash in the
+      // application and had no test at all, because the gate that measures
+      // the code did not look at it.
+      include: [
+        "src/components/**",
+        "src/features/**",
+        "src/lib/**",
+        "src/stores/**",
+        "src/routes/__root.tsx",
+      ],
       thresholds: { lines: 80, functions: 80, branches: 70, statements: 80 },
     },
   },
