@@ -1,6 +1,6 @@
 ## [unreleased]
 
-### 🚀 Features
+### Features
 
 - *(paths)* Resolve xdg directories with riff_* overrides
 - *(error)* Add the adjacently tagged RiffError type
@@ -51,7 +51,7 @@
 - *(logging)* Forward frontend errors into the session log
 - *(about)* Generate and ship third-party licence notices
 
-### 💼 Other
+### Other
 
 - Add biome for linting and formatting
 - Enable strict typescript options and the @/ path alias
@@ -62,7 +62,7 @@
 - Ship a man page, shell completions and troubleshooting docs
 - Add icons, desktop entry and appstream metadata
 
-### 📚 Documentation
+### Documentation
 
 - Add Riff foundation design spec
 - Revise foundation spec after self-review
@@ -86,7 +86,7 @@
 - Mark plan 10 tasks complete
 - Mark plan 11 tasks complete
 
-### 🧪 Testing
+### Testing
 
 - Add vitest, testing library and an axe-core matcher
 - *(ipc)* Pin payload shapes with a committed fixture

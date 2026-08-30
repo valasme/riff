@@ -37,9 +37,6 @@ pub fn render(b: &Banner) -> String {
     if let Some(compositor) = &b.system.compositor {
         line("compositor", compositor);
     }
-    if let Some(format) = &b.system.package_format {
-        line("installed as", format);
-    }
     line("locale", &b.system.locale);
     line("settings", &b.settings_outcome);
 

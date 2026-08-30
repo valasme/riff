@@ -25,7 +25,6 @@ const ENV_ALLOW_PREFIXES: &[&str] = &[
     "DISPLAY",
     "WAYLAND_DISPLAY",
     "DESKTOP_SESSION",
-    "APPIMAGE",
     "container",
 ];
 
@@ -40,7 +39,6 @@ pub struct SystemInfo {
     pub session_type: String,
     pub desktop: String,
     pub compositor: Option<String>,
-    pub package_format: Option<String>,
     pub locale: String,
     pub env: Env,
 }
@@ -68,12 +66,6 @@ impl SystemInfo {
             None
         };
 
-        let package_format = if env.contains_key("APPIMAGE") {
-            Some("AppImage".to_owned())
-        } else {
-            None
-        };
-
         Self {
             distro: field("PRETTY_NAME"),
             distro_id: field("ID"),
@@ -87,7 +79,6 @@ impl SystemInfo {
             session_type: get("XDG_SESSION_TYPE"),
             desktop: get("XDG_CURRENT_DESKTOP"),
             compositor,
-            package_format,
             locale: env
                 .get("LC_ALL")
                 .or_else(|| env.get("LANG"))
@@ -190,15 +181,5 @@ BUILD_ID=rolling
                 .any(|k| k.contains("SECRET") || k.contains("TOKEN")),
             "a diagnostics file is meant to be pasted in public; never dump the environment"
         );
-    }
-
-    #[test]
-    fn detects_an_appimage_launch() {
-        let info = SystemInfo::from_parts(
-            OS_RELEASE,
-            "6.9",
-            &env(&[("APPIMAGE", "/tmp/riff.AppImage")]),
-        );
-        assert_eq!(info.package_format.as_deref(), Some("AppImage"));
     }
 }

@@ -54,8 +54,8 @@ Settled during brainstorming. Each entry is binding for implementation.
 | D10 | State ownership: **Rust owns settings; React renders them** | One place for validation, migration and atomic writes; the webview gets no filesystem permissions. |
 | D11 | **No TanStack Query** this milestone | It earns its keep on cached, paginated, refetched data. One always-loaded local document does not qualify. |
 | D12 | **No** `react-resizable-panels`, `@tanstack/react-table`, `@tanstack/react-virtual`, `pdfjs-dist` | D8 makes them unused code. Recorded here as the seams to add later. |
-| D13 | **Everything — CI and all three bundles — on `ubuntu-24.04`.** Fedora and Debian appear as verification containers, never as build hosts. | Not a preference; the constraint decides it. Tauri v2 needs webkit2gtk **4.1**, whose earliest Ubuntu series is 24.04 — `libwebkit2gtk-4.1-dev` does not exist in 22.04. So 24.04 is simultaneously the oldest image that can build Riff and, near enough, the oldest system that can run it: building there leaves no compatibility unclaimed. Building on 26.04 instead would raise the glibc floor and lock out 24.04 users for nothing. |
-| D14 | Bundles: **deb, rpm, AppImage** | All three, every release, with checksums. |
+| D13 | **Everything — CI and both bundles — on `ubuntu-24.04`.** Fedora and Debian appear as verification containers, never as build hosts. | Not a preference; the constraint decides it. Tauri v2 needs webkit2gtk **4.1**, whose earliest Ubuntu series is 24.04 — `libwebkit2gtk-4.1-dev` does not exist in 22.04. So 24.04 is simultaneously the oldest image that can build Riff and, near enough, the oldest system that can run it: building there leaves no compatibility unclaimed. Building on 26.04 instead would raise the glibc floor and lock out 24.04 users for nothing. |
+| D14 | Bundles: **deb and rpm** | Both, every release, with checksums. AppImage was dropped after the foundation shipped: it is the only bundle whose build shells out to linuxdeploy, and the only one that carries the build host's own libraries with it. |
 | D15 | Repository accepts **no external code contributions** | Bug reports via issues are welcome; pull requests are declined. MIT still permits forks. |
 
 ### 2.1 Deviations from the mockups
@@ -720,7 +720,6 @@ When a file fails to play, a `canPlayType` matrix plus a `gst-inspect-1.0` probe
 
 PDF rendering will use `pdfjs-dist` with the worker bundled locally.
 
-One packaging lever is worth recording now: Tauri's AppImage bundler exposes `bundle.linux.appimage.bundleMediaFramework`, which packs GStreamer and its plugins into the AppImage so playback works on systems missing them. It stays `false` this milestone — it adds well over a hundred megabytes to carry a decoder for media that does not exist yet — and becomes the obvious switch to flip when Practice grows real playback.
 
 ---
 
@@ -797,7 +796,7 @@ No newer-runner canary job. The development machine runs Arch with glibc and Web
 
 ### 17.1 Release
 
-`release.yml` fires on `v*` tags. **One build job**, on `ubuntu-24.04`, producing all three bundles through `tauri-apps/tauri-action@v1`.
+`release.yml` fires on `v*` tags. **One build job**, on `ubuntu-24.04`, producing both bundles through `tauri-apps/tauri-action@v1`.
 
 Splitting the build per format is tempting and wrong. A binary links against the glibc of its build host and runs on anything newer, never older — so the only question is which host is oldest, and webkit2gtk-4.1 answers it: Ubuntu 24.04 or nothing. Building the RPM on Fedora would be strictly worse, raising the glibc floor while changing no dependency metadata, because Tauri's RPM bundler writes `Requires` from `bundle.rpm.depends` in configuration rather than scanning the binary the way `rpmbuild` would. The declared dependencies are ours either way; only the linkage would suffer.
 
@@ -808,10 +807,9 @@ Fedora and Debian belong in verification instead, where they are genuinely load-
 | `glibc-floor` | build host | `objdump -T` reports no required symbol newer than `GLIBC_2.39` |
 | `verify-rpm` | `fedora:latest` container | `dnf install ./riff*.rpm` resolves, then `ldd` finds no missing libraries |
 | `verify-deb` | `debian:trixie` container | `apt install ./riff*.deb` resolves, then the same `ldd` check |
-| `verify-appimage` | bare container, `APPIMAGE_EXTRACT_AND_RUN=1` | the AppImage extracts and its payload links cleanly without FUSE |
 | `publish` | `ubuntu-24.04` | `sha256sums.txt`, draft release with `git-cliff` notes |
 
-`glibc-floor` is the important one. It turns "these binaries are portable" from an assumption into an assertion, so a future runner-image bump cannot silently narrow the audience — that class of regression is otherwise only discovered from a user's bug report. The three install checks exist because "the package built" and "the package installs and its libraries resolve" are different claims, and only the second matters to anyone downloading it.
+`glibc-floor` is the important one. It turns "these binaries are portable" from an assumption into an assertion, so a future runner-image bump cannot silently narrow the audience — that class of regression is otherwise only discovered from a user's bug report. The two install checks exist because "the package built" and "the package installs and its libraries resolve" are different claims, and only the second matters to anyone downloading it.
 
 **Dependabot** monthly, grouped by ecosystem, for npm, cargo and actions.
 
@@ -906,7 +904,7 @@ failure in both Debian and Fedora.
 
 - `LICENSE` — MIT, © 2026 valasme
 - `THIRD-PARTY-LICENSES.md` plus a machine-readable `third-party-licenses.json`, generated from `pnpm licenses list` and `cargo about`, **including each dependency's full licence text and copyright line** — a table of SPDX identifiers does not satisfy MIT's requirement that the notice travel with every copy. Both are **committed**, not generated at build time: they are declared in `bundle.resources`, so a build that generates them on the fly would fail on a clean checkout before the generator had run, and would make release artifacts depend on network access to resolve licence metadata. A CI job regenerates them and fails if the committed copies are stale — the same freshness pattern used for the route tree
-- `README.md` — screenshots, what Riff is, install instructions for all three package formats, required runtime packages including the GStreamer plugin sets, build-from-source steps, the privacy statement, and the contribution policy
+- `README.md` — screenshots, what Riff is, install instructions for both package formats, required runtime packages including the GStreamer plugin sets, build-from-source steps, the privacy statement, and the contribution policy
 - `SECURITY.md` — private disclosure route and supported-version statement
 - `CHANGELOG.md` — Keep a Changelog, generated by `git-cliff`
 - `.github/ISSUE_TEMPLATE/` — bug report and question forms; `config.yml` disables blank issues
@@ -955,7 +953,7 @@ Every package is pinned to the version verified current on 2026-08-28. Nothing i
 - `axe` reports zero violations on every route; the application is fully operable by keyboard alone
 - No string reaches the user outside `t()`
 - CI is green: lint, typecheck, both test suites, build, coverage gate, licence check
-- A tagged release produces deb, rpm and AppImage with checksums; the rpm installs in a fresh Fedora container and the deb in Debian trixie, both with no unresolved libraries, and no binary requires a glibc symbol newer than 2.39
+- A tagged release produces deb and rpm with checksums; the rpm installs in a fresh Fedora container and the deb in Debian trixie, both with no unresolved libraries, and no binary requires a glibc symbol newer than 2.39
 - Killing the frontend before `app_ready()` still results in a visible window
 - Compact density visibly changes row heights and gaps, not only page padding
 - At 1.5× UI scale in a 960px window the sidebar drops to its rail and the settings sub-navigation becomes a horizontal strip

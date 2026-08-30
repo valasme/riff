@@ -123,12 +123,6 @@ BUILD_ID=rolling
             "a diagnostics file is meant to be pasted in public; never dump the environment"
         );
     }
-
-    #[test]
-    fn detects_an_appimage_launch() {
-        let info = SystemInfo::from_parts(OS_RELEASE, "6.9", &env(&[("APPIMAGE", "/tmp/riff.AppImage")]));
-        assert_eq!(info.package_format.as_deref(), Some("AppImage"));
-    }
 }
 ```
 
@@ -158,7 +152,7 @@ pub type Env = BTreeMap<String, String>;
 /// file is designed to be pasted into a public issue.
 const ENV_ALLOW_PREFIXES: &[&str] = &[
     "RIFF_", "XDG_", "GDK_", "GTK_", "WEBKIT_", "GST_", "QT_", "LANG", "LC_",
-    "DISPLAY", "WAYLAND_DISPLAY", "DESKTOP_SESSION", "APPIMAGE", "container",
+    "DISPLAY", "WAYLAND_DISPLAY", "DESKTOP_SESSION", "container",
 ];
 
 #[derive(Debug, Clone, Default, serde::Serialize)]
@@ -172,7 +166,6 @@ pub struct SystemInfo {
     pub session_type: String,
     pub desktop: String,
     pub compositor: Option<String>,
-    pub package_format: Option<String>,
     pub locale: String,
     pub env: Env,
 }
@@ -200,12 +193,6 @@ impl SystemInfo {
             None
         };
 
-        let package_format = if env.contains_key("APPIMAGE") {
-            Some("AppImage".to_owned())
-        } else {
-            None
-        };
-
         Self {
             distro: field("PRETTY_NAME"),
             distro_id: field("ID"),
@@ -215,7 +202,6 @@ impl SystemInfo {
             session_type: get("XDG_SESSION_TYPE"),
             desktop: get("XDG_CURRENT_DESKTOP"),
             compositor,
-            package_format,
             locale: env.get("LC_ALL").or_else(|| env.get("LANG")).cloned().unwrap_or_default(),
             env: env
                 .iter()
@@ -357,9 +343,6 @@ pub fn render(b: &Banner) -> String {
     line("desktop", &b.system.desktop);
     if let Some(compositor) = &b.system.compositor {
         line("compositor", compositor);
-    }
-    if let Some(format) = &b.system.package_format {
-        line("installed as", format);
     }
     line("locale", &b.system.locale);
     line("settings", &b.settings_outcome);

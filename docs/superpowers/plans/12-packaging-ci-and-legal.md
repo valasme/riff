@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Riff installable as deb, rpm and AppImage, with the licensing, documentation and automation an MIT project owes the people who download it.
+**Goal:** Riff installable as deb and rpm, with the licensing, documentation and automation an MIT project owes the people who download it.
 
 **Architecture:** One build job on `ubuntu-24.04` produces all three bundles. Fedora and Debian appear only as **verification** containers, and a `glibc-floor` job turns "these binaries are portable" from an assumption into an assertion. Third-party licence data is generated from `pnpm` and `cargo metadata`, committed, and shipped as a bundled resource so About renders it with no network.
 
@@ -164,8 +164,7 @@ In `src-tauri/tauri.conf.json`, extend `bundle.linux`:
         "files": {
           "/usr/share/metainfo/io.github.valasme.riff.metainfo.xml": "io.github.valasme.riff.metainfo.xml"
         }
-      },
-      "appimage": { "bundleMediaFramework": false }
+      }
     }
 ```
 
@@ -474,12 +473,11 @@ This is Tauri v2's own floor, not a packaging choice, and it is what excludes Ub
 
 ## Install
 
-Download the deb, rpm or AppImage from the [releases page](https://github.com/valasme/riff/releases), then:
+Download the deb or rpm from the [releases page](https://github.com/valasme/riff/releases), then:
 
 ```bash
 sudo apt install ./riff_*_amd64.deb     # Debian, Ubuntu
 sudo dnf install ./riff-*.x86_64.rpm    # Fedora
-chmod +x riff_*.AppImage && ./riff_*.AppImage
 ```
 
 Verify a download against `sha256sums.txt`:
@@ -496,7 +494,7 @@ Updates are manual: download a newer release when you want one. Your settings ar
 sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev patchelf
 pnpm install
 pnpm app          # development
-pnpm app:build    # produces deb, rpm and AppImage
+pnpm app:build    # produces the deb and the rpm
 ```
 
 Node 26, Rust 1.98 and pnpm 11 — all pinned in `.nvmrc`, `rust-toolchain.toml` and `package.json`.
@@ -912,7 +910,7 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: Riff ${{ steps.version.outputs.version }}
           releaseDraft: true
-          args: --bundles deb,rpm,appimage
+          args: --bundles deb,rpm
 
       # Turns "these binaries are portable" from an assumption into an
       # assertion. A future runner-image bump cannot silently narrow the
@@ -930,7 +928,6 @@ jobs:
           subject-path: |
             src-tauri/target/release/bundle/**/*.deb
             src-tauri/target/release/bundle/**/*.rpm
-            src-tauri/target/release/bundle/**/*.AppImage
 
       - uses: actions/upload-artifact@v4
         with:
@@ -938,7 +935,6 @@ jobs:
           path: |
             src-tauri/target/release/bundle/**/*.deb
             src-tauri/target/release/bundle/**/*.rpm
-            src-tauri/target/release/bundle/**/*.AppImage
 
   # Fedora and Debian are verification environments, never build hosts.
   # "The package built" and "the package installs and its libraries resolve"
@@ -982,7 +978,7 @@ jobs:
 
       - name: Checksums
         run: |
-          find bundles -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' \) \
+          find bundles -type f \( -name '*.deb' -o -name '*.rpm' \) \
             -exec sha256sum {} + | sed 's|bundles/.*/||' > sha256sums.txt
           cat sha256sums.txt
 

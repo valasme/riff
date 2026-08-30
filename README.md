@@ -29,12 +29,11 @@ Edit `settings.json` while Riff is running and it reloads live.
 
 ## Install
 
-Download the deb, rpm or AppImage from the [releases page](https://github.com/valasme/riff/releases):
+Download the deb or rpm from the [releases page](https://github.com/valasme/riff/releases):
 
 ```bash
 sudo apt install ./riff_*_amd64.deb     # Debian, Ubuntu
 sudo dnf install ./riff-*.x86_64.rpm    # Fedora
-chmod +x riff_*.AppImage && ./riff_*.AppImage
 ```
 
 Check a download against `sha256sums.txt`:
@@ -51,7 +50,7 @@ Updates are manual, and reinstalling leaves your settings alone.
 sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev patchelf
 pnpm install
 pnpm app          # development
-pnpm app:build    # produces deb, rpm and AppImage
+pnpm app:build    # produces the deb and the rpm
 ```
 
 Node 26, Rust 1.98 and pnpm 11, pinned in `.nvmrc`, `rust-toolchain.toml` and `package.json`.
