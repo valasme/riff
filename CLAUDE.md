@@ -37,7 +37,7 @@ cd src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings &
 
 Add `pnpm licenses:generate` before any commit touching dependencies or the CLI shape; CI regenerates and fails if `third-party-licenses.json` drifted. CI also fails on a stale `src/routeTree.gen.ts`, a `t()` key missing from `src/locales/en/`, an empty translation value, or an entry chunk over 250 KB gzipped.
 
-`RIFF_CONFIG_HOME` and `RIFF_DATA_HOME` name Riff's own directories verbatim (not a parent to append `riff` to). Point them at a temp directory to run against a scratch config instead of your real one.
+`RIFF_CONFIG_HOME` and `RIFF_DATA_HOME` name Riff's own directories verbatim (not a parent to append `riff` to). Point them at a temp directory to run against a scratch config instead of your real one — `RIFF_DATA_HOME` carries `state_dir`, `log_dir` and `cache_dir` with it, so a scratch run cannot take the `latest` symlink, overwrite `riff.pid`, or let `prune_sessions` evict your own log sessions.
 
 ## Architecture
 

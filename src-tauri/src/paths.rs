@@ -34,6 +34,10 @@ impl XdgRoots {
 /// `RIFF_CONFIG_HOME` and `RIFF_DATA_HOME`. Used verbatim — they name Riff's
 /// directory itself, not a parent to append `riff` to — so a test or a
 /// portable install can point at a temporary directory with no surprises.
+///
+/// Two, not four: `RIFF_DATA_HOME` carries state, logs and cache with it. A
+/// scratch run that redirected only config and data would still write the
+/// real `~/.local/state/riff`, which is where everything that hurts lives.
 #[derive(Debug, Clone, Default)]
 pub struct PathOverrides {
     pub config: Option<PathBuf>,
@@ -104,16 +108,24 @@ pub fn resolve(
         Some(dir) => dir.clone(),
         None => roots.data.as_ref().ok_or(PathResolutionError)?.join("riff"),
     };
-    // XDG_STATE_HOME is the newest of the four and not every environment sets
-    // it. Falling back inside the data directory keeps logs with the rest of
-    // Riff's data instead of scattering them.
-    let state_dir = match &roots.state {
-        Some(root) => root.join("riff"),
-        None => data_dir.join("state"),
+    // `RIFF_DATA_HOME` carries state and cache with it. Reading `state` from
+    // XDG whenever it resolved meant the override never reached logs,
+    // `riff.pid` or the `latest` symlink, so every scratch and CI run competed
+    // with the developer's own diagnostics and `prune_sessions` evicted real
+    // sessions — including, at the time this was found, the diagnostics for
+    // the bug being reproduced. Two variables already say "somewhere else";
+    // a third would be a third thing to forget.
+    //
+    // Failing that, XDG_STATE_HOME is the newest of the four roots and not
+    // every environment sets it. Falling back inside the data directory keeps
+    // logs with the rest of Riff's data instead of scattering them.
+    let state_dir = match (&overrides.data, &roots.state) {
+        (Some(_), _) | (None, None) => data_dir.join("state"),
+        (None, Some(root)) => root.join("riff"),
     };
-    let cache_dir = match &roots.cache {
-        Some(root) => root.join("riff"),
-        None => data_dir.join("cache"),
+    let cache_dir = match (&overrides.data, &roots.cache) {
+        (Some(_), _) | (None, None) => data_dir.join("cache"),
+        (None, Some(root)) => root.join("riff"),
     };
     let log_dir = state_dir.join("logs");
 
@@ -199,6 +211,45 @@ mod tests {
         let p = resolve(&roots("/home/u"), &overrides).expect("roots");
         assert_eq!(p.config_dir, PathBuf::from("/tmp/probe/cfg"));
         assert_eq!(p.data_dir, PathBuf::from("/home/u/.local/share/riff"));
+    }
+
+    #[test]
+    fn an_override_redirects_the_state_and_log_directories_too() {
+        // CLAUDE.md says pointing these at a temp directory runs Riff
+        // "against a scratch config instead of your real one". Reading
+        // `state` from XDG regardless meant logs, `riff.pid` and the `latest`
+        // symlink went to the real `~/.local/state/riff` anyway.
+        let overrides = PathOverrides {
+            config: None,
+            data: Some(PathBuf::from("/tmp/probe/data")),
+        };
+        let p = resolve(&roots("/home/u"), &overrides).expect("roots");
+        assert_eq!(p.data_dir, PathBuf::from("/tmp/probe/data"));
+        assert_eq!(p.state_dir, PathBuf::from("/tmp/probe/data/state"));
+        assert_eq!(p.log_dir, PathBuf::from("/tmp/probe/data/state/logs"));
+        assert_eq!(p.cache_dir, PathBuf::from("/tmp/probe/data/cache"));
+    }
+
+    #[test]
+    fn a_scratch_run_cannot_prune_the_real_log_sessions() {
+        // `prune_sessions` evicts everything past the tenth session in
+        // whatever `log_dir` it is handed, and `start_session` takes `latest`.
+        // Every scratch and CI run used to compete with the developer's own
+        // diagnostics — including the diagnostics for the bug being
+        // reproduced.
+        let real = resolve(&roots("/home/u"), &PathOverrides::none()).expect("roots");
+        let scratch = resolve(
+            &roots("/home/u"),
+            &PathOverrides {
+                config: Some(PathBuf::from("/tmp/scratch/config")),
+                data: Some(PathBuf::from("/tmp/scratch/data")),
+            },
+        )
+        .expect("roots");
+
+        assert_ne!(scratch.log_dir, real.log_dir);
+        assert!(scratch.log_dir.starts_with("/tmp/scratch"));
+        assert!(scratch.state_dir.starts_with("/tmp/scratch"));
     }
 
     #[test]
