@@ -85,7 +85,7 @@ pub struct Boot {
     pub outcome: LoadOutcome,
     pub pending_reopen: Vec<Pane>,
     pub workspace: Arc<workspace::WorkspaceStore>,
-    pub pending_score: Option<workspace::Score>,
+    pub pending_score: Option<workspace::OpenScoreRecord>,
 }
 
 /// Steps 2 to 4 of §3.1, behind the one question that decides whether any of
@@ -319,7 +319,34 @@ pub fn run() {
         // Honours `confirmOnQuit`. Without this the setting is decorative.
         .on_window_event({
             let store = Arc::clone(&store);
+            let workspace = Arc::clone(&workspace);
+            let workspace_scheduler = Arc::clone(&workspace_scheduler);
             move |window, event| {
+                // `main` and `popout-score` only: Tauri hands Rust a drop
+                // position in physical pixels, and Rust has no idea where the
+                // Score pane sits inside `main`'s grid — so drops are routed
+                // by *window*, not by position. The first `.pdf` in a
+                // multi-file drop wins; every other window ignores the drop
+                // entirely, including one dropped on Video or Audio, which
+                // would otherwise open a score no pane on screen is showing.
+                if let tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) =
+                    event
+                {
+                    if commands::score::accepts_drop(window.label()) {
+                        if let Some(path) = commands::score::first_pdf(paths) {
+                            let app = window.app_handle();
+                            if let Err(err) =
+                                commands::score::open_at(app, &workspace, &workspace_scheduler, path)
+                            {
+                                tracing::warn!(%err, "a dropped score could not be opened");
+                                use tauri::Emitter;
+                                let _ = window.emit_to(window.label(), "score://drop-failed", &err);
+                            }
+                        }
+                    }
+                    return;
+                }
+
                 let tauri::WindowEvent::CloseRequested { api, .. } = event else {
                     return;
                 };

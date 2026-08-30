@@ -47,6 +47,41 @@ export interface Practice {
   poppedOut: Pane[];
 }
 
+/** Two of pdf.js's four `ScrollMode` values — see `CONTEXT.md`'s "View" entry. */
+export type ScrollMode = "continuous" | "page";
+export type SpreadMode = "none" | "odd" | "even";
+
+/** Free zoom leaves the fit mode rather than fighting it (spec §6). */
+export type Scale =
+  | { mode: "fit-width" }
+  | { mode: "fit-page" }
+  | { mode: "custom"; value: number };
+
+/**
+ * The six values a pop-out carries with it and a reopen offer restores.
+ * Whether auto-scroll is running and whether a page is pinned are
+ * deliberately not here — both always start off. See spec §6.4.
+ */
+export interface View {
+  page: number;
+  scale: Scale;
+  rotation: number;
+  spread: SpreadMode;
+  scrollMode: ScrollMode;
+  autoScrollSpeed: number;
+}
+
+/** Never a path — see `workspace::Score` in Rust for why. */
+export interface Score {
+  name: string;
+  size: number;
+}
+
+export interface OpenScore {
+  score: Score;
+  view: View;
+}
+
 export interface Settings {
   $schema: string;
   version: number;
@@ -110,7 +145,12 @@ export type RiffError =
   | { code: "parse"; details: { path: string; message: string; line: number | null } }
   | { code: "validation"; details: { field: string; reason: string } }
   | { code: "not-found"; details: { what: string } }
-  | { code: "denied"; details: { what: string } };
+  | { code: "denied"; details: { what: string } }
+  | { code: "score-missing"; details: { name: string } }
+  // A unit variant: adjacently-tagged serde omits `details` entirely rather
+  // than writing `null`, so this arm carries no second field at all.
+  | { code: "score-encrypted" }
+  | { code: "score-unreadable"; details: { reason: string } };
 
 /** Mirrors the Rust merge patch: every field optional, recursively. */
 export type DeepPartial<T> = {

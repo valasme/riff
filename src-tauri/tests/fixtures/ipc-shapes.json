@@ -39,6 +39,22 @@
     "debug",
     "trace"
   ],
+  "OpenScore": {
+    "score": {
+      "name": "n",
+      "size": 0
+    },
+    "view": {
+      "autoScrollSpeed": 1.0,
+      "page": 1,
+      "rotation": 0,
+      "scale": {
+        "mode": "fit-width"
+      },
+      "scrollMode": "continuous",
+      "spread": "none"
+    }
+  },
   "Pane": [
     "score",
     "video",
@@ -97,7 +113,42 @@
       "details": {
         "what": "w"
       }
+    },
+    {
+      "code": "score-missing",
+      "details": {
+        "name": "n"
+      }
+    },
+    {
+      "code": "score-encrypted"
+    },
+    {
+      "code": "score-unreadable",
+      "details": {
+        "reason": "r"
+      }
     }
+  ],
+  "Scale": [
+    {
+      "mode": "fit-width"
+    },
+    {
+      "mode": "fit-page"
+    },
+    {
+      "mode": "custom",
+      "value": 1.0
+    }
+  ],
+  "Score": {
+    "name": "n",
+    "size": 0
+  },
+  "ScrollMode": [
+    "continuous",
+    "page"
   ],
   "Section": [
     "general",
@@ -139,5 +190,20 @@
     "ok",
     "warn",
     "error"
-  ]
+  ],
+  "SpreadMode": [
+    "none",
+    "odd",
+    "even"
+  ],
+  "View": {
+    "autoScrollSpeed": 1.0,
+    "page": 1,
+    "rotation": 0,
+    "scale": {
+      "mode": "fit-width"
+    },
+    "scrollMode": "continuous",
+    "spread": "none"
+  }
 }

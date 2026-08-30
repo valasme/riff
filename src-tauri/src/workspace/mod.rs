@@ -189,7 +189,11 @@ pub struct WorkspaceFile {
 /// from the file in the same breath — the exact shape of
 /// `practice::PendingReopen`, and for the same reason: the offer must happen
 /// exactly once whether or not it is answered.
-pub struct PendingReopen(pub Option<Score>);
+///
+/// The full record, path included, not just `Score` — `score_reopen` needs
+/// the path to actually reopen the file. `score_pending_reopen` is what
+/// narrows this to a `Score` before it reaches the webview.
+pub struct PendingReopen(pub Option<OpenScoreRecord>);
 
 pub struct WorkspaceStore {
     paths: AppPaths,
@@ -304,8 +308,8 @@ impl Flushable for WorkspaceStore {
 /// popped-out set — see that function's doc comment for why clearing here,
 /// rather than when the prompt is answered, is what makes the offer happen
 /// exactly once.
-pub fn take_pending_reopen(store: &WorkspaceStore) -> Option<Score> {
-    let current = store.get().open.map(|record| record.as_score());
+pub fn take_pending_reopen(store: &WorkspaceStore) -> Option<OpenScoreRecord> {
+    let current = store.get().open;
     if current.is_some() {
         store.set_open(None);
     }
@@ -345,6 +349,18 @@ pub fn read_and_validate(path: &Path) -> RiffResult<Vec<u8>> {
     if !bytes.starts_with(b"%PDF-") {
         return Err(RiffError::ScoreUnreadable {
             reason: "the file does not start with a %PDF header".to_owned(),
+        });
+    }
+    // Every complete PDF ends with `%%EOF`, however many incremental updates
+    // came before it — so a file missing one near its tail was cut off
+    // somewhere Rust does not need to locate exactly. Only the last 2 KB are
+    // searched: `%%EOF` sits at the very end by construction, and a search
+    // over the whole file would cost real time on a large scan for no
+    // stronger a guarantee.
+    let tail_len = bytes.len().min(2048);
+    if !contains(&bytes[bytes.len() - tail_len..], b"%%EOF") {
+        return Err(RiffError::ScoreUnreadable {
+            reason: "the file has no %%EOF marker; it may be truncated".to_owned(),
         });
     }
     if contains(&bytes, b"/Encrypt") {
@@ -441,8 +457,13 @@ mod tests {
         let store = WorkspaceStore::load(paths);
         store.set_open(Some(record("sonata.pdf")));
 
-        let pending = take_pending_reopen(&store);
-        assert_eq!(pending.map(|s| s.name), Some("sonata.pdf".to_owned()));
+        let pending = take_pending_reopen(&store).expect("a score was open");
+        assert_eq!(pending.name, "sonata.pdf");
+        assert_eq!(
+            pending.path,
+            PathBuf::from("/scores/sonata.pdf"),
+            "score_reopen needs the path back, not just the display name"
+        );
         assert!(store.get().open.is_none());
         assert!(
             take_pending_reopen(&store).is_none(),
@@ -539,15 +560,22 @@ mod tests {
             Err(RiffError::ScoreUnreadable { .. })
         ));
 
+        let truncated = tmp.path().join("truncated.pdf");
+        std::fs::write(&truncated, b"%PDF-1.7\nnever finished").expect("write");
+        assert!(matches!(
+            read_and_validate(&truncated),
+            Err(RiffError::ScoreUnreadable { .. })
+        ));
+
         let encrypted = tmp.path().join("encrypted.pdf");
-        std::fs::write(&encrypted, b"%PDF-1.7\n/Encrypt 5 0 R\n").expect("write");
+        std::fs::write(&encrypted, b"%PDF-1.7\n/Encrypt 5 0 R\n%%EOF").expect("write");
         assert!(matches!(
             read_and_validate(&encrypted),
             Err(RiffError::ScoreEncrypted)
         ));
 
         let ok = tmp.path().join("ok.pdf");
-        std::fs::write(&ok, b"%PDF-1.7\n...\n").expect("write");
+        std::fs::write(&ok, b"%PDF-1.7\n...\n%%EOF").expect("write");
         assert!(read_and_validate(&ok).is_ok());
     }
 

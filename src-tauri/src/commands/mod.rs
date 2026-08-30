@@ -2,6 +2,7 @@ pub mod app;
 pub mod diagnostics;
 pub mod licenses;
 pub mod practice;
+pub mod score;
 pub mod settings;
 pub mod window;
 
@@ -27,6 +28,13 @@ macro_rules! riff_handlers {
             $crate::commands::practice::practice_pop_out,
             $crate::commands::practice::practice_reopen,
             $crate::commands::practice::practice_state,
+            $crate::commands::score::score_bytes,
+            $crate::commands::score::score_close,
+            $crate::commands::score::score_open,
+            $crate::commands::score::score_pending_reopen,
+            $crate::commands::score::score_reopen,
+            $crate::commands::score::score_state,
+            $crate::commands::score::score_view_patch,
             $crate::commands::settings::settings_export,
             $crate::commands::settings::settings_get,
             $crate::commands::settings::settings_import,

@@ -9,11 +9,14 @@ import type {
   HealthCheck,
   LicenseEntry,
   LogLevel,
+  OpenScore,
   Pane,
   PathKind,
   RiffError,
+  Score,
   Section,
   Settings,
+  View,
 } from "./types";
 
 export * from "./types";
@@ -68,6 +71,22 @@ export const ipc = {
   practiceFocus: (pane: Pane) => invoke<void>("practice_focus", { pane }),
   practicePendingReopen: () => invoke<Pane[]>("practice_pending_reopen"),
   practiceReopen: () => invoke<Pane[]>("practice_reopen"),
+  /**
+   * Opens the native picker in Rust and never returns a path — only what
+   * `score_state` would also answer. `null` means the picker was dismissed.
+   */
+  scoreOpen: () => invoke<OpenScore | null>("score_open"),
+  /**
+   * `tauri::ipc::Response` arrives here as a genuine `ArrayBuffer`, not
+   * base64 or an array of numbers — `ipc-protocol.js` decodes any non-JSON
+   * content type with `.arrayBuffer()`. See ADR 0003.
+   */
+  scoreBytes: () => invoke<ArrayBuffer>("score_bytes"),
+  scoreClose: () => invoke<void>("score_close"),
+  scoreState: () => invoke<OpenScore | null>("score_state"),
+  scoreViewPatch: (view: View) => invoke<View>("score_view_patch", { view }),
+  scorePendingReopen: () => invoke<Score | null>("score_pending_reopen"),
+  scoreReopen: () => invoke<OpenScore | null>("score_reopen"),
 } as const;
 
 /**
