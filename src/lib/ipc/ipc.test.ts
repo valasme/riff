@@ -3,10 +3,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const invoke = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({ invoke: (...args: unknown[]) => invoke(...args) }));
 
-const { ipc, isRiffError } = await import("./index");
+const toastError = vi.fn();
+vi.mock("sonner", () => ({ toast: { error: toastError } }));
+
+const { fire, ipc, isRiffError, reportFailure } = await import("./index");
 
 describe("ipc facade", () => {
-  beforeEach(() => invoke.mockReset());
+  beforeEach(() => {
+    invoke.mockReset();
+    toastError.mockReset();
+  });
 
   it("passes a patch under the argument name the command expects", async () => {
     invoke.mockResolvedValue({});
@@ -97,5 +103,43 @@ describe("ipc facade", () => {
       message: "m",
       context: null,
     });
+  });
+
+  it("turns a structured RiffError into its own localised message", () => {
+    invoke.mockResolvedValue(undefined);
+    reportFailure({ code: "denied", details: { what: "x" } }, "opening a folder");
+    expect(toastError).toHaveBeenCalledWith("Your system refused that action.");
+  });
+
+  it("falls back to the unknown message for the bare string tauri rejects with", () => {
+    // A command that panicked, or one that is not registered at all. There is
+    // no `errors:code.<string>` key for it, and a missing key must not become
+    // the message.
+    invoke.mockResolvedValue(undefined);
+    reportFailure("command practice_pop_out not found", "popping a pane out");
+    expect(toastError).toHaveBeenCalledWith("An unexpected error occurred.");
+  });
+
+  it("records the failure on disk as well as on screen", () => {
+    invoke.mockResolvedValue(undefined);
+    reportFailure({ code: "io", details: { path: "p", message: "m" } }, "exporting");
+    expect(invoke).toHaveBeenCalledWith(
+      "log_write",
+      expect.objectContaining({ level: "warn", message: "exporting failed" }),
+    );
+  });
+
+  it("gives a fire-and-forget call a voice when it rejects", async () => {
+    invoke.mockResolvedValue(undefined);
+    fire(Promise.reject({ code: "not-found", details: { what: "w" } }), "focusing a pane");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(toastError).toHaveBeenCalledOnce();
+  });
+
+  it("says nothing when a fire-and-forget call succeeds", async () => {
+    invoke.mockResolvedValue(undefined);
+    fire(Promise.resolve(), "focusing a pane");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(toastError).not.toHaveBeenCalled();
   });
 });

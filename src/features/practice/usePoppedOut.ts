@@ -1,6 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef, useState } from "react";
-import { ipc, type Pane } from "@/lib/ipc";
+import { fire, ipc, type Pane } from "@/lib/ipc";
 
 export const PANES_CHANGED = "practice://panes-changed";
 
@@ -19,9 +19,15 @@ export function usePoppedOut(): Pane[] {
 
   useEffect(() => {
     let alive = true;
-    void ipc.practiceState().then((seed) => {
-      if (alive && !heard.current) setPanes(seed);
-    });
+    // Reported rather than swallowed: without the set, a pane that is in a
+    // window of its own draws no chip, and the chip strip is the only way
+    // back to a pop-out that has drifted behind another application.
+    fire(
+      ipc.practiceState().then((seed) => {
+        if (alive && !heard.current) setPanes(seed);
+      }),
+      "reading which panes are popped out",
+    );
     const unlisten = listen<Pane[]>(PANES_CHANGED, (event) => {
       heard.current = true;
       setPanes(event.payload);

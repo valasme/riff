@@ -7,13 +7,13 @@ import {
   type AppInfo,
   type AppPaths,
   type DeepPartial,
+  fire,
   ipc,
-  isRiffError,
   type Recovery,
+  reportFailure,
   type Section,
   type Settings,
 } from "@/lib/ipc";
-import { log } from "@/lib/logger";
 import { mergeDeep } from "@/lib/merge";
 
 interface BootstrapPayload {
@@ -36,7 +36,10 @@ function bootstrap(): BootstrapPayload {
   // Only reachable if the initialisation script failed. Rendering with
   // defaults and correcting asynchronously beats refusing to start.
   console.warn("bootstrap payload missing; falling back to an async read");
-  void ipc.settingsGet().then((settings) => useSettings.getState().adopt(settings));
+  fire(
+    ipc.settingsGet().then((settings) => useSettings.getState().adopt(settings)),
+    "reading settings after a missing bootstrap payload",
+  );
   throw new Error("bootstrap payload missing");
 }
 
@@ -128,9 +131,7 @@ export const useSettings = create<SettingsState>((set, get) => ({
       // reverting the control would misrepresent what the user chose.
       if (ticket !== sequence) return;
       get().adopt(previous);
-      const code = isRiffError(error) ? error.code : "unknown";
-      void log.warn("settings patch rejected", { code, patch });
-      toast.error(i18n.t(`errors:code.${code}`, { defaultValue: i18n.t("errors:code.unknown") }));
+      reportFailure(error, "applying a settings change");
     }
   },
 
@@ -138,9 +139,9 @@ export const useSettings = create<SettingsState>((set, get) => ({
     const previous = get().settings;
     try {
       get().adopt(await ipc.settingsReset(section));
-    } catch {
+    } catch (error) {
       get().adopt(previous);
-      toast.error(i18n.t("errors:code.unknown"));
+      reportFailure(error, "resetting settings");
     }
   },
 }));

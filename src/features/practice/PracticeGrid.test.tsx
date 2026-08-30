@@ -6,10 +6,10 @@ import i18n from "@/app/i18n";
 import type { Pane } from "@/lib/ipc";
 
 const practiceState = vi.fn<() => Promise<Pane[]>>();
-const practicePopOut = vi.fn();
-const practiceDockBack = vi.fn();
-const practiceDockAll = vi.fn();
-const practiceFocus = vi.fn();
+const practicePopOut = vi.fn().mockResolvedValue(undefined);
+const practiceDockBack = vi.fn().mockResolvedValue(undefined);
+const practiceDockAll = vi.fn().mockResolvedValue(undefined);
+const practiceFocus = vi.fn().mockResolvedValue(undefined);
 vi.mock("@/lib/ipc", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/ipc")>()),
   ipc: { practiceState, practicePopOut, practiceDockBack, practiceDockAll, practiceFocus },

@@ -1,4 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
+import { toast } from "sonner";
+import i18n from "@/app/i18n";
 import type {
   AppInfo,
   AppPaths,
@@ -67,3 +69,34 @@ export const ipc = {
   practicePendingReopen: () => invoke<Pane[]>("practice_pending_reopen"),
   practiceReopen: () => invoke<Pane[]>("practice_reopen"),
 } as const;
+
+/**
+ * The one place a rejected command becomes something the user can see.
+ *
+ * Every call site used to be `void ipc.x()` or a bare `async` handler with no
+ * rejection path, so a failure produced a log line and nothing on screen —
+ * including on Import (Rust has a test asserting it rejects a malformed file;
+ * the dialog just closed), Export, and Export diagnostics, which is pressed
+ * precisely when something is already wrong.
+ *
+ * `code.unknown` is the floor rather than a missing-key error: Tauri rejects
+ * with a bare string when a command panics or does not exist, and that is
+ * exactly the case with no `RiffError` to key off.
+ *
+ * `ipc.logWrite` directly rather than `log.warn`, because `@/lib/logger`
+ * imports this module and a cycle here would be a cycle in the module every
+ * other module depends on.
+ */
+export function reportFailure(error: unknown, doing: string): void {
+  const code = isRiffError(error) ? error.code : "unknown";
+  void ipc.logWrite("warn", `${doing} failed`, { code, error: String(error) }).catch(() => {});
+  toast.error(i18n.t(`errors:code.${code}`, { defaultValue: i18n.t("errors:code.unknown") }));
+}
+
+/**
+ * `void ipc.x()` with a voice. Wraps a fire-and-forget call so a rejection
+ * raises the toast above instead of vanishing.
+ */
+export function fire(promise: Promise<unknown>, doing: string): void {
+  void promise.catch((error: unknown) => reportFailure(error, doing));
+}

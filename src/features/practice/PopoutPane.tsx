@@ -1,4 +1,4 @@
-import { ipc, type Pane } from "@/lib/ipc";
+import { fire, ipc, type Pane } from "@/lib/ipc";
 import { PracticePane } from "./PracticePane";
 
 /**
@@ -17,7 +17,7 @@ export function PopoutPane({ pane }: { pane: Pane }) {
         pane={pane}
         popped
         className="h-full"
-        onDockBack={(p) => void ipc.practiceDockBack(p)}
+        onDockBack={(p) => fire(ipc.practiceDockBack(p), "docking the pane back")}
       />
     </div>
   );

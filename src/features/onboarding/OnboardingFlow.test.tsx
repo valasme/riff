@@ -26,8 +26,11 @@ function useSettingsMock(selector: (s: typeof state) => unknown) {
 }
 useSettingsMock.getState = () => state;
 vi.mock("@/stores/settings", () => ({ useSettings: useSettingsMock }));
-const openPath = vi.fn();
-vi.mock("@/lib/ipc", () => ({ ipc: { openPath } }));
+const openPath = vi.fn().mockResolvedValue(undefined);
+vi.mock("@/lib/ipc", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/ipc")>()),
+  ipc: { openPath },
+}));
 
 const { OnboardingFlow } = await import("./OnboardingFlow");
 

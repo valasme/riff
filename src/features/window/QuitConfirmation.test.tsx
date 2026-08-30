@@ -12,7 +12,10 @@ vi.mock("@tauri-apps/api/event", () => ({
   },
 }));
 const windowQuitConfirmed = vi.fn().mockResolvedValue(undefined);
-vi.mock("@/lib/ipc", () => ({ ipc: { windowQuitConfirmed } }));
+vi.mock("@/lib/ipc", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/ipc")>()),
+  ipc: { windowQuitConfirmed },
+}));
 
 const { QuitConfirmation } = await import("./QuitConfirmation");
 

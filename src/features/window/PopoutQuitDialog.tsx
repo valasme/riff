@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ipc, type Pane } from "@/lib/ipc";
+import { fire, ipc, type Pane } from "@/lib/ipc";
 
 /**
  * `Ctrl+Q` in a pop-out, and nothing else. The window's own `×` docks the
@@ -38,14 +38,19 @@ export function PopoutQuitDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             {t("common:cancel")}
           </Button>
-          <Button variant="ghost" onClick={() => void ipc.practiceDockBack(pane)}>
+          <Button
+            variant="ghost"
+            onClick={() => fire(ipc.practiceDockBack(pane), "docking the pane back")}
+          >
             {t("nav:popoutQuit.dockBack")}
           </Button>
           {/* `windowQuitConfirmed`, not `windowClose`: it sets the approval
               flag so `confirmOnQuit` does not raise a second modal for one
               expressed intent, and it closes MAIN — closing this window would
               merely dock the pane back, under a button labelled Quit Riff. */}
-          <Button onClick={() => void ipc.windowQuitConfirmed()}>{t("nav:popoutQuit.quit")}</Button>
+          <Button onClick={() => fire(ipc.windowQuitConfirmed(), "quitting")}>
+            {t("nav:popoutQuit.quit")}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

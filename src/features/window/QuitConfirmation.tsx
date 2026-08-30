@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ipc } from "@/lib/ipc";
+import { fire, ipc } from "@/lib/ipc";
 
 /**
  * Rust owns the decision: it reads `confirmOnQuit`, cancels the close and
@@ -37,7 +37,9 @@ export function QuitConfirmation() {
           <Button variant="ghost" onClick={() => setOpen(false)}>
             {t("cancel")}
           </Button>
-          <Button onClick={() => void ipc.windowQuitConfirmed()}>{t("quit.action")}</Button>
+          <Button onClick={() => fire(ipc.windowQuitConfirmed(), "quitting")}>
+            {t("quit.action")}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

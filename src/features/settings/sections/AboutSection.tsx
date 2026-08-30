@@ -14,7 +14,14 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SettingRow, SettingsGroup } from "@/features/settings/SettingRow";
-import { type HealthCheck, ipc, type LicenseEntry, type Severity } from "@/lib/ipc";
+import {
+  fire,
+  type HealthCheck,
+  ipc,
+  type LicenseEntry,
+  reportFailure,
+  type Severity,
+} from "@/lib/ipc";
 import { MIT_LICENSE } from "@/lib/license";
 import { useSettings } from "@/stores/settings";
 
@@ -22,7 +29,23 @@ export function AboutSection() {
   const { t } = useTranslation(["settings", "common"]);
   const appInfo = useSettings((s) => s.appInfo);
   const [licenses, setLicenses] = useState<LicenseEntry[] | null>(null);
+  // Three states, not two. An empty list and a failed fetch used to render
+  // identically — a search box over a permanently empty list, with no loading
+  // state, no error and no retry, which reads as "Riff has no dependencies".
+  const [licenseLoad, setLicenseLoad] = useState<"idle" | "loading" | "failed">("idle");
   const [query, setQuery] = useState("");
+
+  async function loadLicenses() {
+    setLicenseLoad("loading");
+    try {
+      setLicenses(await ipc.licensesGet());
+      setLicenseLoad("idle");
+    } catch {
+      // No toast: the failure is already on screen, in the place the list
+      // would have been, next to the button that tries again.
+      setLicenseLoad("failed");
+    }
+  }
 
   const rows: [string, string][] = [
     [t("settings:about.version"), appInfo.version],
@@ -106,43 +129,62 @@ export function AboutSection() {
             licenses ? t("settings:about.thirdPartyCount", { count: licenses.length }) : undefined
           }
           onToggle={(open) => {
-            if (open && licenses === null) void ipc.licensesGet().then(setLicenses);
+            if (open && licenses === null && licenseLoad !== "loading") void loadLicenses();
           }}
         >
-          <Input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            aria-label={t("settings:about.thirdPartySearch")}
-            placeholder={t("settings:about.thirdPartySearch")}
-          />
-          {matches.length === 0 && licenses !== null ? (
+          {licenseLoad === "loading" && (
             <p className="py-6 text-center text-[0.8125rem] text-muted-foreground">
-              {t("settings:about.thirdPartyEmpty")}
+              {t("settings:about.thirdPartyLoading")}
             </p>
-          ) : (
-            // `pe-2.5` is the scrollbar's own 0.625rem, reserved by hand.
-            // WebKitGTK draws overlay scrollbars, which take no layout space,
-            // so the right-aligned licence name ran underneath the bar and
-            // lost its last few characters. `scrollbar-gutter: stable` is the
-            // property for exactly this and is a no-op here — the engine
-            // reports support and still reserves nothing, because the spec
-            // exempts overlay scrollbars — so the gutter has to be padding.
-            // `overscroll-contain` keeps the settings pane still once this
-            // list reaches an end, rather than handing it the leftover scroll.
-            <ul className="mt-3 max-h-80 divide-y divide-separator overflow-auto overscroll-contain pe-2.5">
-              {matches.map((entry) => (
-                <li
-                  key={`${entry.ecosystem}-${entry.name}`}
-                  className="flex items-center justify-between gap-4 py-1.5"
-                >
-                  <span className="truncate font-mono text-xs">
-                    {entry.name}@{entry.version}
-                  </span>
-                  <span className="shrink-0 text-xs text-muted-foreground">{entry.license}</span>
-                </li>
-              ))}
-            </ul>
+          )}
+          {licenseLoad === "failed" && (
+            <div role="alert" className="flex flex-col items-center gap-2 py-6 text-center">
+              <p className="text-[0.8125rem]">{t("settings:about.thirdPartyFailed")}</p>
+              <Button variant="secondary" size="sm" onClick={() => void loadLicenses()}>
+                {t("common:retry")}
+              </Button>
+            </div>
+          )}
+          {licenses && (
+            <>
+              <Input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                aria-label={t("settings:about.thirdPartySearch")}
+                placeholder={t("settings:about.thirdPartySearch")}
+              />
+              {matches.length === 0 ? (
+                <p className="py-6 text-center text-[0.8125rem] text-muted-foreground">
+                  {t("settings:about.thirdPartyEmpty")}
+                </p>
+              ) : (
+                // `pe-2.5` is the scrollbar's own 0.625rem, reserved by hand.
+                // WebKitGTK draws overlay scrollbars, which take no layout space,
+                // so the right-aligned licence name ran underneath the bar and
+                // lost its last few characters. `scrollbar-gutter: stable` is the
+                // property for exactly this and is a no-op here — the engine
+                // reports support and still reserves nothing, because the spec
+                // exempts overlay scrollbars — so the gutter has to be padding.
+                // `overscroll-contain` keeps the settings pane still once this
+                // list reaches an end, rather than handing it the leftover scroll.
+                <ul className="mt-3 max-h-80 divide-y divide-separator overflow-auto overscroll-contain pe-2.5">
+                  {matches.map((entry) => (
+                    <li
+                      key={`${entry.ecosystem}-${entry.name}`}
+                      className="flex items-center justify-between gap-4 py-1.5"
+                    >
+                      <span className="truncate font-mono text-xs">
+                        {entry.name}@{entry.version}
+                      </span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {entry.license}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
           )}
         </Disclosure>
       </SettingsGroup>
@@ -163,11 +205,17 @@ export function AboutSection() {
           description={t("settings:about.links.description")}
         >
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => void ipc.openExternal("repository")}>
+            <Button
+              variant="secondary"
+              onClick={() => fire(ipc.openExternal("repository"), "opening the repository")}
+            >
               <ExternalLink aria-hidden />
               {t("settings:about.repository")}
             </Button>
-            <Button variant="secondary" onClick={() => void ipc.openExternal("issues")}>
+            <Button
+              variant="secondary"
+              onClick={() => fire(ipc.openExternal("issues"), "opening the issue tracker")}
+            >
               <ExternalLink aria-hidden />
               {t("settings:about.issues")}
             </Button>
@@ -181,8 +229,15 @@ export function AboutSection() {
           <Button
             variant="secondary"
             onClick={async () => {
-              const path = await ipc.diagnosticsExport();
-              if (path) toast.success(t("settings:about.exportDiagnostics.done", { path }));
+              try {
+                const path = await ipc.diagnosticsExport();
+                if (path) toast.success(t("settings:about.exportDiagnostics.done", { path }));
+              } catch (error) {
+                // This is the button someone presses when something is
+                // already wrong. Silence here is the worst silence of the
+                // lot.
+                reportFailure(error, "exporting diagnostics");
+              }
             }}
           >
             <FileDown aria-hidden />

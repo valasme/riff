@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { ipc } from "@/lib/ipc";
+import { fire, ipc } from "@/lib/ipc";
 import { useWindowMaximized } from "./useWindowMaximized";
 import { WindowGlyph } from "./WindowGlyph";
 
@@ -19,7 +19,7 @@ export function WindowControls() {
         type="button"
         className={BUTTON}
         aria-label={t("minimize")}
-        onClick={() => void ipc.windowMinimize()}
+        onClick={() => fire(ipc.windowMinimize(), "minimising the window")}
       >
         <WindowGlyph shape="minimize" />
       </button>
@@ -29,7 +29,7 @@ export function WindowControls() {
         // Telling a screen-reader user the button maximizes a window that is
         // already maximized is worse than not labelling it at all.
         aria-label={maximized ? t("restore") : t("maximize")}
-        onClick={() => void ipc.windowToggleMaximize()}
+        onClick={() => fire(ipc.windowToggleMaximize(), "maximising the window")}
       >
         <WindowGlyph shape={maximized ? "restore" : "maximize"} />
       </button>
@@ -37,7 +37,7 @@ export function WindowControls() {
         type="button"
         className={BUTTON}
         aria-label={t("closeWindow")}
-        onClick={() => void ipc.windowClose()}
+        onClick={() => fire(ipc.windowClose(), "closing the window")}
       >
         <WindowGlyph shape="close" />
       </button>

@@ -8,7 +8,7 @@ import { ThemePreview } from "@/components/ThemePreview";
 import { Button } from "@/components/ui/button";
 import { Wordmark } from "@/components/Wordmark";
 import { cn } from "@/lib/cn";
-import { ipc, type Theme } from "@/lib/ipc";
+import { fire, ipc, type Theme } from "@/lib/ipc";
 import { PATH_KINDS, pathFor } from "@/lib/paths";
 import { resolveStartupRoute } from "@/lib/startup-route";
 import { useSettings } from "@/stores/settings";
@@ -136,7 +136,7 @@ export function OnboardingFlow() {
                     size="sm"
                     aria-label={t("common:openFolder")}
                     aria-describedby={`onboarding-path-${kind}`}
-                    onClick={() => void ipc.openPath(kind)}
+                    onClick={() => fire(ipc.openPath(kind), "opening a folder")}
                   >
                     <FolderOpen aria-hidden />
                   </Button>

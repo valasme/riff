@@ -4,10 +4,11 @@ import { I18nextProvider } from "react-i18next";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/app/i18n";
 
-const windowMinimize = vi.fn();
-const windowToggleMaximize = vi.fn();
-const windowClose = vi.fn();
-vi.mock("@/lib/ipc", () => ({
+const windowMinimize = vi.fn().mockResolvedValue(undefined);
+const windowToggleMaximize = vi.fn().mockResolvedValue(undefined);
+const windowClose = vi.fn().mockResolvedValue(undefined);
+vi.mock("@/lib/ipc", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/ipc")>()),
   ipc: { windowMinimize, windowToggleMaximize, windowClose },
   isRiffError: () => false,
 }));

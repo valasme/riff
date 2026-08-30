@@ -2,7 +2,7 @@ import { ChevronRight, ClipboardCopy, FolderOpen, RefreshCw, TriangleAlert } fro
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import { ipc, isRiffError } from "@/lib/ipc";
+import { fire, ipc, isRiffError } from "@/lib/ipc";
 import { log } from "@/lib/logger";
 
 export function RouteError({ error }: { error: unknown }) {
@@ -33,7 +33,10 @@ export function RouteError({ error }: { error: unknown }) {
             <RefreshCw aria-hidden />
             {t("reload")}
           </Button>
-          <Button variant="secondary" onClick={() => void ipc.openPath("logs")}>
+          <Button
+            variant="secondary"
+            onClick={() => fire(ipc.openPath("logs"), "opening the log folder")}
+          >
             <FolderOpen aria-hidden />
             {t("openLogs")}
           </Button>

@@ -32,9 +32,17 @@ vi.mock("@/stores/settings", () => ({
       },
     }),
 }));
-vi.mock("@/lib/ipc", () => ({
-  ipc: { openPath, settingsImport, settingsExport },
+// `importOriginal`, not a bare object: `reportFailure` and `fire` live in this
+// module too, and stubbing them out would stub out the very behaviour these
+// tests exist to check.
+vi.mock("@/lib/ipc", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/ipc")>()),
+  ipc: { openPath, settingsImport, settingsExport, logWrite: vi.fn().mockResolvedValue(undefined) },
 }));
+
+const toastError = vi.fn();
+const toastSuccess = vi.fn();
+vi.mock("sonner", () => ({ toast: { error: toastError, success: toastSuccess } }));
 
 const { GeneralSection } = await import("./GeneralSection");
 
@@ -48,6 +56,8 @@ function renderSection() {
 
 describe("GeneralSection", () => {
   beforeEach(() => {
+    toastError.mockReset();
+    toastSuccess.mockReset();
     patch.mockClear();
     reset.mockClear();
     openPath.mockClear();
@@ -95,5 +105,45 @@ describe("GeneralSection", () => {
   it("has no accessibility violations", async () => {
     const { container } = renderSection();
     await expect(container).toHaveNoAxeViolations();
+  });
+
+  it("tells the user when an import is rejected, and changes nothing", async () => {
+    // Rust has a test asserting `settings_import` rejects a malformed file.
+    // The frontend dropped that rejection on the floor: the dialog just closed.
+    settingsImport.mockRejectedValueOnce({
+      code: "parse",
+      details: { path: "p", message: "m", line: 2 },
+    });
+    renderSection();
+
+    await userEvent.click(screen.getByRole("button", { name: "Import settings" }));
+    // The confirmation dialog's own Import button — Import is guarded because
+    // it goes to arbitrary values from a file and there is no undo.
+    const confirms = screen.getAllByRole("button", { name: "Import settings" });
+    await userEvent.click(confirms[confirms.length - 1] as HTMLElement);
+
+    expect(toastError).toHaveBeenCalledOnce();
+    expect(toastSuccess).not.toHaveBeenCalled();
+  });
+
+  it("says a failed export failed rather than looking like success", async () => {
+    settingsExport.mockRejectedValueOnce({ code: "io", details: { path: "p", message: "m" } });
+    renderSection();
+
+    await userEvent.click(screen.getByRole("button", { name: "Export settings" }));
+
+    expect(toastError).toHaveBeenCalledOnce();
+    expect(toastSuccess).not.toHaveBeenCalled();
+  });
+
+  it("reports a folder that cannot be opened, rather than leaving a dead button", async () => {
+    // A machine with no `xdg-utils` and no file manager. The button did
+    // nothing at all, forever, with no way to find out why.
+    openPath.mockRejectedValueOnce({ code: "denied", details: { what: "no opener" } });
+    renderSection();
+
+    const [open] = screen.getAllByRole("button", { name: "Open folder" });
+    await userEvent.click(open as HTMLElement);
+    await vi.waitFor(() => expect(toastError).toHaveBeenCalledOnce());
   });
 });

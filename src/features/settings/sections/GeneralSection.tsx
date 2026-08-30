@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { SettingRow, SettingsGroup } from "@/features/settings/SettingRow";
-import { ipc, type StartupRoute } from "@/lib/ipc";
+import { fire, ipc, reportFailure, type StartupRoute } from "@/lib/ipc";
 import { PATH_KINDS, pathFor } from "@/lib/paths";
 import { useGeneral, useSettings } from "@/stores/settings";
 
@@ -125,7 +125,7 @@ export function GeneralSection() {
                   size="sm"
                   aria-label={t("common:openFolder")}
                   aria-describedby={`path-${kind}`}
-                  onClick={() => void ipc.openPath(kind)}
+                  onClick={() => fire(ipc.openPath(kind), "opening a folder")}
                 >
                   <FolderOpen aria-hidden />
                 </Button>
@@ -144,8 +144,14 @@ export function GeneralSection() {
             <Button
               variant="secondary"
               onClick={async () => {
-                const path = await ipc.settingsExport();
-                if (path) toast.success(t("settings:general.exported", { path }));
+                try {
+                  const path = await ipc.settingsExport();
+                  // `null` means the user cancelled the picker, which is not
+                  // a failure and gets no toast either way.
+                  if (path) toast.success(t("settings:general.exported", { path }));
+                } catch (error) {
+                  reportFailure(error, "exporting settings");
+                }
               }}
             >
               <Download aria-hidden />
@@ -207,10 +213,18 @@ export function GeneralSection() {
             <Button
               onClick={async () => {
                 setConfirmingImport(false);
-                const imported = await ipc.settingsImport();
-                if (imported) {
-                  useSettings.getState().adopt(imported);
-                  toast.success(t("settings:general.imported"));
+                try {
+                  const imported = await ipc.settingsImport();
+                  if (imported) {
+                    useSettings.getState().adopt(imported);
+                    toast.success(t("settings:general.imported"));
+                  }
+                } catch (error) {
+                  // Rust rejects a malformed file — it has a test saying so.
+                  // Without this the dialog simply closed and nothing changed,
+                  // which reads exactly like a successful import of a file
+                  // that happened to match.
+                  reportFailure(error, "importing settings");
                 }
               }}
             >

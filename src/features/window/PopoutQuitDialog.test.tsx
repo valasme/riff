@@ -4,9 +4,9 @@ import { I18nextProvider } from "react-i18next";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/app/i18n";
 
-const practiceDockBack = vi.fn();
-const windowQuitConfirmed = vi.fn();
-const windowClose = vi.fn();
+const practiceDockBack = vi.fn().mockResolvedValue(undefined);
+const windowQuitConfirmed = vi.fn().mockResolvedValue(undefined);
+const windowClose = vi.fn().mockResolvedValue(undefined);
 vi.mock("@/lib/ipc", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/ipc")>()),
   ipc: { practiceDockBack, windowQuitConfirmed, windowClose },

@@ -30,9 +30,20 @@ vi.mock("@/stores/settings", () => ({
       },
     }),
 }));
-vi.mock("@/lib/ipc", () => ({
-  ipc: { openExternal, diagnosticsExport, licensesGet, diagnosticsCheck },
+vi.mock("@/lib/ipc", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/ipc")>()),
+  ipc: {
+    openExternal,
+    diagnosticsExport,
+    licensesGet,
+    diagnosticsCheck,
+    logWrite: vi.fn().mockResolvedValue(undefined),
+  },
 }));
+
+const toastError = vi.fn();
+const toastSuccess = vi.fn();
+vi.mock("sonner", () => ({ toast: { error: toastError, success: toastSuccess } }));
 
 const { AboutSection } = await import("./AboutSection");
 
@@ -55,6 +66,8 @@ describe("AboutSection", () => {
     licensesGet.mockClear();
     diagnosticsCheck.mockClear();
     diagnosticsCheck.mockResolvedValue([]);
+    toastError.mockReset();
+    toastSuccess.mockReset();
   });
 
   it("reports what riff doctor would report, for someone who never opens a terminal", async () => {
@@ -139,5 +152,34 @@ describe("AboutSection", () => {
   it("has no accessibility violations", async () => {
     const { container } = renderSection();
     await expect(container).toHaveNoAxeViolations();
+  });
+
+  it("distinguishes an empty licence list from one that failed to load", async () => {
+    // A search box over a permanently empty list, with no loading state, no
+    // error and no retry, is indistinguishable from "Riff has no
+    // dependencies".
+    licensesGet.mockRejectedValueOnce({ code: "io", details: { path: "p", message: "m" } });
+    renderSection();
+
+    await userEvent.click(screen.getByText("Third-party licences"));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.queryByText("No package matches that.")).not.toBeInTheDocument();
+  });
+
+  it("says so when exporting diagnostics fails — the button pressed when something is already wrong", async () => {
+    diagnosticsExport.mockRejectedValueOnce({ code: "io", details: { path: "p", message: "m" } });
+    renderSection();
+
+    await userEvent.click(screen.getByRole("button", { name: /export/i }));
+    expect(toastError).toHaveBeenCalledOnce();
+    expect(toastSuccess).not.toHaveBeenCalled();
+  });
+
+  it("reports a repository link that cannot be opened", async () => {
+    openExternal.mockRejectedValueOnce({ code: "denied", details: { what: "no browser" } });
+    renderSection();
+
+    await userEvent.click(screen.getByRole("button", { name: "Repository" }));
+    await vi.waitFor(() => expect(toastError).toHaveBeenCalledOnce());
   });
 });

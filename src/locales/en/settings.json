@@ -124,6 +124,8 @@
     "thirdPartyCount_other": "{{count}} packages",
     "thirdPartySearch": "Filter packages",
     "thirdPartyEmpty": "No package matches that.",
+    "thirdPartyLoading": "Reading the licence list…",
+    "thirdPartyFailed": "The licence list could not be read.",
     "links": {
       "label": "Project links",
       "description": "Riff makes no network connections. These open in your browser."

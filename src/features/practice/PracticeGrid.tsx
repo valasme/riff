@@ -1,6 +1,6 @@
 import { PictureInPicture2, Undo2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { ipc, type Pane } from "@/lib/ipc";
+import { fire, ipc, type Pane } from "@/lib/ipc";
 import { dockedPanes, gridShape } from "./layout";
 import { PANE_ICONS, PracticePane } from "./PracticePane";
 import { usePoppedOut } from "./usePoppedOut";
@@ -33,7 +33,7 @@ export function PracticeGrid() {
               // The tall cell exists only in the three-pane arrangement, and
               // there it is always the first one drawn.
               className={shape === "feature" && index === 0 ? "row-span-2" : undefined}
-              onPopOut={(p) => void ipc.practicePopOut(p)}
+              onPopOut={(p) => fire(ipc.practicePopOut(p), "popping the pane out")}
             />
           ))}
         </div>
@@ -69,7 +69,7 @@ function PoppedOutStrip({ panes }: { panes: Pane[] }) {
               <button
                 type="button"
                 aria-label={t("panesOut.focus", { pane: name })}
-                onClick={() => void ipc.practiceFocus(pane)}
+                onClick={() => fire(ipc.practiceFocus(pane), "focusing the pane window")}
                 className="flex items-center gap-1.5 rounded-l-full py-1 ps-2.5 pe-1.5 text-muted-foreground transition-colors duration-[var(--motion-fast)] ease-(--ease-standard) hover:text-foreground"
               >
                 <Icon size={13} aria-hidden />
@@ -78,7 +78,7 @@ function PoppedOutStrip({ panes }: { panes: Pane[] }) {
               <button
                 type="button"
                 aria-label={t("panesOut.dockBack", { pane: name })}
-                onClick={() => void ipc.practiceDockBack(pane)}
+                onClick={() => fire(ipc.practiceDockBack(pane), "docking the pane back")}
                 className="grid size-6 place-items-center rounded-r-full text-muted-foreground transition-colors duration-[var(--motion-fast)] ease-(--ease-standard) hover:bg-active-fill hover:text-foreground"
               >
                 <X size={12} aria-hidden />
@@ -104,7 +104,7 @@ function EmptyState() {
         </p>
         <button
           type="button"
-          onClick={() => void ipc.practiceDockAll()}
+          onClick={() => fire(ipc.practiceDockAll(), "docking every pane back")}
           className="flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-hover px-3 py-1.5 text-[0.8125rem] font-medium transition-colors duration-[var(--motion-fast)] ease-(--ease-standard) hover:bg-active-fill"
         >
           <Undo2 size={14} aria-hidden />

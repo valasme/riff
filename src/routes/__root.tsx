@@ -19,7 +19,7 @@ import { PANE_ICONS } from "@/features/practice/PracticePane";
 import { PopoutQuitDialog } from "@/features/window/PopoutQuitDialog";
 import { QuitConfirmation } from "@/features/window/QuitConfirmation";
 import { TitleBar } from "@/features/window/TitleBar";
-import { ipc } from "@/lib/ipc";
+import { fire, ipc } from "@/lib/ipc";
 import { reportRecovery, subscribeToBackend, useAppearance, useSettings } from "@/stores/settings";
 
 export const Route = createRootRoute({
@@ -114,15 +114,15 @@ export function RootLayout() {
         toggleSidebar,
         patch: (p) => void patch(p),
         settings,
-        openPath: (kind) => void ipc.openPath(kind),
-        popOut: (pane) => void ipc.practicePopOut(pane),
-        dockBack: (pane) => void ipc.practiceDockBack(pane),
-        dockAll: () => void ipc.practiceDockAll(),
+        openPath: (kind) => fire(ipc.openPath(kind), "opening a folder"),
+        popOut: (pane) => fire(ipc.practicePopOut(pane), "popping the pane out"),
+        dockBack: (pane) => fire(ipc.practiceDockBack(pane), "docking the pane back"),
+        dockAll: () => fire(ipc.practiceDockAll(), "docking every pane back"),
         // In a pop-out, Ctrl+Q is ambiguous. It is muscle memory for "close
         // the application", and a command labelled "Quit Riff" that silently
         // folds a pane back into a grid is a mislabelled action — so the
         // dialog asks rather than picking a side.
-        quit: () => (popoutPane ? setQuitPromptOpen(true) : void ipc.windowClose()),
+        quit: () => (popoutPane ? setQuitPromptOpen(true) : fire(ipc.windowClose(), "quitting")),
         closeOverlay: () => setPaletteOpen(false),
       }),
     [navigate, toggleSidebar, patch, settings, popoutPane],
@@ -157,7 +157,7 @@ export function RootLayout() {
         toast(t("common:panesOut.reopenPrompt", { count: panes.length, panes: names }), {
           action: {
             label: t("common:panesOut.reopen"),
-            onClick: () => void ipc.practiceReopen(),
+            onClick: () => fire(ipc.practiceReopen(), "reopening last session's panes"),
           },
           cancel: { label: t("common:panesOut.notNow"), onClick: () => {} },
           // It waits. Sonner's four-second default is fine for "copied to
