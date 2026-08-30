@@ -3,6 +3,7 @@ pub mod cli;
 pub mod commands;
 pub mod diagnostics;
 pub mod error;
+pub mod instance;
 pub mod logging;
 pub mod paths;
 pub mod practice;
@@ -14,6 +15,7 @@ use std::time::Duration;
 
 use tauri::Manager;
 
+use crate::settings::model::Pane;
 use crate::settings::store::{LoadOutcome, SettingsStore};
 
 /// How long to wait for the frontend to signal readiness before showing the
@@ -64,60 +66,41 @@ fn fatal(message: &str) -> ! {
     std::process::exit(1);
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-    // 1. Paths, before anything can need them.
-    let paths = match paths::resolve(
-        &paths::XdgRoots::from_system(),
-        &paths::PathOverrides::from_env(),
-    ) {
-        Ok(paths) => paths,
-        Err(err) => {
-            fatal(&err.to_string());
-        }
-    };
-    if let Err(err) = paths::ensure_dirs(&paths) {
-        fatal(&format!("cannot create data directories: {err}"));
-    }
+/// Everything the boot sequence leaves on disk, and the instance name that
+/// entitled this process to leave it.
+///
+/// Held together in one value because they share one lifetime: dropping the
+/// session truncates the log, and dropping the instance hands Riff's name to
+/// the next launch while this window is still on screen.
+pub struct Boot {
+    pub instance: instance::Instance,
+    pub session: logging::Session,
+    pub store: Arc<SettingsStore>,
+    pub outcome: LoadOutcome,
+    pub pending_reopen: Vec<Pane>,
+}
 
-    // 2. Logging, so a startup failure still leaves a trail. One directory
-    //    per launch; `latest` points at it.
-    let boot = std::time::Instant::now();
-    let session = logging::start_session(&paths, "info");
+/// Steps 2 to 4 of §3.1, behind the one question that decides whether any of
+/// them may happen.
+///
+/// Extracted from `run` so that ordering is a test rather than a reading of
+/// the source: `a_second_launch_leaves_the_popped_out_set_alone` calls this
+/// twice against one scratch config, and moving anything below the gate above
+/// it turns that test red. Every line here writes something a live Riff is
+/// still using.
+pub fn start(paths: &crate::paths::AppPaths) -> Result<Boot, instance::AlreadyRunning> {
+    // 2. Am I the only Riff? Nothing below this line may run in a process
+    //    that is about to exit — every one of those lines writes something
+    //    the live instance is still using.
+    let instance = instance::acquire(paths)?;
+
+    // 3a. Logging, so a startup failure still leaves a trail. One directory
+    //     per launch; `latest` points at it.
+    let session = logging::start_session(paths, "info");
     logging::install_panic_hook(&session.dir);
-    tracing::info!(
-        phase = "paths",
-        elapsed_ms = boot.elapsed().as_millis() as u64,
-        "boot"
-    );
-    // The best-effort notification Plan 02 deferred to here. Non-blocking on
-    // purpose: a blocking dialog raised from a panic on the GTK main thread
-    // can deadlock, turning a crash report into a hang. The hook already
-    // logged unconditionally; this is a courtesy on top.
-    logging::set_panic_notifier(|message| {
-        use tauri_plugin_dialog::DialogExt;
-        if let Some(app) = APP_HANDLE.get() {
-            app.dialog()
-                .message(message)
-                .title("Riff crashed")
-                .show(|_| {});
-        }
-    });
 
-    // 3. The CLI, before anything else that could need a window. Argument
-    //    parsing, health checks and repair need no GTK, no webview and no
-    //    display, so `riff doctor` works over SSH on a machine whose window
-    //    will not open. This also runs before `tauri_plugin_single_instance`
-    //    is registered below — that plugin forwards a second process's
-    //    arguments to the running window and exits, so `riff --help` typed
-    //    while Riff is open would otherwise print nothing at all.
-    let cli = <cli::Cli as clap::Parser>::parse();
-    if let Some(code) = cli::dispatch(&cli, &paths) {
-        std::process::exit(code);
-    }
-
-    // 4. Settings, BEFORE the Tauri builder exists — the bootstrap script
-    //    needs them as a string at plugin-registration time.
+    // 3b. Settings, BEFORE the Tauri builder exists — the bootstrap script
+    //     needs them as a string at plugin-registration time.
     let (store, outcome) = SettingsStore::load(paths.clone());
     match &outcome {
         LoadOutcome::Fresh => tracing::info!("no settings file; starting from defaults"),
@@ -144,10 +127,88 @@ pub fn run() {
     }
     // Lets `riff repair`, run from another terminal, warn that it may race
     // with a session that is already live rather than fixing things blind.
-    let _ = std::fs::write(cli::pid_file(&paths), std::process::id().to_string());
-    if let Err(err) = settings::schema::write(&paths) {
+    let _ = std::fs::write(cli::pid_file(paths), std::process::id().to_string());
+    if let Err(err) = settings::schema::write(paths) {
         tracing::warn!(%err, "could not write settings.schema.json");
     }
+
+    Ok(Boot {
+        instance,
+        session,
+        store,
+        outcome,
+        pending_reopen,
+    })
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    // 1. Paths, before anything can need them.
+    let paths = match paths::resolve(
+        &paths::XdgRoots::from_system(),
+        &paths::PathOverrides::from_env(),
+    ) {
+        Ok(paths) => paths,
+        Err(err) => {
+            fatal(&err.to_string());
+        }
+    };
+    if let Err(err) = paths::ensure_dirs(&paths) {
+        fatal(&format!("cannot create data directories: {err}"));
+    }
+    let boot = std::time::Instant::now();
+
+    // 2. The CLI, before anything else that could need a window. Argument
+    //    parsing, health checks and repair need no GTK, no webview and no
+    //    display, so `riff doctor` works over SSH on a machine whose window
+    //    will not open. That is exactly when somebody runs it — and it is why
+    //    the CLI runs before the single-instance gate below rather than after
+    //    it: `riff --help` typed while Riff is open must print, not raise the
+    //    window and exit. Given no subcommand, `dispatch` touches nothing and
+    //    returns; given one, it exits. Either way nothing is written here by
+    //    accident.
+    let cli = <cli::Cli as clap::Parser>::parse();
+    if let Some(code) = cli::dispatch(&cli, &paths) {
+        std::process::exit(code);
+    }
+
+    // 3. Everything that touches disk, behind "am I the only Riff?" — see
+    //    docs/adr/0002. A second launch used to clear `practice.poppedOut`
+    //    and flush it (which closed the live instance's pop-out windows),
+    //    take the `latest` symlink and overwrite `riff.pid`, all before
+    //    discovering it was about to exit.
+    let Ok(started) = start(&paths) else {
+        // Riff is already open. Raise that window and go, having changed
+        // nothing. This replaces tauri-plugin-single-instance, whose
+        // equivalent branch ran from inside `.build()` — far too late.
+        instance::request_focus(&paths);
+        std::process::exit(0);
+    };
+    let Boot {
+        instance,
+        session: _session,
+        store,
+        outcome,
+        pending_reopen,
+    } = started;
+    tracing::info!(
+        phase = "paths",
+        elapsed_ms = boot.elapsed().as_millis() as u64,
+        "boot"
+    );
+    // The best-effort notification Plan 02 deferred to here. Non-blocking on
+    // purpose: a blocking dialog raised from a panic on the GTK main thread
+    // can deadlock, turning a crash report into a hang. The hook already
+    // logged unconditionally; this is a courtesy on top.
+    logging::set_panic_notifier(|message| {
+        use tauri_plugin_dialog::DialogExt;
+        if let Some(app) = APP_HANDLE.get() {
+            app.dialog()
+                .message(message)
+                .title("Riff crashed")
+                .show(|_| {});
+        }
+    });
 
     tracing::info!(
         phase = "settings",
@@ -166,13 +227,6 @@ pub fn run() {
     };
 
     let mut builder = tauri::Builder::default()
-        // single-instance must be registered first, per its documentation.
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.unminimize();
-                let _ = window.set_focus();
-            }
-        }))
         .plugin(bootstrap::init(&payload))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init());
@@ -282,6 +336,22 @@ pub fn run() {
                     Err(err) => tracing::warn!(%err, "external settings edits will not be noticed"),
                 }
 
+                // Further launches. `instance` is managed rather than dropped
+                // here: the kernel holds Riff's name only for as long as the
+                // listener lives, so dropping it at the end of `setup` would
+                // hand the name to the next launch while this window is still
+                // on screen.
+                {
+                    let handle = app.handle().clone();
+                    instance.serve(move || {
+                        if let Some(window) = handle.get_webview_window(practice::MAIN) {
+                            let _ = window.unminimize();
+                            let _ = window.set_focus();
+                        }
+                    });
+                }
+                app.manage(instance);
+
                 let _ = APP_HANDLE.set(app.handle().clone());
                 tracing::info!(
                     phase = "setup",
@@ -309,4 +379,110 @@ pub fn run() {
                 tracing::info!("shutdown complete");
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn scratch() -> (crate::paths::AppPaths, tempfile::TempDir) {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let paths = crate::paths::resolve(
+            &crate::paths::XdgRoots::default(),
+            &crate::paths::PathOverrides {
+                config: Some(tmp.path().join("config")),
+                data: Some(tmp.path().join("data")),
+            },
+        )
+        .expect("overrides supply both roots");
+        crate::paths::ensure_dirs(&paths).expect("dirs");
+        (paths, tmp)
+    }
+
+    fn popped_out_on_disk(paths: &crate::paths::AppPaths) -> serde_json::Value {
+        let bytes = std::fs::read(paths.settings_file()).expect("settings.json");
+        let document: serde_json::Value = serde_json::from_slice(&bytes).expect("json");
+        document["practice"]["poppedOut"].clone()
+    }
+
+    #[test]
+    fn a_second_launch_leaves_the_popped_out_set_alone() {
+        // The live instance has two panes in windows of their own. A second
+        // launch that reaches `take_pending_reopen` clears the set and
+        // flushes it — and the live instance's watcher obeys the write, so
+        // both windows close. The second process never even got a window.
+        let (paths, _tmp) = scratch();
+        let live = start(&paths).expect("the first launch boots");
+        live.store
+            .patch(&serde_json::json!({ "practice": { "poppedOut": ["score", "video"] } }))
+            .expect("pop two panes out");
+        live.store.flush_if_dirty().expect("flush");
+
+        assert!(start(&paths).is_err(), "the second launch must not boot");
+        assert_eq!(
+            popped_out_on_disk(&paths),
+            serde_json::json!(["score", "video"]),
+            "a doomed second process must not close the live one's windows"
+        );
+    }
+
+    #[test]
+    fn a_second_launch_does_not_move_the_latest_symlink() {
+        let (paths, _tmp) = scratch();
+        let live = start(&paths).expect("the first launch boots");
+        let latest = paths.log_dir.join("latest");
+        let live_session = std::fs::read_link(&latest).expect("latest points at the live session");
+        assert_eq!(live_session, live.session.dir);
+
+        assert!(start(&paths).is_err());
+        assert_eq!(
+            std::fs::read_link(&latest).expect("latest"),
+            live_session,
+            "`tail -f .../logs/latest/riff.log` must follow the Riff that is on screen"
+        );
+    }
+
+    #[test]
+    fn a_second_launch_does_not_overwrite_the_pid_of_the_running_instance() {
+        let (paths, _tmp) = scratch();
+        let _live = start(&paths).expect("the first launch boots");
+        let pid_file = cli::pid_file(&paths);
+        assert_eq!(
+            std::fs::read_to_string(&pid_file).expect("riff.pid"),
+            std::process::id().to_string()
+        );
+
+        // Both launches share this test process's pid, so the write has to be
+        // made visible: take the file away and see whether the doomed launch
+        // puts one back. In a real second process it puts back a pid that
+        // dies seconds later, and `riff repair` believes it.
+        std::fs::remove_file(&pid_file).expect("remove");
+        assert!(start(&paths).is_err());
+        assert!(
+            !pid_file.exists(),
+            "`riff repair` must warn about the Riff that is running, not a pid that died"
+        );
+    }
+
+    #[test]
+    fn a_second_launch_does_not_spend_one_of_the_ten_retained_log_sessions() {
+        let (paths, _tmp) = scratch();
+        let _live = start(&paths).expect("the first launch boots");
+        let sessions = || {
+            std::fs::read_dir(&paths.log_dir)
+                .expect("logs")
+                .filter_map(Result::ok)
+                .filter(|e| e.path().is_dir() && e.file_name() != "latest")
+                .count()
+        };
+        let before = sessions();
+
+        assert!(start(&paths).is_err());
+        assert_eq!(
+            sessions(),
+            before,
+            "a three-line log from a process that never reached setup must not \
+             evict the session that explains the bug"
+        );
+    }
 }

@@ -50,12 +50,13 @@ Riff runs **three windows at most**: `main`, and one `popout-{pane}` per popped-
 `src-tauri/src/lib.rs::run()` is ordered, and the order *is* the design:
 
 1. `paths::resolve()` — XDG directories, or a native error dialog and exit. Never a silent fallback to the working directory.
-2. `logging::start_session()` — one directory per launch under `~/.local/state/riff/logs/`, with `latest` symlinked at it. Everything after this point leaves a trail.
-3. `cli::dispatch()` — **before `tauri::Builder` exists**, because `tauri-plugin-single-instance` would otherwise swallow `riff --help` typed while a window is open, and because nothing in `doctor`/`repair`/`logs` needs GTK or a display. That is exactly when someone runs them.
-4. `SettingsStore::load()` — also before the builder, because step 5 needs the settings as a *string* at plugin-registration time.
-5. `bootstrap::init()` — a `js_init_script` that assigns `window.__RIFF_BOOTSTRAP__` and writes `data-theme`, `data-density`, `data-contrast`, `data-motion` and `--ui-scale` onto `<html>`. Doing it here rather than in an inline `<script>` is what lets the CSP keep `script-src 'self'`.
-6. React mounts and hydrates from that same object. Zero IPC round-trips, no loading state.
-7. The window is created `visible: false`; the frontend calls `app_ready()` after its first commit and Rust reveals it. A three-second watchdog reveals it regardless — a React crash must still produce a window to read the error in.
+2. `cli::dispatch()` — **before `tauri::Builder` exists**, and before step 3, because a second launch must still be able to print `riff --help` rather than raise the running window and exit, and because nothing in `doctor`/`repair`/`logs` needs GTK or a display. That is exactly when someone runs them. Given no subcommand it touches nothing.
+3. `instance::acquire()` — the first line of `start()`, and the reason steps 4–5 are inside it. A second launch is refused **here**, before anything writes: it used to clear `practice.poppedOut` and flush it — closing the live instance's pop-out windows — steal the `latest` symlink and overwrite `riff.pid` before `tauri-plugin-single-instance` exited it from inside `.build()`. See `docs/adr/0002-single-instance-runs-before-anything-touches-disk.md`.
+4. `logging::start_session()` — one directory per launch under `~/.local/state/riff/logs/`, with `latest` symlinked at it. Everything after this point leaves a trail.
+5. `SettingsStore::load()` — also before the builder, because step 6 needs the settings as a *string* at plugin-registration time.
+6. `bootstrap::init()` — a `js_init_script` that assigns `window.__RIFF_BOOTSTRAP__` and writes `data-theme`, `data-density`, `data-contrast`, `data-motion` and `--ui-scale` onto `<html>`. Doing it here rather than in an inline `<script>` is what lets the CSP keep `script-src 'self'`.
+7. React mounts and hydrates from that same object. Zero IPC round-trips, no loading state.
+8. The window is created `visible: false`; the frontend calls `app_ready()` after its first commit and Rust reveals it. A three-second watchdog reveals it regardless — a React crash must still produce a window to read the error in.
 
 The two failure paths (missing bootstrap object → async `settings_get()`; missing `app_ready()` → watchdog) are deliberate, not defensive noise. An optimisation must never be able to stop the application appearing.
 

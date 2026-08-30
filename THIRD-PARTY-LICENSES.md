@@ -486,7 +486,6 @@ Regenerate with `pnpm licenses:generate`.
 | tauri-plugin-dialog | 2.7.2 | Apache-2.0 OR MIT |
 | tauri-plugin-fs | 2.5.1 | Apache-2.0 OR MIT |
 | tauri-plugin-opener | 2.5.4 | Apache-2.0 OR MIT |
-| tauri-plugin-single-instance | 2.4.3 | Apache-2.0 OR MIT |
 | tauri-plugin-window-state | 2.4.1 | Apache-2.0 OR MIT |
 | tauri-runtime | 2.11.3 | Apache-2.0 OR MIT |
 | tauri-runtime-wry | 2.11.4 | Apache-2.0 OR MIT |
@@ -48009,31 +48008,6 @@ Creator: Person: Daniel Thompson-Yvetot
 ```
 
 ### tauri-plugin-opener 2.5.4
-
-```
-SPDXVersion: SPDX-2.1
-DataLicense: CC0-1.0
-PackageName: tauri
-DataFormat: SPDXRef-1
-PackageSupplier: Organization: The Tauri Programme in the Commons Conservancy
-PackageHomePage: https://tauri.app
-PackageLicenseDeclared: Apache-2.0
-PackageLicenseDeclared: MIT
-PackageCopyrightText: 2019-2022, The Tauri Programme in the Commons Conservancy
-PackageSummary: <text>Tauri is a rust project that enables developers to make secure
-and small desktop applications using a web frontend.
-                </text>
-PackageComment: <text>The package includes the following libraries; see
-Relationship information.
-                </text>
-Created: 2019-05-20T09:00:00Z
-PackageDownloadLocation: git://github.com/tauri-apps/tauri
-PackageDownloadLocation: git+https://github.com/tauri-apps/tauri.git
-PackageDownloadLocation: git+ssh://github.com/tauri-apps/tauri.git
-Creator: Person: Daniel Thompson-Yvetot
-```
-
-### tauri-plugin-single-instance 2.4.3
 
 ```
 SPDXVersion: SPDX-2.1

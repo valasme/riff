@@ -2555,13 +2555,6 @@
     "text": "SPDXVersion: SPDX-2.1\nDataLicense: CC0-1.0\nPackageName: tauri\nDataFormat: SPDXRef-1\nPackageSupplier: Organization: The Tauri Programme in the Commons Conservancy\nPackageHomePage: https://tauri.app\nPackageLicenseDeclared: Apache-2.0\nPackageLicenseDeclared: MIT\nPackageCopyrightText: 2019-2022, The Tauri Programme in the Commons Conservancy\nPackageSummary: <text>Tauri is a rust project that enables developers to make secure\nand small desktop applications using a web frontend.\n                </text>\nPackageComment: <text>The package includes the following libraries; see\nRelationship information.\n                </text>\nCreated: 2019-05-20T09:00:00Z\nPackageDownloadLocation: git://github.com/tauri-apps/tauri\nPackageDownloadLocation: git+https://github.com/tauri-apps/tauri.git\nPackageDownloadLocation: git+ssh://github.com/tauri-apps/tauri.git\nCreator: Person: Daniel Thompson-Yvetot"
   },
   {
-    "name": "tauri-plugin-single-instance",
-    "version": "2.4.3",
-    "license": "Apache-2.0 OR MIT",
-    "ecosystem": "cargo",
-    "text": "SPDXVersion: SPDX-2.1\nDataLicense: CC0-1.0\nPackageName: tauri\nDataFormat: SPDXRef-1\nPackageSupplier: Organization: The Tauri Programme in the Commons Conservancy\nPackageHomePage: https://tauri.app\nPackageLicenseDeclared: Apache-2.0\nPackageLicenseDeclared: MIT\nPackageCopyrightText: 2019-2022, The Tauri Programme in the Commons Conservancy\nPackageSummary: <text>Tauri is a rust project that enables developers to make secure\nand small desktop applications using a web frontend.\n                </text>\nPackageComment: <text>The package includes the following libraries; see\nRelationship information.\n                </text>\nCreated: 2019-05-20T09:00:00Z\nPackageDownloadLocation: git://github.com/tauri-apps/tauri\nPackageDownloadLocation: git+https://github.com/tauri-apps/tauri.git\nPackageDownloadLocation: git+ssh://github.com/tauri-apps/tauri.git\nCreator: Person: Daniel Thompson-Yvetot"
-  },
-  {
     "name": "tauri-plugin-window-state",
     "version": "2.4.1",
     "license": "Apache-2.0 OR MIT",

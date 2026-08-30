@@ -1,11 +1,16 @@
 //! Riff's terminal surface.
 //!
-//! Dispatched from `run()` BEFORE `tauri::Builder` is constructed, for two
-//! reasons. First, `tauri_plugin_single_instance` forwards a second process's
-//! arguments to the running window and exits — so `riff --help` typed while
-//! Riff is open would print nothing at all. Second, nothing here needs GTK, a
-//! webview or a display, which means `riff doctor` works over SSH on a machine
-//! whose window will not open. That is exactly when somebody runs it.
+//! Dispatched from `run()` BEFORE `tauri::Builder` is constructed *and*
+//! before `instance::acquire`, for two reasons. First, a second launch of an
+//! already-running Riff raises the running window and exits — so `riff --help`
+//! typed while Riff is open would print nothing at all. Second, nothing here
+//! needs GTK, a webview or a display, which means `riff doctor` works over SSH
+//! on a machine whose window will not open. That is exactly when somebody runs
+//! it.
+//!
+//! Running ahead of the gate does not reopen the hole ADR 0002 closed: given
+//! no subcommand `dispatch` returns having touched nothing, and the writes it
+//! does make — `riff repair` — are the ones the user asked for by name.
 //!
 //! Accepting `--output <path>` here does not contradict the rule that no
 //! caller-supplied path crosses IPC. That rule constrains a *compromised
