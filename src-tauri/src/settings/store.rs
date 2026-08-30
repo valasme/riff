@@ -730,7 +730,16 @@ mod tests {
                 .expect("patch");
             scheduler.notify();
         }
-        std::thread::sleep(Duration::from_millis(200));
+        // Poll rather than fixed sleep: the worker thread may be delayed
+        // under load (e.g. GHA with 140 tests in parallel) so a 200 ms
+        // sleep can expire before the 30 ms quiet period + flush, or
+        // before the thread has even started and the 40 notifies are
+        // coalesced correctly but not yet flushed. Polling with a
+        // generous timeout makes the assertion deterministic.
+        let deadline = std::time::Instant::now() + Duration::from_millis(1000);
+        while s.write_count() != 1 && std::time::Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(10));
+        }
 
         assert_eq!(
             s.write_count(),
@@ -749,11 +758,22 @@ mod tests {
         s.patch(&json!({ "appearance": { "theme": "light" } }))
             .expect("one");
         scheduler.notify();
-        std::thread::sleep(Duration::from_millis(200));
+        // Wait for the first burst to flush before starting the second,
+        // otherwise a slow worker startup (e.g. 250 ms on a loaded CI
+        // runner) queues both notifies before the first recv and they
+        // coalesce into one write (1 vs 2). See the reproduction in
+        // /tmp/test_scheduler.rs.
+        let deadline = std::time::Instant::now() + Duration::from_millis(1000);
+        while s.write_count() != 1 && std::time::Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(10));
+        }
         s.patch(&json!({ "appearance": { "density": "compact" } }))
             .expect("two");
         scheduler.notify();
-        std::thread::sleep(Duration::from_millis(200));
+        let deadline = std::time::Instant::now() + Duration::from_millis(1000);
+        while s.write_count() != 2 && std::time::Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(10));
+        }
 
         assert_eq!(
             s.write_count(),
@@ -786,7 +806,10 @@ mod tests {
                 .expect("patch");
             scheduler.notify();
         }
-        std::thread::sleep(Duration::from_millis(200));
+        let deadline = std::time::Instant::now() + Duration::from_millis(1000);
+        while REPORTS.load(Ordering::SeqCst) != 1 && std::time::Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(10));
+        }
         std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).expect("restore");
 
         assert_eq!(
