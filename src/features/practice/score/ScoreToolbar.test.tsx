@@ -20,20 +20,23 @@ function renderToolbar(props: Partial<Parameters<typeof ScoreToolbar>[0]> = {}) 
   const onGoToPage = vi.fn();
   const onViewChange = vi.fn();
   const onZoom = vi.fn();
+  const onToggleSearch = vi.fn();
   render(
     <I18nextProvider i18n={i18n}>
       <ScoreToolbar
         page={3}
         pageCount={12}
         view={VIEW}
+        searching={false}
         onGoToPage={onGoToPage}
+        onToggleSearch={onToggleSearch}
         onViewChange={onViewChange}
         onZoom={onZoom}
         {...props}
       />
     </I18nextProvider>,
   );
-  return { onGoToPage, onViewChange, onZoom };
+  return { onGoToPage, onViewChange, onZoom, onToggleSearch };
 }
 
 describe("the score toolbar", () => {
@@ -158,6 +161,22 @@ describe("the score toolbar", () => {
       "true",
     );
     expect(screen.getByRole("button", { name: "One page at a time" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("offers search as a toggle rather than a permanent field", async () => {
+    const { onToggleSearch } = renderToolbar();
+    await userEvent.click(screen.getByRole("button", { name: "Search this score" }));
+    expect(onToggleSearch).toHaveBeenCalledTimes(1);
+    // The row itself is the viewer's, not the toolbar's.
+    expect(screen.queryByLabelText("Search the score")).not.toBeInTheDocument();
+  });
+
+  it("shows search as engaged while the row is open", () => {
+    renderToolbar({ searching: true });
+    expect(screen.getByRole("button", { name: "Search this score" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );

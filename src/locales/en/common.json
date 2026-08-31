@@ -55,6 +55,17 @@
       "odd": "Two pages, odd first",
       "even": "Two pages, even first"
     },
+    "search": {
+      "toggle": "Search this score",
+      "label": "Search the score",
+      "placeholder": "Find in score",
+      "next": "Next match",
+      "previous": "Previous match",
+      "close": "Close search",
+      "notFound": "No matches",
+      "matches": "{{current}} of {{total}}",
+      "wrapped": "(wrapped)"
+    },
     "workerUnavailable": "Riff could not start its PDF renderer. This requires WebKitGTK {{minimum}} or newer; this system has {{webkitVersion}}."
   },
   "panesOut": {

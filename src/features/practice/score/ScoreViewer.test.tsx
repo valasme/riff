@@ -18,6 +18,8 @@ vi.mock("@/lib/ipc", async (importOriginal) => ({
 // `PDFViewer` cannot run in jsdom at all — no canvas, no layout — so it is
 // mocked at the facade, `./pdfjs`, the way `@/lib/ipc` is mocked rather than
 // `@tauri-apps/api`. Each fake keeps only the surface `ScoreViewer` touches.
+let lastBus: FakeEventBus | undefined;
+
 class FakeEventBus {
   #handlers = new Map<string, Set<(event: unknown) => void>>();
   on(name: string, handler: (event: unknown) => void) {
@@ -54,6 +56,7 @@ class FakePDFViewer {
   #eventBus: FakeEventBus;
   constructor(options: { eventBus: FakeEventBus }) {
     this.#eventBus = options.eventBus;
+    lastBus = options.eventBus;
     lastViewer = this;
   }
   get currentPageNumber() {
@@ -72,6 +75,33 @@ class FakePDFViewer {
   }
 }
 
+/**
+ * Enough of `PDFFindController` to drive the row: it subscribes to `find` on
+ * the shared bus, exactly as the real one does in its constructor, and
+ * answers with the same two events the viewer listens for.
+ */
+class FakePDFFindController {
+  #eventBus: FakeEventBus;
+  /** Set by a test to decide what the next search "finds". */
+  static result: { state: number; current: number; total: number } = {
+    state: 0,
+    current: 1,
+    total: 3,
+  };
+  constructor(options: { eventBus: FakeEventBus }) {
+    this.#eventBus = options.eventBus;
+    this.#eventBus.on("find", () => {
+      const { state, current, total } = FakePDFFindController.result;
+      this.#eventBus.dispatch("updatefindcontrolstate", {
+        source: this,
+        state,
+        matchesCount: { current, total },
+      });
+    });
+  }
+  setDocument() {}
+}
+
 class WorkerUnavailableError extends Error {}
 class PasswordException extends Error {}
 class InvalidPDFException extends Error {}
@@ -85,6 +115,7 @@ let getDocumentImpl: (options: unknown) => {
 vi.mock("./pdfjs", () => ({
   AnnotationMode: { ENABLE: 1 },
   EventBus: FakeEventBus,
+  PDFFindController: FakePDFFindController,
   PDFLinkService: FakePDFLinkService,
   PDFViewer: FakePDFViewer,
   SCORE_DOCUMENT_OPTIONS: {},
@@ -130,7 +161,9 @@ describe("ScoreViewer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     lastViewer = undefined;
+    lastBus = undefined;
     dim = 0;
+    FakePDFFindController.result = { state: 0, current: 1, total: 3 };
     ensureWorker.mockResolvedValue(undefined);
     scoreBytes.mockResolvedValue(new ArrayBuffer(4));
     scoreViewPatch.mockResolvedValue(undefined);
@@ -378,6 +411,66 @@ describe("ScoreViewer", () => {
     const surface = container.querySelector(".riff-score-viewer") as HTMLElement;
     expect(surface.dataset.dimmed).toBe("true");
     expect(surface.style.getPropertyValue("--score-dim-brightness")).toBe("0.6");
+  });
+
+  async function openSearch(numPages = 12, textItems: unknown[] = [{ str: "a" }]) {
+    getDocumentImpl = () => ({
+      promise: Promise.resolve(fakeDocument(textItems, numPages)),
+      destroy: vi.fn(),
+    });
+    const rendered = renderViewer();
+    await screen.findByRole("button", { name: "Search this score" });
+    await userEvent.click(screen.getByRole("button", { name: "Search this score" }));
+    return rendered;
+  }
+
+  it("reveals the search row from a toggle rather than keeping a field on the toolbar", async () => {
+    await openSearch();
+    expect(screen.getByLabelText("Search the score")).toBeInTheDocument();
+  });
+
+  // The highlight is painted into a layer over the canvas, which is exactly
+  // what a screen-reader user is not looking at.
+  it("announces the match count rather than only highlighting it", async () => {
+    await openSearch();
+    await userEvent.type(screen.getByLabelText("Search the score"), "andante");
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent("1 of 3");
+  });
+
+  it("says a search wrapped, since a silent restart looks like the same match twice", async () => {
+    await openSearch();
+    FakePDFFindController.result = { state: 2, current: 1, total: 3 };
+    await userEvent.type(screen.getByLabelText("Search the score"), "coda");
+    expect(await screen.findByRole("status")).toHaveTextContent("(wrapped)");
+  });
+
+  it("says plainly when there is nothing to find", async () => {
+    await openSearch();
+    FakePDFFindController.result = { state: 1, current: 0, total: 0 };
+    await userEvent.type(screen.getByLabelText("Search the score"), "zzz");
+    expect(await screen.findByRole("status")).toHaveTextContent("No matches");
+  });
+
+  // Reporting zero matches on a scan reads as a search that is broken,
+  // rather than one that was never possible. Reuses Task 5's sentence.
+  it("tells a scan it has no searchable text instead of finding nothing", async () => {
+    await openSearch(12, []);
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "This score has no searchable text.",
+    );
+    expect(screen.getByLabelText("Search the score")).toBeDisabled();
+  });
+
+  it("clears the highlights when the row is dismissed", async () => {
+    let closed = false;
+    await openSearch();
+    lastBus?.on("findbarclose", () => {
+      closed = true;
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Close search" }));
+    expect(closed).toBe(true);
+    expect(screen.queryByLabelText("Search the score")).not.toBeInTheDocument();
   });
 
   it("tears the loading task down on unmount, per the StrictMode fix", async () => {

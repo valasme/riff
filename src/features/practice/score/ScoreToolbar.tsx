@@ -5,6 +5,7 @@ import {
   Maximize2,
   RotateCw,
   ScrollText,
+  Search,
   StretchHorizontal,
   ZoomIn,
   ZoomOut,
@@ -33,19 +34,23 @@ export function ScoreToolbar({
   page,
   pageCount,
   view,
+  searching,
   onGoToPage,
   onViewChange,
   onZoom,
+  onToggleSearch,
 }: {
   page: number;
   pageCount: number;
   view: View;
+  searching: boolean;
   onGoToPage: (page: number) => void;
   onViewChange: (patch: Partial<View>) => void;
   /** Separate from `onViewChange` because stepping out of a fit mode has to
    *  start from the scale pdf.js actually resolved, which only the viewer
    *  knows. */
   onZoom: (direction: 1 | -1) => void;
+  onToggleSearch: () => void;
 }) {
   const { t } = useTranslation("common");
   const fit = nextFit(view.scale);
@@ -104,6 +109,17 @@ export function ScoreToolbar({
           ) : (
             <StretchHorizontal size={15} aria-hidden />
           )}
+        </ToolbarButton>
+
+        {/* A toggle, not a permanent field: the row it reveals costs more
+            width than the feature is worth at the ~650px the Score pane
+            gets beside Video and Audio (spec §5.1). */}
+        <ToolbarButton
+          label={t("score.search.toggle")}
+          pressed={searching}
+          onClick={onToggleSearch}
+        >
+          <Search size={15} aria-hidden />
         </ToolbarButton>
 
         <Tier tier="next">

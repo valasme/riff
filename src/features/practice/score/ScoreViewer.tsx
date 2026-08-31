@@ -7,9 +7,12 @@ import { fire, ipc, type OpenScore, type View } from "@/lib/ipc";
 import { useScoreDim } from "@/stores/settings";
 import {
   clampPage,
+  NO_SEARCH,
   PDFJS_SCROLL_MODE,
   PDFJS_SPREAD_MODE,
+  type SearchStatus,
   scaleValue,
+  searchStateFrom,
   steppedScale,
 } from "./geometry";
 import {
@@ -19,11 +22,13 @@ import {
   getDocument,
   InvalidPDFException,
   PasswordException,
+  PDFFindController,
   PDFLinkService,
   PDFViewer,
   SCORE_DOCUMENT_OPTIONS,
   WorkerUnavailableError,
 } from "./pdfjs";
+import { ScoreSearch } from "./ScoreSearch";
 import { ScoreToolbar } from "./ScoreToolbar";
 import { scoreErrorMessage } from "./scoreError";
 import { MIN_WEBKITGTK } from "./webkitVersion";
@@ -79,11 +84,15 @@ export function ScoreViewer({
   // anything, and putting it in state would rebuild the viewer on every
   // page turn.
   const pdfViewerRef = useRef<InstanceType<typeof PDFViewer> | null>(null);
+  const findControllerRef = useRef<InstanceType<typeof PDFFindController> | null>(null);
+  const eventBusRef = useRef<InstanceType<typeof EventBus> | null>(null);
   const [ready, setReady] = useState(false);
   const [hasText, setHasText] = useState(true);
   const [page, setPage] = useState(open.view.page);
   const [pageCount, setPageCount] = useState(0);
   const [view, setView] = useState<View>(open.view);
+  const [searching, setSearching] = useState(false);
+  const [search, setSearch] = useState<SearchStatus>(NO_SEARCH);
   // The callback is fresh every render; the effect below must not be, or
   // every render would tear the viewer down and rebuild it.
   const onLoadErrorRef = useRef(onLoadError);
@@ -103,6 +112,7 @@ export function ScoreViewer({
     // documented teardown path, not one improvised here.
     const abortController = new AbortController();
     const eventBus = new EventBus();
+    eventBusRef.current = eventBus;
     const linkService = new PDFLinkService({ eventBus });
     // A public field, not a constructor option: `PDFLinkService`'s
     // constructor destructures only `eventBus`, `externalLinkTarget`,
@@ -130,9 +140,37 @@ export function ScoreViewer({
       // CSP does not govern top-level navigation a script could attempt.
       enableScripting: false,
     };
-    const viewer = new PDFViewer(viewerOptions);
+    // The text layer needs no configuration for matches to land in:
+    // `textLayerMode` already defaults to `TextLayerMode.ENABLE`, so the
+    // only way to break search is to turn it off.
+    const findController = new PDFFindController({ linkService, eventBus });
+    findControllerRef.current = findController;
+    const viewer = new PDFViewer({ ...viewerOptions, findController });
     pdfViewerRef.current = viewer;
     linkService.setViewer(viewer);
+
+    function onFindState(event: {
+      state: number;
+      matchesCount?: { current: number; total: number };
+    }) {
+      setSearch((current) => ({
+        ...current,
+        state: searchStateFrom(event.state),
+        current: event.matchesCount?.current ?? 0,
+        total: event.matchesCount?.total ?? 0,
+      }));
+    }
+    eventBus.on("updatefindcontrolstate", onFindState);
+    // Fired on its own as pages are scanned, so a long score's count climbs
+    // rather than sitting at the first page's total until it finishes.
+    function onFindMatchesCount(event: { matchesCount?: { current: number; total: number } }) {
+      setSearch((current) => ({
+        ...current,
+        current: event.matchesCount?.current ?? current.current,
+        total: event.matchesCount?.total ?? current.total,
+      }));
+    }
+    eventBus.on("updatefindmatchescount", onFindMatchesCount);
 
     // The score can move without the toolbar: a chord, a pedal, a search
     // hit, a click on an internal link. `pagechanging` is the one place all
@@ -184,6 +222,7 @@ export function ScoreViewer({
         if (cancelled) return;
         viewer.setDocument(pdfDocument);
         linkService.setDocument(pdfDocument, null);
+        findController.setDocument(pdfDocument);
         // From the document rather than the `pagesloaded` event, which does
         // not fire until every page has been fetched — a 300-page score
         // would show "of 0" until then.
@@ -223,7 +262,11 @@ export function ScoreViewer({
       eventBus.off("pagerendered", onPageRendered);
       eventBus.off("pagesinit", onPagesInit);
       eventBus.off("pagechanging", onPageChanging);
+      eventBus.off("updatefindcontrolstate", onFindState);
+      eventBus.off("updatefindmatchescount", onFindMatchesCount);
       pdfViewerRef.current = null;
+      findControllerRef.current = null;
+      eventBusRef.current = null;
       abortController.abort();
       void loadingTask?.destroy();
     };
@@ -267,6 +310,39 @@ export function ScoreViewer({
     changeView({ scale: steppedScale(viewer.currentScale, direction) });
   }
 
+  /**
+   * Searching goes through the event bus rather than by calling the find
+   * controller directly: that is the interface pdf.js gives it — its
+   * constructor subscribes to `find` — and it is what keeps the highlight,
+   * the match count and the scroll-to-match in step with each other.
+   *
+   * `type: ""` starts a fresh search; `"again"` walks the matches already
+   * found. `findPrevious` is what makes Shift+Enter go backwards.
+   */
+  function find(query: string, type: "" | "again", findPrevious = false) {
+    setSearch((current) => ({ ...current, query }));
+    eventBusRef.current?.dispatch("find", {
+      source: null,
+      type,
+      query,
+      caseSensitive: false,
+      entireWord: false,
+      // Every match on the page, not only the current one — a musician
+      // scanning for a repeat wants to see them all at once.
+      highlightAll: true,
+      findPrevious,
+      matchDiacritics: false,
+    });
+  }
+
+  function closeSearch() {
+    setSearching(false);
+    setSearch(NO_SEARCH);
+    // Clears the highlights; without it they stay painted over the score
+    // after the row that explained them has gone.
+    eventBusRef.current?.dispatch("findbarclose", { source: null });
+  }
+
   return (
     <>
       {/* Beneath the pane header, which is left exactly as it is — twelve
@@ -276,9 +352,21 @@ export function ScoreViewer({
           page={page}
           pageCount={pageCount}
           view={view}
+          searching={searching}
           onGoToPage={goToPage}
           onViewChange={changeView}
           onZoom={zoom}
+          onToggleSearch={() => (searching ? closeSearch() : setSearching(true))}
+        />
+      )}
+      {ready && searching && (
+        <ScoreSearch
+          query={search.query}
+          status={search}
+          hasText={hasText}
+          onQueryChange={(query) => find(query, "")}
+          onFindAgain={(direction) => find(search.query, "again", direction === -1)}
+          onClose={closeSearch}
         />
       )}
       <div className="relative min-h-0 flex-1">
@@ -313,7 +401,10 @@ export function ScoreViewer({
             </div>
           </div>
         )}
-        {ready && !hasText && (
+        {/* Not while the search row is open: it says the same sentence, in
+            the place the question was just asked, and two `role="status"`
+            elements carrying identical text is one announcement too many. */}
+        {ready && !hasText && !searching && (
           <p
             role="status"
             className="absolute inset-x-0 bottom-0 bg-card/90 px-3 py-1.5 text-center text-[0.75rem] text-muted-foreground"

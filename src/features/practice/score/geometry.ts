@@ -95,6 +95,42 @@ export function nextScrollMode(mode: ScrollMode): ScrollMode {
   return mode === "continuous" ? "page" : "continuous";
 }
 
+/** What the search row is currently reporting. */
+export interface SearchStatus {
+  query: string;
+  state: "pending" | "found" | "not-found" | "wrapped";
+  /** 1-based, as shown; 0 while there is nothing to point at. */
+  current: number;
+  total: number;
+}
+
+export const NO_SEARCH: SearchStatus = {
+  query: "",
+  state: "pending",
+  current: 0,
+  total: 0,
+};
+
+/**
+ * pdf.js's `FindState` in Riff's words. A plain lookup rather than a
+ * re-export, because the numbers are module-private in `pdf_viewer.mjs` and
+ * the four states are worth naming: "wrapped" in particular has to reach the
+ * interface, since a search that silently restarts at the top looks like a
+ * search that found the same match twice.
+ */
+export function searchStateFrom(findState: number): SearchStatus["state"] {
+  switch (findState) {
+    case 0:
+      return "found";
+    case 1:
+      return "not-found";
+    case 2:
+      return "wrapped";
+    default:
+      return "pending";
+  }
+}
+
 /**
  * Riff's two scroll modes in pdf.js's four-value enum. Horizontal and
  * wrapped are deliberately not exposed — see `CONTEXT.md`'s "View" entry.

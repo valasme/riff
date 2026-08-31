@@ -10,6 +10,7 @@ import {
   PDFJS_SCROLL_MODE,
   PDFJS_SPREAD_MODE,
   scaleValue,
+  searchStateFrom,
   steppedScale,
   TOOLBAR_TIERS,
 } from "./geometry";
@@ -152,5 +153,20 @@ describe("nextSpread and nextScrollMode", () => {
     expect(PDFJS_SCROLL_MODE.continuous).toBe(0);
     expect(PDFJS_SCROLL_MODE.page).toBe(3);
     expect(PDFJS_SPREAD_MODE).toEqual({ none: 0, odd: 1, even: 2 });
+  });
+});
+
+describe("searchStateFrom", () => {
+  // pdf.js's FindState numbers are module-private, so they are transcribed
+  // here and named in Riff's words.
+  it("names each of pdf.js's find states", () => {
+    expect(searchStateFrom(0)).toBe("found");
+    expect(searchStateFrom(1)).toBe("not-found");
+    expect(searchStateFrom(2)).toBe("wrapped");
+    expect(searchStateFrom(3)).toBe("pending");
+  });
+
+  it("treats anything it does not recognise as still pending", () => {
+    expect(searchStateFrom(99)).toBe("pending");
   });
 });
