@@ -33,10 +33,29 @@ export function isTypingTarget(target: EventTarget | null): boolean {
   return false;
 }
 
+/**
+ * Key names that need more than a capitalised first letter.
+ *
+ * `chordFromEvent` uses `event.key.toLowerCase()` verbatim, so the page-turn
+ * chords arrive as `"pageup"` and `"arrowright"` — which the general rule
+ * below renders as "Pageup" and "Arrowright". Arrows become glyphs because
+ * that is the convention every shortcut UI uses and they stay legible in an
+ * 18px chip; `Kbd` marks the whole badge `aria-hidden`, so no screen reader
+ * has to read one out.
+ */
+const KEY_LABELS: Record<string, string> = {
+  pageup: "Page Up",
+  pagedown: "Page Down",
+  arrowleft: "←",
+  arrowright: "→",
+};
+
 export function formatChord(chord: string): string {
   return chord
     .split("+")
     .map((part) => {
+      const label = KEY_LABELS[part];
+      if (label) return label;
       if (part.length === 1) return part.toUpperCase();
       const [first, ...rest] = part;
       return first ? first.toUpperCase() + rest.join("") : part;

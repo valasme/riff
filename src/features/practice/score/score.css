@@ -13,6 +13,37 @@
   --score-page-gap: 1rem;
 }
 
+/* Toolbar overflow (spec §5.1). Container queries, never viewport media
+   queries: the Score pane runs from roughly 650px beside Video and Audio to
+   the full width of a pop-out window, at any of five UI scales, and a media
+   query cannot see UI scale at all. In `rem` for the same reason — the
+   threshold has to grow with the text it is making room for.
+
+   Which control sits in which tier is `TOOLBAR_TIERS` in `geometry.ts`; the
+   widths live only here, so there is one place to change and nothing to
+   drift. Both copies of a collapsing control are rendered and exactly one is
+   `display: none` — which also takes the hidden one out of the
+   accessibility tree, so a screen reader never hears "Rotate" twice. */
+@container score-toolbar (width < 34rem) {
+  [data-toolbar-tier="next"] {
+    display: none;
+  }
+}
+
+@container score-toolbar (width < 46rem) {
+  [data-toolbar-tier="last"] {
+    display: none;
+  }
+}
+
+/* The overflow menu is the mirror image: present only while something has
+   collapsed into it, so it never appears as an empty button. */
+@container score-toolbar (width >= 46rem) {
+  [data-toolbar-overflow] {
+    display: none;
+  }
+}
+
 /* Set through pdf.js's OWN variables rather than by overwriting the
    `border`/`margin` declarations that read them. The two are a matched pair
    — stock is a 9px transparent border with `1px auto -8px` margins pulling

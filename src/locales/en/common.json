@@ -35,6 +35,12 @@
   "score": {
     "loading": "Opening {{name}}…",
     "noText": "This score has no searchable text.",
+    "toolbar": "Score controls",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "pageNumber": "Page number",
+    "pageOf": "of {{total}}",
+    "pageAnnouncement": "Page {{page}} of {{total}}",
     "workerUnavailable": "Riff could not start its PDF renderer. This requires WebKitGTK {{minimum}} or newer; this system has {{webkitVersion}}."
   },
   "panesOut": {

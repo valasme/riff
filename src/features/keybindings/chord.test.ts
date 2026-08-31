@@ -51,4 +51,19 @@ describe("formatChord", () => {
     expect(formatChord("alt+k")).toBe("Alt+K");
     expect(formatChord("ctrl+,")).toBe("Ctrl+,");
   });
+
+  // The general rule capitalises the first letter, which was right while
+  // every chord was a letter or a modifier. `event.key.toLowerCase()` gives
+  // "pageup" and "arrowright", so the palette rendered "Pageup" and
+  // "Arrowright" — the page-turn chords, and the ones a pedal sends.
+  it("renders the page-turn keys legibly rather than as one run-on word", () => {
+    expect(formatChord("pageup")).toBe("Page Up");
+    expect(formatChord("pagedown")).toBe("Page Down");
+    expect(formatChord("arrowleft")).toBe("←");
+    expect(formatChord("arrowright")).toBe("→");
+  });
+
+  it("still formats a modified page-turn chord as one badge per key", () => {
+    expect(formatChord("ctrl+pagedown")).toBe("Ctrl+Page Down");
+  });
 });

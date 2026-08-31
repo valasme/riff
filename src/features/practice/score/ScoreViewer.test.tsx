@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { I18nextProvider } from "react-i18next";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/app/i18n";
@@ -42,10 +43,20 @@ class FakePDFViewer {
   // has chosen a scale for renders at 100%, which is the bug `pagesinit`
   // below exists to close.
   currentScaleValue: string | null = null;
+  #currentPageNumber = 1;
   #eventBus: FakeEventBus;
   constructor(options: { eventBus: FakeEventBus }) {
     this.#eventBus = options.eventBus;
     lastViewer = this;
+  }
+  get currentPageNumber() {
+    return this.#currentPageNumber;
+  }
+  // The real setter dispatches `pagechanging`, which is what the page
+  // indicator follows — rather than being set wherever a turn is requested.
+  set currentPageNumber(value: number) {
+    this.#currentPageNumber = value;
+    this.#eventBus.dispatch("pagechanging", { source: this, pageNumber: value });
   }
   setDocument(document: unknown) {
     this.pdfDocument = document;
@@ -91,9 +102,9 @@ const OPEN: OpenScore = {
   },
 };
 
-function fakeDocument(textItems: unknown[] = [{}]) {
+function fakeDocument(textItems: unknown[] = [{}], numPages = 1) {
   return {
-    numPages: 1,
+    numPages,
     getPage: vi.fn().mockResolvedValue({
       getTextContent: vi.fn().mockResolvedValue({ items: textItems }),
     }),
@@ -221,6 +232,60 @@ describe("ScoreViewer", () => {
       </I18nextProvider>,
     );
     await waitFor(() => expect(lastViewer?.currentScaleValue).toBe("1.25"));
+  });
+
+  it("shows the toolbar with the document's page count once the score is ready", async () => {
+    getDocumentImpl = () => ({
+      promise: Promise.resolve(fakeDocument([{ str: "a" }], 12)),
+      destroy: vi.fn(),
+    });
+    renderViewer();
+    expect(await screen.findByText("of 12")).toBeInTheDocument();
+    expect(screen.getByLabelText("Page number")).toHaveValue(1);
+  });
+
+  it("has no toolbar to mislead with while the score is still loading", () => {
+    getDocumentImpl = () => ({ promise: new Promise(() => {}), destroy: vi.fn() });
+    renderViewer();
+    expect(screen.queryByLabelText("Score controls")).not.toBeInTheDocument();
+  });
+
+  it("turns the page through the viewer rather than tracking a number of its own", async () => {
+    getDocumentImpl = () => ({
+      promise: Promise.resolve(fakeDocument([{ str: "a" }], 12)),
+      destroy: vi.fn(),
+    });
+    renderViewer();
+    await userEvent.click(await screen.findByRole("button", { name: "Next page" }));
+    expect(lastViewer?.currentPageNumber).toBe(2);
+    expect(screen.getByLabelText("Page number")).toHaveValue(2);
+  });
+
+  // A pedal, a chord, a search hit and an internal link all move the score
+  // without touching the toolbar; `pagechanging` is where they converge.
+  it("follows a page change it did not initiate", async () => {
+    getDocumentImpl = () => ({
+      promise: Promise.resolve(fakeDocument([{ str: "a" }], 12)),
+      destroy: vi.fn(),
+    });
+    renderViewer();
+    await screen.findByText("of 12");
+    act(() => {
+      const viewer = lastViewer;
+      if (viewer) viewer.currentPageNumber = 7;
+    });
+    expect(screen.getByLabelText("Page number")).toHaveValue(7);
+  });
+
+  it("announces the page politely, since the indicator is a number nobody is looking at", async () => {
+    getDocumentImpl = () => ({
+      promise: Promise.resolve(fakeDocument([{ str: "a" }], 12)),
+      destroy: vi.fn(),
+    });
+    const { container } = renderViewer();
+    await screen.findByText("of 12");
+    const live = container.querySelector('[aria-live="polite"]');
+    expect(live).toHaveTextContent("Page 1 of 12");
   });
 
   it("tears the loading task down on unmount, per the StrictMode fix", async () => {

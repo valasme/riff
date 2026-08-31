@@ -4,7 +4,7 @@ import "./score.css";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ipc, type OpenScore } from "@/lib/ipc";
-import { scaleValue } from "./geometry";
+import { clampPage, scaleValue } from "./geometry";
 import {
   AnnotationMode,
   EventBus,
@@ -17,6 +17,7 @@ import {
   SCORE_DOCUMENT_OPTIONS,
   WorkerUnavailableError,
 } from "./pdfjs";
+import { ScoreToolbar } from "./ScoreToolbar";
 import { scoreErrorMessage } from "./scoreError";
 import { MIN_WEBKITGTK } from "./webkitVersion";
 
@@ -42,8 +43,15 @@ export function ScoreViewer({
   const { t } = useTranslation(["common", "errors"]);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<HTMLDivElement | null>(null);
+  // The live `PDFViewer`, reachable outside the effect that builds it so the
+  // toolbar can drive it. Not state: replacing it does not re-render
+  // anything, and putting it in state would rebuild the viewer on every
+  // page turn.
+  const pdfViewerRef = useRef<InstanceType<typeof PDFViewer> | null>(null);
   const [ready, setReady] = useState(false);
   const [hasText, setHasText] = useState(true);
+  const [page, setPage] = useState(open.view.page);
+  const [pageCount, setPageCount] = useState(0);
   // The callback is fresh every render; the effect below must not be, or
   // every render would tear the viewer down and rebuild it.
   const onLoadErrorRef = useRef(onLoadError);
@@ -91,7 +99,17 @@ export function ScoreViewer({
       enableScripting: false,
     };
     const viewer = new PDFViewer(viewerOptions);
+    pdfViewerRef.current = viewer;
     linkService.setViewer(viewer);
+
+    // The score can move without the toolbar: a chord, a pedal, a search
+    // hit, a click on an internal link. `pagechanging` is the one place all
+    // of those converge, which is why the indicator follows it rather than
+    // being set wherever a page turn is requested.
+    function onPageChanging(event: { pageNumber: number }) {
+      setPage(event.pageNumber);
+    }
+    eventBus.on("pagechanging", onPageChanging);
 
     function onPageRendered(event: PageRenderedEvent) {
       // The text layer is the accessible content (spec §10); the canvas is
@@ -137,6 +155,10 @@ export function ScoreViewer({
         if (cancelled) return;
         viewer.setDocument(pdfDocument);
         linkService.setDocument(pdfDocument, null);
+        // From the document rather than the `pagesloaded` event, which does
+        // not fire until every page has been fetched — a 300-page score
+        // would show "of 0" until then.
+        setPageCount(pdfDocument.numPages);
         setReady(true);
 
         const firstPage = await pdfDocument.getPage(1);
@@ -171,6 +193,8 @@ export function ScoreViewer({
       resizeObserver.disconnect();
       eventBus.off("pagerendered", onPageRendered);
       eventBus.off("pagesinit", onPagesInit);
+      eventBus.off("pagechanging", onPageChanging);
+      pdfViewerRef.current = null;
       abortController.abort();
       void loadingTask?.destroy();
     };
@@ -179,34 +203,53 @@ export function ScoreViewer({
     // this effect: a new score, not a changed `t` or callback identity.
   }, [open.score.name, open.score.size]);
 
+  function goToPage(next: number) {
+    const viewer = pdfViewerRef.current;
+    if (!viewer) return;
+    viewer.currentPageNumber = clampPage(next, pageCount, page);
+  }
+
   return (
-    <div className="relative min-h-0 flex-1">
-      <div ref={containerRef} className="riff-score-viewer absolute inset-0 overflow-auto">
-        <div ref={viewerRef} className="pdfViewer" />
-      </div>
-      {!ready && (
-        <div className="absolute inset-0 grid place-items-center bg-card">
-          <div className="flex flex-col items-center gap-2 text-[0.8125rem] text-muted-foreground">
-            {/* No progress bar: with `data:` there is no streaming, the IPC
+    <>
+      {/* Beneath the pane header, which is left exactly as it is — twelve
+          controls do not go beside `⧉` and `×`. */}
+      {ready && <ScoreToolbar page={page} pageCount={pageCount} onGoToPage={goToPage} />}
+      <div className="relative min-h-0 flex-1">
+        <div ref={containerRef} className="riff-score-viewer absolute inset-0 overflow-auto">
+          <div ref={viewerRef} className="pdfViewer" />
+        </div>
+        {!ready && (
+          <div className="absolute inset-0 grid place-items-center bg-card">
+            <div className="flex flex-col items-center gap-2 text-[0.8125rem] text-muted-foreground">
+              {/* No progress bar: with `data:` there is no streaming, the IPC
                 transfer reports nothing, and parsing is not instrumented —
                 an honest percentage does not exist here. */}
-            <span
-              aria-hidden
-              className="size-5 animate-spin rounded-full border-2 border-current border-t-transparent"
-            />
-            <span>{t("common:score.loading", { name: open.score.name })}</span>
+              <span
+                aria-hidden
+                className="size-5 animate-spin rounded-full border-2 border-current border-t-transparent"
+              />
+              <span>{t("common:score.loading", { name: open.score.name })}</span>
+            </div>
           </div>
-        </div>
-      )}
-      {ready && !hasText && (
-        <p
-          role="status"
-          className="absolute inset-x-0 bottom-0 bg-card/90 px-3 py-1.5 text-center text-[0.75rem] text-muted-foreground"
-        >
-          {t("common:score.noText")}
-        </p>
-      )}
-    </div>
+        )}
+        {ready && !hasText && (
+          <p
+            role="status"
+            className="absolute inset-x-0 bottom-0 bg-card/90 px-3 py-1.5 text-center text-[0.75rem] text-muted-foreground"
+          >
+            {t("common:score.noText")}
+          </p>
+        )}
+      </div>
+      {/* The same pattern the route announcer uses in `__root.tsx`: a page
+          turn is silent to a screen reader otherwise, and the indicator that
+          shows it is a number nobody is looking at. */}
+      <div aria-live="polite" className="sr-only">
+        {ready && pageCount > 0
+          ? t("common:score.pageAnnouncement", { page, total: pageCount })
+          : ""}
+      </div>
+    </>
   );
 }
 
