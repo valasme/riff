@@ -4,16 +4,36 @@ import { I18nextProvider } from "react-i18next";
 import { describe, expect, it, vi } from "vitest";
 import i18n from "@/app/i18n";
 import { isTypingTarget } from "@/features/keybindings/chord";
+import type { View } from "@/lib/ipc";
 import { ScoreToolbar } from "./ScoreToolbar";
+
+const VIEW: View = {
+  page: 3,
+  scale: { mode: "fit-width" },
+  rotation: 0,
+  spread: "none",
+  scrollMode: "continuous",
+  autoScrollSpeed: 1,
+};
 
 function renderToolbar(props: Partial<Parameters<typeof ScoreToolbar>[0]> = {}) {
   const onGoToPage = vi.fn();
+  const onViewChange = vi.fn();
+  const onZoom = vi.fn();
   render(
     <I18nextProvider i18n={i18n}>
-      <ScoreToolbar page={3} pageCount={12} onGoToPage={onGoToPage} {...props} />
+      <ScoreToolbar
+        page={3}
+        pageCount={12}
+        view={VIEW}
+        onGoToPage={onGoToPage}
+        onViewChange={onViewChange}
+        onZoom={onZoom}
+        {...props}
+      />
     </I18nextProvider>,
   );
-  return { onGoToPage };
+  return { onGoToPage, onViewChange, onZoom };
 }
 
 describe("the score toolbar", () => {
@@ -83,6 +103,64 @@ describe("the score toolbar", () => {
   it("leaves arrows in the page field to move the caret, not the score", () => {
     renderToolbar();
     expect(isTypingTarget(screen.getByLabelText("Page number"))).toBe(true);
+  });
+
+  it("toggles between fit width and fit page", async () => {
+    const { onViewChange } = renderToolbar();
+    await userEvent.click(screen.getByRole("button", { name: "Fit page" }));
+    expect(onViewChange).toHaveBeenCalledWith({ scale: { mode: "fit-page" } });
+  });
+
+  // The label and the action come from one `nextFit` call. Computed apart,
+  // the button said "Fit page" while taking you to fit width.
+  it("labels the fit control with what pressing it does", async () => {
+    const { onViewChange } = renderToolbar({
+      view: { ...VIEW, scale: { mode: "custom", value: 2 } },
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Fit width" }));
+    expect(onViewChange).toHaveBeenCalledWith({ scale: { mode: "fit-width" } });
+  });
+
+  // Only the viewer knows what fit width resolved to in this pane, so the
+  // toolbar asks for a direction rather than computing a scale.
+  it("asks the viewer to zoom rather than computing a scale it cannot know", async () => {
+    const { onZoom, onViewChange } = renderToolbar();
+    await userEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    expect(onZoom).toHaveBeenCalledWith(1);
+    await userEvent.click(screen.getByRole("button", { name: "Zoom out" }));
+    expect(onZoom).toHaveBeenCalledWith(-1);
+    expect(onViewChange).not.toHaveBeenCalled();
+  });
+
+  it("rotates the whole score in 90° steps", async () => {
+    const { onViewChange } = renderToolbar();
+    await userEvent.click(screen.getByRole("button", { name: "Rotate 90°" }));
+    expect(onViewChange).toHaveBeenCalledWith({ rotation: 90 });
+  });
+
+  it("cycles the spread", async () => {
+    const { onViewChange } = renderToolbar();
+    await userEvent.click(screen.getByRole("button", { name: "Single pages" }));
+    expect(onViewChange).toHaveBeenCalledWith({ spread: "odd" });
+  });
+
+  it("switches between continuous and one page at a time", async () => {
+    const { onViewChange } = renderToolbar();
+    await userEvent.click(screen.getByRole("button", { name: "Scrolling continuously" }));
+    expect(onViewChange).toHaveBeenCalledWith({ scrollMode: "page" });
+  });
+
+  // Colour alone would leave the state invisible to a screen reader.
+  it("says which controls are currently on, not only shows it", () => {
+    renderToolbar({ view: { ...VIEW, spread: "odd", scrollMode: "page" } });
+    expect(screen.getByRole("button", { name: "Two pages, odd first" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "One page at a time" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 
   it("keeps its targets at least 24px in both densities rather than shrinking them", () => {

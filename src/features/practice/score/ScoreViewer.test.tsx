@@ -7,9 +7,10 @@ import type { OpenScore } from "@/lib/ipc";
 
 const scoreBytes = vi.fn();
 const appInfo = vi.fn();
+const scoreViewPatch = vi.fn().mockResolvedValue(undefined);
 vi.mock("@/lib/ipc", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/ipc")>()),
-  ipc: { scoreBytes, appInfo },
+  ipc: { scoreBytes, appInfo, scoreViewPatch },
 }));
 
 // `PDFViewer` cannot run in jsdom at all — no canvas, no layout — so it is
@@ -43,6 +44,10 @@ class FakePDFViewer {
   // has chosen a scale for renders at 100%, which is the bug `pagesinit`
   // below exists to close.
   currentScaleValue: string | null = null;
+  currentScale = 1;
+  pagesRotation = 0;
+  spreadMode = 0;
+  scrollMode = 0;
   #currentPageNumber = 1;
   #eventBus: FakeEventBus;
   constructor(options: { eventBus: FakeEventBus }) {
@@ -125,6 +130,7 @@ describe("ScoreViewer", () => {
     lastViewer = undefined;
     ensureWorker.mockResolvedValue(undefined);
     scoreBytes.mockResolvedValue(new ArrayBuffer(4));
+    scoreViewPatch.mockResolvedValue(undefined);
     appInfo.mockResolvedValue({
       webkitVersion: "2.10.0",
       version: "0",
@@ -286,6 +292,67 @@ describe("ScoreViewer", () => {
     await screen.findByText("of 12");
     const live = container.querySelector('[aria-live="polite"]');
     expect(live).toHaveTextContent("Page 1 of 12");
+  });
+
+  async function renderReady(numPages = 12) {
+    getDocumentImpl = () => ({
+      promise: Promise.resolve(fakeDocument([{ str: "a" }], numPages)),
+      destroy: vi.fn(),
+    });
+    const rendered = renderViewer();
+    await screen.findByText(`of ${numPages}`);
+    return rendered;
+  }
+
+  it("applies rotation, spread and scroll mode to the viewer and records all three", async () => {
+    await renderReady();
+
+    await userEvent.click(screen.getByRole("button", { name: "Rotate 90°" }));
+    expect(lastViewer?.pagesRotation).toBe(90);
+
+    await userEvent.click(screen.getByRole("button", { name: "Single pages" }));
+    expect(lastViewer?.spreadMode).toBe(1);
+
+    await userEvent.click(screen.getByRole("button", { name: "Scrolling continuously" }));
+    expect(lastViewer?.scrollMode).toBe(3);
+
+    // The command takes a whole view, not a partial patch, so the last call
+    // carries every value the round trip has to survive.
+    expect(scoreViewPatch).toHaveBeenLastCalledWith(
+      expect.objectContaining({ rotation: 90, spread: "odd", scrollMode: "page" }),
+    );
+  });
+
+  it("fits to the pane rather than the window, and says so as a keyword", async () => {
+    await renderReady();
+    await userEvent.click(screen.getByRole("button", { name: "Fit page" }));
+    // "page-fit", not a number: the scale is resolved by pdf.js against the
+    // container's own width, which is the pane — a window resize is not
+    // what this follows.
+    expect(lastViewer?.currentScaleValue).toBe("page-fit");
+    expect(scoreViewPatch).toHaveBeenLastCalledWith(
+      expect.objectContaining({ scale: { mode: "fit-page" } }),
+    );
+  });
+
+  it("steps zoom from the scale pdf.js resolved, leaving the fit mode", async () => {
+    await renderReady();
+    // What fit width came out as in this pane — not 100%.
+    if (lastViewer) lastViewer.currentScale = 0.6;
+    await userEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    expect(scoreViewPatch).toHaveBeenLastCalledWith(
+      expect.objectContaining({ scale: { mode: "custom", value: 0.66 } }),
+    );
+    expect(lastViewer?.currentScaleValue).toBe("0.66");
+  });
+
+  // Page moves far more often than these do, and Task 11 owns writing it
+  // alongside the restore that reads it back.
+  it("does not write the page number yet, which would overwrite what a reopen restores", async () => {
+    await renderReady();
+    scoreViewPatch.mockClear();
+    await userEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(scoreViewPatch).not.toHaveBeenCalled();
   });
 
   it("tears the loading task down on unmount, per the StrictMode fix", async () => {

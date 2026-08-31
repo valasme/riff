@@ -1,8 +1,19 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Columns2,
+  Maximize2,
+  RotateCw,
+  ScrollText,
+  StretchHorizontal,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
-import { clampPage } from "./geometry";
+import type { View } from "@/lib/ipc";
+import { clampPage, nextFit, nextRotation, nextScrollMode, nextSpread } from "./geometry";
 
 /**
  * The row beneath the pane header. **A labelled group of ordinary tabbable
@@ -21,13 +32,23 @@ import { clampPage } from "./geometry";
 export function ScoreToolbar({
   page,
   pageCount,
+  view,
   onGoToPage,
+  onViewChange,
+  onZoom,
 }: {
   page: number;
   pageCount: number;
+  view: View;
   onGoToPage: (page: number) => void;
+  onViewChange: (patch: Partial<View>) => void;
+  /** Separate from `onViewChange` because stepping out of a fit mode has to
+   *  start from the scale pdf.js actually resolved, which only the viewer
+   *  knows. */
+  onZoom: (direction: 1 | -1) => void;
 }) {
   const { t } = useTranslation("common");
+  const fit = nextFit(view.scale);
 
   return (
     <div
@@ -63,9 +84,81 @@ export function ScoreToolbar({
         >
           <ChevronRight size={15} aria-hidden />
         </ToolbarButton>
+
+        <Separator />
+
+        {/* Always visible: without a fit control a score that is too wide or
+            too tall has no way back.
+
+            Labelled with what pressing it *does*, not with the mode it is
+            in — and both come from one `nextFit` call, because computing
+            them separately is how a button ends up saying "Fit page" while
+            taking you to fit width. Not `aria-pressed`: this alternates
+            between two modes rather than toggling one thing on and off. */}
+        <ToolbarButton
+          label={fit.mode === "fit-page" ? t("score.fitPage") : t("score.fitWidth")}
+          onClick={() => onViewChange({ scale: fit })}
+        >
+          {fit.mode === "fit-page" ? (
+            <Maximize2 size={15} aria-hidden />
+          ) : (
+            <StretchHorizontal size={15} aria-hidden />
+          )}
+        </ToolbarButton>
+
+        <Tier tier="next">
+          <ToolbarButton label={t("score.zoomOut")} onClick={() => onZoom(-1)}>
+            <ZoomOut size={15} aria-hidden />
+          </ToolbarButton>
+          <ToolbarButton label={t("score.zoomIn")} onClick={() => onZoom(1)}>
+            <ZoomIn size={15} aria-hidden />
+          </ToolbarButton>
+          {/* Continuous or one page at a time. On the toolbar rather than
+              buried because the two suit two different users: continuous is
+              what auto-scroll is for, page-at-a-time is what a pedal user
+              wants, since a turn then lands on a whole page rather than
+              somewhere between two. */}
+          <ToolbarButton
+            label={t(`score.scrollMode.${view.scrollMode}`)}
+            pressed={view.scrollMode === "page"}
+            onClick={() => onViewChange({ scrollMode: nextScrollMode(view.scrollMode) })}
+          >
+            <ScrollText size={15} aria-hidden />
+          </ToolbarButton>
+          <ToolbarButton
+            label={t(`score.spread.${view.spread}`)}
+            pressed={view.spread !== "none"}
+            onClick={() => onViewChange({ spread: nextSpread(view.spread) })}
+          >
+            <Columns2 size={15} aria-hidden />
+          </ToolbarButton>
+          <ToolbarButton
+            label={t("score.rotate")}
+            onClick={() => onViewChange({ rotation: nextRotation(view.rotation) })}
+          >
+            <RotateCw size={15} aria-hidden />
+          </ToolbarButton>
+        </Tier>
       </fieldset>
     </div>
   );
+}
+
+/**
+ * One tier of the overflow order in spec §5.1. The tier is an attribute
+ * rather than a class so `score.css` owns the widths it gives way at — see
+ * `TOOLBAR_TIERS` in `geometry.ts` for why the two halves live apart.
+ */
+function Tier({ tier, children }: { tier: "next" | "last"; children: React.ReactNode }) {
+  return (
+    <div data-toolbar-tier={tier} className="flex items-center gap-1">
+      {children}
+    </div>
+  );
+}
+
+function Separator() {
+  return <span aria-hidden className="mx-0.5 h-4 w-px shrink-0 bg-line" />;
 }
 
 /**
@@ -145,11 +238,16 @@ function ToolbarButton({
   label,
   onClick,
   disabled,
+  pressed,
   children,
 }: {
   label: string;
   onClick: () => void;
   disabled?: boolean;
+  /** A control that is currently *on* — spread, page-at-a-time, a fit mode.
+   *  `aria-pressed` rather than colour alone, so the state is available to a
+   *  screen reader and not only to someone looking at the row. */
+  pressed?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -157,6 +255,7 @@ function ToolbarButton({
       type="button"
       aria-label={label}
       title={label}
+      aria-pressed={pressed}
       onClick={onClick}
       disabled={disabled}
       aria-disabled={disabled || undefined}
@@ -165,6 +264,7 @@ function ToolbarButton({
         disabled
           ? "opacity-40"
           : "transition-colors duration-[var(--motion-fast)] ease-(--ease-standard) hover:bg-active-fill hover:text-foreground",
+        pressed && !disabled && "bg-active-fill text-foreground",
       )}
     >
       {children}

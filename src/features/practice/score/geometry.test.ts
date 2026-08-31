@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { chordFromEvent } from "@/features/keybindings/chord";
-import { clampPage, PAGE_TURN_CHORDS, scaleValue, TOOLBAR_TIERS } from "./geometry";
+import {
+  clampPage,
+  nextFit,
+  nextRotation,
+  nextScrollMode,
+  nextSpread,
+  PAGE_TURN_CHORDS,
+  PDFJS_SCROLL_MODE,
+  PDFJS_SPREAD_MODE,
+  scaleValue,
+  steppedScale,
+  TOOLBAR_TIERS,
+} from "./geometry";
 
 describe("scaleValue", () => {
   it("maps fit width to the string pdf.js recognises", () => {
@@ -68,5 +80,77 @@ describe("the toolbar tiers", () => {
   it("assign every control to exactly one tier", () => {
     const all = [...TOOLBAR_TIERS.always, ...TOOLBAR_TIERS.next, ...TOOLBAR_TIERS.last];
     expect(new Set(all).size).toBe(all.length);
+  });
+});
+
+describe("steppedScale", () => {
+  // Free zoom leaves the fit mode rather than fighting it (spec §6), so a
+  // step always lands on a number, never back on a keyword.
+  it("leaves the fit mode for a numeric scale", () => {
+    expect(steppedScale(1, 1)).toEqual({ mode: "custom", value: 1.1 });
+    expect(steppedScale(1, -1)).toEqual({ mode: "custom", value: 0.91 });
+  });
+
+  it("steps from the scale actually on screen, not from a stored keyword", () => {
+    // Fit width in a narrow pane might have resolved to 0.6; one step in is
+    // relative to that, not to 100%.
+    expect(steppedScale(0.6, 1)).toEqual({ mode: "custom", value: 0.66 });
+  });
+
+  it("clamps at pdf.js's own bounds rather than zooming to nothing", () => {
+    expect(steppedScale(0.1, -1)).toEqual({ mode: "custom", value: 0.1 });
+    expect(steppedScale(25, 1)).toEqual({ mode: "custom", value: 25 });
+  });
+
+  it("rounds, so repeated steps do not write a floating-point tail to disk", () => {
+    const stepped = steppedScale(1.331, 1);
+    expect(stepped.mode).toBe("custom");
+    if (stepped.mode !== "custom") return;
+    expect(Number.isInteger(stepped.value * 100)).toBe(true);
+  });
+});
+
+describe("the fit toggle", () => {
+  it("alternates width and page", () => {
+    expect(nextFit({ mode: "fit-width" })).toEqual({ mode: "fit-page" });
+    expect(nextFit({ mode: "fit-page" })).toEqual({ mode: "fit-width" });
+  });
+
+  // "custom" is somewhere you arrive by zooming, not somewhere a toggle
+  // should be able to put you.
+  it("brings free zoom back to a fit mode", () => {
+    expect(nextFit({ mode: "custom", value: 2.4 })).toEqual({ mode: "fit-width" });
+  });
+});
+
+describe("nextRotation", () => {
+  it("steps in 90° and wraps, since pdf.js throws on anything else", () => {
+    expect(nextRotation(0)).toBe(90);
+    expect(nextRotation(270)).toBe(0);
+  });
+
+  it("normalises a hand-edited negative rotation rather than passing it on", () => {
+    expect(nextRotation(-90)).toBe(0);
+  });
+});
+
+describe("nextSpread and nextScrollMode", () => {
+  it("cycles the three spreads", () => {
+    expect(nextSpread("none")).toBe("odd");
+    expect(nextSpread("odd")).toBe("even");
+    expect(nextSpread("even")).toBe("none");
+  });
+
+  it("toggles the two scroll modes Riff exposes", () => {
+    expect(nextScrollMode("continuous")).toBe("page");
+    expect(nextScrollMode("page")).toBe("continuous");
+  });
+
+  // Riff exposes two of pdf.js's four; horizontal and wrapped are not
+  // Riff's vocabulary — see CONTEXT.md's "View" entry.
+  it("maps onto the pdf.js enum values, not onto its ordinals", () => {
+    expect(PDFJS_SCROLL_MODE.continuous).toBe(0);
+    expect(PDFJS_SCROLL_MODE.page).toBe(3);
+    expect(PDFJS_SPREAD_MODE).toEqual({ none: 0, odd: 1, even: 2 });
   });
 });

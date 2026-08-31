@@ -41,6 +41,20 @@
     "pageNumber": "Page number",
     "pageOf": "of {{total}}",
     "pageAnnouncement": "Page {{page}} of {{total}}",
+    "fitWidth": "Fit width",
+    "fitPage": "Fit page",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "rotate": "Rotate 90°",
+    "scrollMode": {
+      "continuous": "Scrolling continuously",
+      "page": "One page at a time"
+    },
+    "spread": {
+      "none": "Single pages",
+      "odd": "Two pages, odd first",
+      "even": "Two pages, even first"
+    },
     "workerUnavailable": "Riff could not start its PDF renderer. This requires WebKitGTK {{minimum}} or newer; this system has {{webkitVersion}}."
   },
   "panesOut": {

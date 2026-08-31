@@ -1,4 +1,4 @@
-import type { Scale } from "@/lib/ipc";
+import type { Scale, ScrollMode, SpreadMode } from "@/lib/ipc";
 
 /**
  * The chords a commodity page-turner pedal sends, per spec §6.1. Bluetooth
@@ -46,6 +46,69 @@ export function clampPage(page: number, pageCount: number, current: number): num
   if (!Number.isFinite(page)) return current;
   return Math.min(Math.max(Math.trunc(page), 1), Math.max(pageCount, 1));
 }
+
+/**
+ * pdf.js's own zoom bounds and step, so Riff's `+`/`−` land on the same
+ * scales its reference viewer would. Copied deliberately rather than
+ * imported: they are module-private constants in `pdf_viewer.mjs`.
+ */
+const MIN_SCALE = 0.1;
+const MAX_SCALE = 25.0;
+const SCALE_DELTA = 1.1;
+
+/**
+ * One press of zoom in or out, from whatever scale is on screen now.
+ *
+ * Takes the *live* numeric scale rather than the stored `Scale`, because
+ * stepping out of a fit mode has to start from what fit width actually
+ * resolved to in this pane — the whole point of free zoom leaving the fit
+ * mode rather than fighting it (spec §6). Rounded to two decimals so
+ * repeated steps do not accumulate a long tail of floating-point noise into
+ * `workspace.json`.
+ */
+export function steppedScale(currentScale: number, direction: 1 | -1): Scale {
+  const stepped = direction === 1 ? currentScale * SCALE_DELTA : currentScale / SCALE_DELTA;
+  const clamped = Math.min(Math.max(stepped, MIN_SCALE), MAX_SCALE);
+  return { mode: "custom", value: Math.round(clamped * 100) / 100 };
+}
+
+/**
+ * The fit toggle: width and page alternate, and free zoom returns to fit
+ * width. Two states rather than three, because "custom" is somewhere you
+ * arrive by zooming, not somewhere a toggle should be able to land you.
+ */
+export function nextFit(scale: Scale): Scale {
+  return scale.mode === "fit-width" ? { mode: "fit-page" } : { mode: "fit-width" };
+}
+
+/** 90° steps, normalised — pdf.js throws on anything that is not one. */
+export function nextRotation(rotation: number): number {
+  return (((rotation + 90) % 360) + 360) % 360;
+}
+
+export function nextSpread(spread: SpreadMode): SpreadMode {
+  const order: SpreadMode[] = ["none", "odd", "even"];
+  return order[(order.indexOf(spread) + 1) % order.length] ?? "none";
+}
+
+export function nextScrollMode(mode: ScrollMode): ScrollMode {
+  return mode === "continuous" ? "page" : "continuous";
+}
+
+/**
+ * Riff's two scroll modes in pdf.js's four-value enum. Horizontal and
+ * wrapped are deliberately not exposed — see `CONTEXT.md`'s "View" entry.
+ */
+export const PDFJS_SCROLL_MODE: Record<ScrollMode, number> = {
+  continuous: 0, // ScrollMode.VERTICAL
+  page: 3, // ScrollMode.PAGE
+};
+
+export const PDFJS_SPREAD_MODE: Record<SpreadMode, number> = {
+  none: 0,
+  odd: 1,
+  even: 2,
+};
 
 /**
  * Riff's `Scale` in the vocabulary pdf.js's `currentScaleValue` speaks: the

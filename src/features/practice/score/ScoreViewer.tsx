@@ -3,8 +3,14 @@ import "./score.css";
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ipc, type OpenScore } from "@/lib/ipc";
-import { clampPage, scaleValue } from "./geometry";
+import { fire, ipc, type OpenScore, type View } from "@/lib/ipc";
+import {
+  clampPage,
+  PDFJS_SCROLL_MODE,
+  PDFJS_SPREAD_MODE,
+  scaleValue,
+  steppedScale,
+} from "./geometry";
 import {
   AnnotationMode,
   EventBus,
@@ -23,6 +29,26 @@ import { MIN_WEBKITGTK } from "./webkitVersion";
 
 interface PageRenderedEvent {
   source: { canvas?: HTMLCanvasElement };
+}
+
+/**
+ * Puts a whole `View` onto a `PDFViewer`. One function, used both when the
+ * pages first exist and on every later change, so there is no second path
+ * that could apply four of the five values.
+ *
+ * Scale last: `pagesRotation` and `spreadMode` both re-lay-out the pages,
+ * and pdf.js re-applies `_currentScaleValue` itself afterwards — but only if
+ * one has been set. Setting it first and letting the others follow is what
+ * keeps a rotated score still fitted to the pane.
+ */
+function applyViewToViewer(viewer: InstanceType<typeof PDFViewer>, view: View) {
+  viewer.pagesRotation = view.rotation;
+  viewer.spreadMode = PDFJS_SPREAD_MODE[view.spread];
+  viewer.scrollMode = PDFJS_SCROLL_MODE[view.scrollMode];
+  // Stringified because that is what the setter stores anyway
+  // (`newValue.toString()`) and what its `parseFloat` reads back — a number
+  // reaches the same branch, but only the string is type-honest.
+  viewer.currentScaleValue = String(scaleValue(view.scale));
 }
 
 /**
@@ -52,6 +78,7 @@ export function ScoreViewer({
   const [hasText, setHasText] = useState(true);
   const [page, setPage] = useState(open.view.page);
   const [pageCount, setPageCount] = useState(0);
+  const [view, setView] = useState<View>(open.view);
   // The callback is fresh every render; the effect below must not be, or
   // every render would tear the viewer down and rebuild it.
   const onLoadErrorRef = useRef(onLoadError);
@@ -125,10 +152,7 @@ export function ScoreViewer({
     // reference viewer uses, and without it the viewer stays at
     // `UNKNOWN_SCALE` and renders every page at 100%: see `geometry.ts`.
     function onPagesInit() {
-      // Stringified because that is what the setter stores anyway
-      // (`newValue.toString()`) and what its `parseFloat` reads back — a
-      // number reaches the same branch, but only the string is type-honest.
-      viewer.currentScaleValue = String(scaleValue(open.view.scale));
+      applyViewToViewer(viewer, open.view);
     }
     eventBus.on("pagesinit", onPagesInit);
 
@@ -209,11 +233,49 @@ export function ScoreViewer({
     viewer.currentPageNumber = clampPage(next, pageCount, page);
   }
 
+  /**
+   * Applies a view change to pdf.js and records it, in that order.
+   *
+   * No throttle: `score_view_patch` is deliberately un-throttled and only
+   * the *disk* write is coalesced, in Rust. Page is not written here — it
+   * moves far more often than these do, and writing it before Task 11's
+   * restore exists would overwrite the very page a reopen is meant to
+   * return to.
+   */
+  function changeView(patch: Partial<View>) {
+    const next = { ...view, ...patch };
+    setView(next);
+    const viewer = pdfViewerRef.current;
+    if (viewer) applyViewToViewer(viewer, next);
+    fire(ipc.scoreViewPatch(next), "saving the view");
+  }
+
+  /**
+   * Zoom steps from the scale pdf.js actually resolved, not from the stored
+   * one — in a fit mode the stored value is a keyword, and "one step in from
+   * fit width" only means anything against the number that fit width came
+   * out as in this pane.
+   */
+  function zoom(direction: 1 | -1) {
+    const viewer = pdfViewerRef.current;
+    if (!viewer) return;
+    changeView({ scale: steppedScale(viewer.currentScale, direction) });
+  }
+
   return (
     <>
       {/* Beneath the pane header, which is left exactly as it is — twelve
           controls do not go beside `⧉` and `×`. */}
-      {ready && <ScoreToolbar page={page} pageCount={pageCount} onGoToPage={goToPage} />}
+      {ready && (
+        <ScoreToolbar
+          page={page}
+          pageCount={pageCount}
+          view={view}
+          onGoToPage={goToPage}
+          onViewChange={changeView}
+          onZoom={zoom}
+        />
+      )}
       <div className="relative min-h-0 flex-1">
         <div ref={containerRef} className="riff-score-viewer absolute inset-0 overflow-auto">
           <div ref={viewerRef} className="pdfViewer" />
