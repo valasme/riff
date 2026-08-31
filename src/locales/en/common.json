@@ -55,6 +55,16 @@
       "odd": "Two pages, odd first",
       "even": "Two pages, even first"
     },
+    "pin": "Pin to this page",
+    "autoScroll": {
+      "start": "Start auto-scroll",
+      "stop": "Stop auto-scroll",
+      "started": "Auto-scroll started",
+      "stopped": "Auto-scroll stopped",
+      "speedHeading": "Pages per minute",
+      "speedLabel": "Auto-scroll speed: {{speed}} pages per minute",
+      "speedValue": "{{speed}}/min"
+    },
     "search": {
       "toggle": "Search this score",
       "label": "Search the score",

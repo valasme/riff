@@ -21,6 +21,8 @@ function renderToolbar(props: Partial<Parameters<typeof ScoreToolbar>[0]> = {}) 
   const onViewChange = vi.fn();
   const onZoom = vi.fn();
   const onToggleSearch = vi.fn();
+  const onToggleScrolling = vi.fn();
+  const onTogglePinned = vi.fn();
   render(
     <I18nextProvider i18n={i18n}>
       <ScoreToolbar
@@ -28,15 +30,19 @@ function renderToolbar(props: Partial<Parameters<typeof ScoreToolbar>[0]> = {}) 
         pageCount={12}
         view={VIEW}
         searching={false}
+        scrolling={false}
+        pinned={false}
         onGoToPage={onGoToPage}
         onToggleSearch={onToggleSearch}
+        onToggleScrolling={onToggleScrolling}
+        onTogglePinned={onTogglePinned}
         onViewChange={onViewChange}
         onZoom={onZoom}
         {...props}
       />
     </I18nextProvider>,
   );
-  return { onGoToPage, onViewChange, onZoom, onToggleSearch };
+  return { onGoToPage, onViewChange, onZoom, onToggleSearch, onToggleScrolling, onTogglePinned };
 }
 
 describe("the score toolbar", () => {

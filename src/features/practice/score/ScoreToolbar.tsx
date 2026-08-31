@@ -2,7 +2,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Columns2,
+  Gauge,
   Maximize2,
+  Pause,
+  Pin,
+  Play,
   RotateCw,
   ScrollText,
   Search,
@@ -12,9 +16,21 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/cn";
 import type { View } from "@/lib/ipc";
-import { clampPage, nextFit, nextRotation, nextScrollMode, nextSpread } from "./geometry";
+import {
+  clampPage,
+  clampSpeed,
+  MAX_SPEED,
+  MIN_SPEED,
+  nextFit,
+  nextRotation,
+  nextScrollMode,
+  nextSpread,
+  SPEED_STEP,
+} from "./geometry";
 
 /**
  * The row beneath the pane header. **A labelled group of ordinary tabbable
@@ -35,15 +51,21 @@ export function ScoreToolbar({
   pageCount,
   view,
   searching,
+  scrolling,
+  pinned,
   onGoToPage,
   onViewChange,
   onZoom,
   onToggleSearch,
+  onToggleScrolling,
+  onTogglePinned,
 }: {
   page: number;
   pageCount: number;
   view: View;
   searching: boolean;
+  scrolling: boolean;
+  pinned: boolean;
   onGoToPage: (page: number) => void;
   onViewChange: (patch: Partial<View>) => void;
   /** Separate from `onViewChange` because stepping out of a fit mode has to
@@ -51,6 +73,8 @@ export function ScoreToolbar({
    *  knows. */
   onZoom: (direction: 1 | -1) => void;
   onToggleSearch: () => void;
+  onToggleScrolling: () => void;
+  onTogglePinned: () => void;
 }) {
   const { t } = useTranslation("common");
   const fit = nextFit(view.scale);
@@ -155,8 +179,77 @@ export function ScoreToolbar({
             <RotateCw size={15} aria-hidden />
           </ToolbarButton>
         </Tier>
+
+        <Tier tier="last">
+          <ToolbarButton
+            label={t(scrolling ? "score.autoScroll.stop" : "score.autoScroll.start")}
+            pressed={scrolling}
+            onClick={onToggleScrolling}
+          >
+            {scrolling ? <Pause size={15} aria-hidden /> : <Play size={15} aria-hidden />}
+          </ToolbarButton>
+          {/* Speed lives in a popover on the play control rather than as a
+              slider on the row: inline it would eat the toolbar, and it is
+              a number set occasionally, not one reached for every bar. */}
+          <SpeedPopover
+            speed={view.autoScrollSpeed}
+            onChange={(autoScrollSpeed) => onViewChange({ autoScrollSpeed })}
+          />
+          <ToolbarButton label={t("score.pin")} pressed={pinned} onClick={onTogglePinned}>
+            <Pin size={15} aria-hidden />
+          </ToolbarButton>
+        </Tier>
       </fieldset>
     </div>
+  );
+}
+
+/**
+ * The auto-scroll speed, in pages per minute. Keyboard-operable and
+ * announced, per foundation §11 — the slider carries the value, and the
+ * readout beside it is what says the unit.
+ */
+function SpeedPopover({ speed, onChange }: { speed: number; onChange: (speed: number) => void }) {
+  const { t } = useTranslation("common");
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={t("score.autoScroll.speedLabel", { speed })}
+          title={t("score.autoScroll.speedLabel", { speed })}
+          className={cn(
+            "grid size-6 shrink-0 place-items-center rounded-[var(--radius-control)]",
+            "text-muted-foreground transition-colors duration-[var(--motion-fast)]",
+            "ease-(--ease-standard) hover:bg-active-fill hover:text-foreground",
+          )}
+        >
+          <Gauge size={15} aria-hidden />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[14rem]">
+        <div className="flex flex-col gap-2">
+          <span className="text-[0.75rem] font-medium text-foreground">
+            {t("score.autoScroll.speedHeading")}
+          </span>
+          <div className="flex items-center gap-2">
+            <Slider
+              thumbLabel={t("score.autoScroll.speedHeading")}
+              min={MIN_SPEED}
+              max={MAX_SPEED}
+              step={SPEED_STEP}
+              value={[speed]}
+              onValueChange={([next]) => {
+                if (next !== undefined) onChange(clampSpeed(next));
+              }}
+            />
+            <span className="w-14 shrink-0 text-end font-mono text-xs tabular-nums text-foreground">
+              {t("score.autoScroll.speedValue", { speed })}
+            </span>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 

@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { chordFromEvent } from "@/features/keybindings/chord";
 import {
   clampPage,
+  clampSpeed,
+  MAX_SPEED,
+  MIN_SPEED,
   nextFit,
   nextRotation,
   nextScrollMode,
@@ -9,8 +12,13 @@ import {
   PAGE_TURN_CHORDS,
   PDFJS_SCROLL_MODE,
   PDFJS_SPREAD_MODE,
+  pageInterval,
+  pinnedBounds,
+  pixelsPerSecond,
   scaleValue,
   searchStateFrom,
+  spreadRow,
+  spreadRowCount,
   steppedScale,
   TOOLBAR_TIERS,
 } from "./geometry";
@@ -168,5 +176,78 @@ describe("searchStateFrom", () => {
 
   it("treats anything it does not recognise as still pending", () => {
     expect(searchStateFrom(99)).toBe("pending");
+  });
+});
+
+describe("auto-scroll arithmetic", () => {
+  // The unit's whole promise: 1 page/min stays 1 page/min however far the
+  // score is zoomed in. A cached pixels-per-second would silently mean a
+  // different number of pages at every other scale.
+  it("keeps pages per minute stable across zoom levels", () => {
+    // Same 10-page score at two zooms: taller pages, proportionally faster
+    // pixels, identical pages per minute.
+    const slow = pixelsPerSecond(10_000, 10, 1);
+    const zoomed = pixelsPerSecond(20_000, 10, 1);
+    expect(slow).toBeCloseTo(1000 / 60);
+    expect(zoomed).toBeCloseTo(2000 / 60);
+    // One page takes a minute in both cases.
+    expect(10_000 / 10 / slow).toBeCloseTo(60);
+    expect(20_000 / 10 / zoomed).toBeCloseTo(60);
+  });
+
+  it("doubles the rate when the speed doubles", () => {
+    expect(pixelsPerSecond(6000, 10, 2)).toBeCloseTo(pixelsPerSecond(6000, 10, 1) * 2);
+  });
+
+  it("turns a page every 60/speed seconds where there is nothing to scroll", () => {
+    expect(pageInterval(1)).toBe(60);
+    expect(pageInterval(2)).toBe(30);
+    expect(pageInterval(10)).toBe(6);
+  });
+
+  it("clamps speed to the range the slider offers", () => {
+    expect(clampSpeed(0)).toBe(MIN_SPEED);
+    expect(clampSpeed(99)).toBe(MAX_SPEED);
+    expect(clampSpeed(Number.NaN)).toBe(1);
+    expect(clampSpeed(1.26)).toBe(1.3);
+  });
+});
+
+describe("pinning", () => {
+  // Releasing auto-scroll onto one half of a spread you are reading both
+  // halves of would be worse than not pinning at all.
+  it("holds a whole spread, not one half of it", () => {
+    const first = pinnedBounds(1, "odd", 12, 6000);
+    const second = pinnedBounds(2, "odd", 12, 6000);
+    expect(second).toEqual(first);
+    // Six rows of two pages each across 6000px.
+    expect(first).toEqual({ top: 0, bottom: 1000 });
+  });
+
+  it("holds a single page when there is no spread", () => {
+    expect(pinnedBounds(3, "none", 12, 6000)).toEqual({ top: 1000, bottom: 1500 });
+  });
+
+  // pdf.js's SpreadMode.EVEN puts page 1 on its own, as a cover.
+  it("gives an even spread's first page a row of its own", () => {
+    expect(spreadRow(1, "even")).toBe(0);
+    expect(spreadRow(2, "even")).toBe(1);
+    expect(spreadRow(3, "even")).toBe(1);
+  });
+
+  it("pairs from page one in an odd spread", () => {
+    expect(spreadRow(1, "odd")).toBe(0);
+    expect(spreadRow(2, "odd")).toBe(0);
+    expect(spreadRow(3, "odd")).toBe(1);
+  });
+
+  it("counts the rows each spread mode produces", () => {
+    expect(spreadRowCount(12, "none")).toBe(12);
+    expect(spreadRowCount(12, "odd")).toBe(6);
+    expect(spreadRowCount(12, "even")).toBe(7);
+  });
+
+  it("cannot point past the last row for a page beyond the score", () => {
+    expect(pinnedBounds(99, "none", 4, 4000)).toEqual({ top: 3000, bottom: 4000 });
   });
 });

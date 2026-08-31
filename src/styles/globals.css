@@ -353,7 +353,15 @@ li {
 
    The :not() is what makes "Never reduce" mean never. Resolving "system" to
    one of the other two in JavaScript is what used to freeze it — see
-   motionAttribute() in src/lib/appearance.ts. */
+   motionAttribute() in src/lib/appearance.ts.
+
+   `scroll-behavior` is in both rules because zeroing animation and
+   transition durations does not touch it: smooth scrolling survived reduced
+   motion everywhere in Riff until plan 15 went looking. Jumping forty pages
+   to a search hit is a large animated movement whose only point is the
+   destination, which is exactly what a stated preference for less motion is
+   about. Auto-scroll is the deliberate exception and is not implemented with
+   `scroll-behavior` at all — see ScoreViewer for why it is exempt. */
 @media (prefers-reduced-motion: reduce) {
   :root:not([data-motion="full"]) *,
   :root:not([data-motion="full"]) *::before,
@@ -361,6 +369,7 @@ li {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
@@ -370,6 +379,7 @@ li {
   animation-duration: 0.01ms !important;
   animation-iteration-count: 1 !important;
   transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }
 
 /* Anything genuinely off-screen but announced. */

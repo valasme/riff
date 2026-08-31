@@ -95,6 +95,96 @@ export function nextScrollMode(mode: ScrollMode): ScrollMode {
   return mode === "continuous" ? "page" : "continuous";
 }
 
+/** Pages per minute, the unit a musician already thinks in (spec §6.3). */
+export const MIN_SPEED = 0.1;
+export const MAX_SPEED = 10;
+export const SPEED_STEP = 0.1;
+
+export function clampSpeed(speed: number): number {
+  if (!Number.isFinite(speed)) return 1;
+  // Rounded to one decimal so `±` stepping cannot accumulate a
+  // floating-point tail into `workspace.json`.
+  return Math.round(Math.min(Math.max(speed, MIN_SPEED), MAX_SPEED) * 10) / 10;
+}
+
+/**
+ * Pages per minute as pixels per second, measured against the container
+ * rather than computed from a scale.
+ *
+ * `scrollHeight / pageCount` is one page's worth of vertical distance
+ * whatever the zoom, rotation or spread currently is — which is what makes
+ * the speed stable across zoom levels, as the unit promises. A pixels-per-
+ * second figure cached at one scale would silently mean a different number
+ * of pages per minute at every other one.
+ *
+ * In a spread the same division still holds: a row carries two pages, so
+ * one page of music is half a row, and "pages per minute" keeps meaning
+ * pages of music rather than rows of layout.
+ */
+export function pixelsPerSecond(
+  scrollHeight: number,
+  pageCount: number,
+  pagesPerMinute: number,
+): number {
+  const pageHeight = scrollHeight / Math.max(pageCount, 1);
+  return (pageHeight * pagesPerMinute) / 60;
+}
+
+/** Seconds between page turns in `ScrollMode.PAGE`, where there is nothing
+ *  to scroll — the same speed number, the same unit (spec §6.3). */
+export function pageInterval(pagesPerMinute: number): number {
+  return 60 / Math.max(pagesPerMinute, MIN_SPEED);
+}
+
+/**
+ * Which row of the layout a page sits in, and how many rows there are.
+ * A spread holds two pages, so pinning has to hold the row rather than the
+ * page: releasing auto-scroll onto one half of a spread you are reading
+ * both halves of would be worse than not pinning at all (spec §6.3).
+ *
+ * `even` puts page 1 on its own — the cover — and pairs from page 2, which
+ * is what pdf.js's `SpreadMode.EVEN` does.
+ */
+export function spreadRow(page: number, spread: SpreadMode): number {
+  switch (spread) {
+    case "none":
+      return page - 1;
+    case "odd":
+      return Math.floor((page - 1) / 2);
+    case "even":
+      return Math.floor(page / 2);
+  }
+}
+
+export function spreadRowCount(pageCount: number, spread: SpreadMode): number {
+  switch (spread) {
+    case "none":
+      return Math.max(pageCount, 1);
+    case "odd":
+      return Math.max(Math.ceil(pageCount / 2), 1);
+    case "even":
+      return Math.max(Math.floor(pageCount / 2) + 1, 1);
+  }
+}
+
+/**
+ * The scroll range a pin holds auto-scroll inside: the current page, or in
+ * a spread the whole row. Scrolling by hand still works — a pin that
+ * snapped you back would be unusable — so this bounds the loop, not the
+ * user.
+ */
+export function pinnedBounds(
+  page: number,
+  spread: SpreadMode,
+  pageCount: number,
+  scrollHeight: number,
+): { top: number; bottom: number } {
+  const rows = spreadRowCount(pageCount, spread);
+  const rowHeight = scrollHeight / rows;
+  const row = Math.min(Math.max(spreadRow(page, spread), 0), rows - 1);
+  return { top: row * rowHeight, bottom: (row + 1) * rowHeight };
+}
+
 /** What the search row is currently reporting. */
 export interface SearchStatus {
   query: string;

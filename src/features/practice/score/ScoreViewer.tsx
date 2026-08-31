@@ -31,6 +31,7 @@ import {
 import { ScoreSearch } from "./ScoreSearch";
 import { ScoreToolbar } from "./ScoreToolbar";
 import { scoreErrorMessage } from "./scoreError";
+import { useAutoScroll } from "./useAutoScroll";
 import { MIN_WEBKITGTK } from "./webkitVersion";
 
 interface PageRenderedEvent {
@@ -91,6 +92,12 @@ export function ScoreViewer({
   const [page, setPage] = useState(open.view.page);
   const [pageCount, setPageCount] = useState(0);
   const [view, setView] = useState<View>(open.view);
+  // Neither of these is in the view, and spec §6.4 is explicit about why:
+  // a score that began scrolling the moment it reopened would be alarming
+  // rather than helpful, and a pin is something you do to practise this
+  // passage now, not a property of the score. Both start off, every time.
+  const [scrolling, setScrolling] = useState(false);
+  const [pinned, setPinned] = useState(false);
   const [searching, setSearching] = useState(false);
   const [search, setSearch] = useState<SearchStatus>(NO_SEARCH);
   // The callback is fresh every render; the effect below must not be, or
@@ -275,6 +282,22 @@ export function ScoreViewer({
     // this effect: a new score, not a changed `t` or callback identity.
   }, [open.score.name, open.score.size]);
 
+  useAutoScroll({
+    running: scrolling,
+    speed: view.autoScrollSpeed,
+    pinned,
+    page,
+    pageCount,
+    spread: view.spread,
+    scrollMode: view.scrollMode,
+    container: containerRef,
+    onAdvancePage: () => {
+      const viewer = pdfViewerRef.current;
+      if (viewer) viewer.currentPageNumber = viewer.currentPageNumber + 1;
+    },
+    onPause: () => setScrolling(false),
+  });
+
   function goToPage(next: number) {
     const viewer = pdfViewerRef.current;
     if (!viewer) return;
@@ -353,10 +376,14 @@ export function ScoreViewer({
           pageCount={pageCount}
           view={view}
           searching={searching}
+          scrolling={scrolling}
+          pinned={pinned}
           onGoToPage={goToPage}
           onViewChange={changeView}
           onZoom={zoom}
           onToggleSearch={() => (searching ? closeSearch() : setSearching(true))}
+          onToggleScrolling={() => setScrolling((was) => !was)}
+          onTogglePinned={() => setPinned((was) => !was)}
         />
       )}
       {ready && searching && (
@@ -419,6 +446,14 @@ export function ScoreViewer({
       <div aria-live="polite" className="sr-only">
         {ready && pageCount > 0
           ? t("common:score.pageAnnouncement", { page, total: pageCount })
+          : ""}
+      </div>
+      {/* Start and stop, and nothing in between: announcing every frame of
+          an auto-scroll would be intolerable (spec §10). Separate from the
+          page announcer above so one does not overwrite the other. */}
+      <div aria-live="polite" className="sr-only">
+        {ready
+          ? t(scrolling ? "common:score.autoScroll.started" : "common:score.autoScroll.stopped")
           : ""}
       </div>
     </>
