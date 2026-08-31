@@ -1,8 +1,7 @@
 import { RotateCcw } from "lucide-react";
 import { RadioGroup as RadioGroupPrimitive } from "radix-ui";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { toast } from "sonner";
 import { ThemePreview } from "@/components/ThemePreview";
 import { Button } from "@/components/ui/button";
 import { SegmentedGroup } from "@/components/ui/radio-group";
@@ -10,17 +9,15 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { SettingRow, SettingsGroup } from "@/features/settings/SettingRow";
 import { cn } from "@/lib/cn";
-import { type Density, ipc, type ReduceMotion, type Theme, type TitleBarStyle } from "@/lib/ipc";
-import { log } from "@/lib/logger";
+import type { Density, ReduceMotion, Theme } from "@/lib/ipc";
 import { useAppearance, useSettings } from "@/stores/settings";
 
 const THEMES: Theme[] = ["dark", "darker", "light"];
 const DENSITIES: Density[] = ["comfortable", "compact"];
 const MOTIONS: ReduceMotion[] = ["system", "always", "never"];
-const TITLE_BARS: TitleBarStyle[] = ["custom", "system"];
 
 export function AppearanceSection() {
-  const { t, i18n } = useTranslation(["settings", "errors"]);
+  const { t, i18n } = useTranslation("settings");
   const appearance = useAppearance();
   const patch = useSettings((s) => s.patch);
 
@@ -45,46 +42,6 @@ export function AppearanceSection() {
    */
   const [draftScale, setDraftScale] = useState<number | null>(null);
   const uiScale = draftScale ?? appearance.uiScale;
-
-  // The setting is applied on every launch, not only when it changes.
-  // `decorations: false` is baked into tauri.conf.json, so without this a
-  // user who chose System decorations reopens Riff with no title bar of
-  // either kind and a switch insisting otherwise.
-  //
-  // Deliberately silent, unlike `setTitleBar` below. This is a
-  // reapplication rather than a request, and many Wayland compositors decline
-  // permanently — a toast here would be the same complaint on every single
-  // launch, about something the user did not just ask for.
-  useEffect(() => {
-    if (appearance.titleBar === "system") void ipc.windowSetDecorations(true).catch(() => {});
-  }, [appearance.titleBar]);
-
-  async function setTitleBar(style: TitleBarStyle) {
-    // The window manager decides. Under Wayland many compositors, Hyprland
-    // among them, simply decline — so ask, then read back what actually
-    // happened rather than leaving a switch that claims otherwise.
-    // Best-effort: `is_decorated()` reports GTK's own client-side property,
-    // so a Wayland compositor that ignores the request will not always show
-    // up here. It catches the refusals it can and the description tells the
-    // truth about the rest.
-    let decorated: boolean;
-    try {
-      decorated = await ipc.windowSetDecorations(style === "system");
-    } catch (error) {
-      // A rejection and a `false` answer mean the same thing to the person who
-      // pressed the control: the window manager did not do it. This message
-      // was unreachable whenever the command errored rather than answering,
-      // which left the switch claiming a frame the window does not have.
-      void log.warn("window_set_decorations rejected", { error: String(error) });
-      toast.error(t("errors:decorationsRefused"));
-      return;
-    }
-    if (style === "system" && !decorated) {
-      toast.error(t("errors:decorationsRefused"));
-      return;
-    }
-    await patch({ appearance: { titleBar: style } });
-  }
 
   return (
     <div className="flex flex-col gap-[var(--section-gap)]">
@@ -282,23 +239,6 @@ export function AppearanceSection() {
               <RotateCcw aria-hidden />
             </Button>
           </div>
-        </SettingRow>
-      </SettingsGroup>
-
-      <SettingsGroup title={t("settings:appearance.groups.window")}>
-        <SettingRow
-          label={t("settings:appearance.titleBar.label")}
-          description={t("settings:appearance.titleBar.description")}
-        >
-          <SegmentedGroup
-            aria-label={t("settings:appearance.titleBar.label")}
-            value={appearance.titleBar}
-            onValueChange={(style) => void setTitleBar(style)}
-            options={TITLE_BARS.map((value) => ({
-              value,
-              label: t(`settings:appearance.titleBarOptions.${value}`),
-            }))}
-          />
         </SettingRow>
       </SettingsGroup>
     </div>

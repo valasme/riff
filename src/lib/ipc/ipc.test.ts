@@ -60,12 +60,7 @@ describe("ipc facade", () => {
     ["windowToggleMaximize", () => ipc.windowToggleMaximize(), "window_toggle_maximize", undefined],
     ["windowClose", () => ipc.windowClose(), "window_close", undefined],
     ["windowQuitConfirmed", () => ipc.windowQuitConfirmed(), "window_quit_confirmed", undefined],
-    [
-      "windowSetDecorations",
-      () => ipc.windowSetDecorations(true),
-      "window_set_decorations",
-      { enabled: true },
-    ],
+    ["windowStartDragging", () => ipc.windowStartDragging(), "window_start_dragging", undefined],
     ["practiceState", () => ipc.practiceState(), "practice_state", undefined],
     ["practicePopOut", () => ipc.practicePopOut("score"), "practice_pop_out", { pane: "score" }],
     [

@@ -13,7 +13,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 use crate::error::{RiffError, RiffResult};
-use crate::settings::model::{Pane, TitleBar};
+use crate::settings::model::Pane;
 use crate::settings::store::{FlushScheduler, SettingsStore};
 
 /// The window that always exists, and the only one that can quit Riff.
@@ -156,14 +156,6 @@ pub fn record_docked_back(
 /// and one whose React throws must still produce a window to read the error
 /// in.
 fn open_window(app: &AppHandle, pane: Pane) -> RiffResult<()> {
-    let decorated = matches!(
-        app.state::<std::sync::Arc<SettingsStore>>()
-            .get()
-            .appearance
-            .title_bar,
-        TitleBar::System
-    );
-
     // The hash is deliberate. Riff routes on hash history because the asset
     // protocol serves no SPA fallback, so this is the same URL the main
     // window would navigate to — `Url::join` keeps the fragment intact.
@@ -173,7 +165,7 @@ fn open_window(app: &AppHandle, pane: Pane) -> RiffResult<()> {
         .title(pane.window_title())
         .inner_size(720.0, 800.0)
         .min_inner_size(360.0, 320.0)
-        .decorations(decorated)
+        .decorations(false)
         .visible(false)
         .background_color(tauri::webview::Color(0x24, 0x24, 0x24, 0xff))
         .build()

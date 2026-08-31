@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { I18nextProvider } from "react-i18next";
@@ -10,19 +10,22 @@ const logWrite = vi.fn().mockResolvedValue(undefined);
 const windowMinimize = vi.fn().mockResolvedValue(undefined);
 const windowToggleMaximize = vi.fn().mockResolvedValue(undefined);
 const windowClose = vi.fn().mockResolvedValue(undefined);
+const windowStartDragging = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("@/lib/ipc", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/ipc")>()),
-  ipc: { openPath, logWrite, windowMinimize, windowToggleMaximize, windowClose },
+  ipc: {
+    openPath,
+    logWrite,
+    windowMinimize,
+    windowToggleMaximize,
+    windowClose,
+    windowStartDragging,
+  },
 }));
 
 const writeText = vi.fn().mockResolvedValue(undefined);
 const reload = vi.fn();
-
-let titleBar: "custom" | "system" = "custom";
-vi.mock("@/stores/settings", () => ({
-  useTitleBarStyle: () => titleBar,
-}));
 
 const { RouteError } = await import("./RouteError");
 
@@ -38,10 +41,9 @@ function renderCrash(error: unknown = new Error("boom")) {
 describe("RouteError", () => {
   beforeEach(() => {
     sessionStorage.clear();
-    titleBar = "custom";
     vi.clearAllMocks();
     window.__RIFF_BOOTSTRAP__ = {
-      settings: { appearance: { titleBar: "custom" } },
+      settings: { appearance: {} },
       paths: { homeDir: "/home/dimitris", logDir: "/home/dimitris/.local/state/riff/logs" },
     } as unknown as Window["__RIFF_BOOTSTRAP__"];
     Object.defineProperty(window, "location", {
@@ -66,10 +68,12 @@ describe("RouteError", () => {
     expect(screen.getByRole("button", { name: /minimi[sz]e/i })).toBeInTheDocument();
   });
 
-  it("draws no controls of its own when the system draws the title bar", () => {
-    titleBar = "system";
-    renderCrash();
-    expect(screen.queryByRole("button", { name: /minimi[sz]e/i })).not.toBeInTheDocument();
+  it("lets the crash window be moved", () => {
+    const { container } = renderCrash();
+    const chrome = container.querySelector("header");
+    if (!chrome) throw new Error("crash chrome not found");
+    fireEvent.mouseDown(chrome, { button: 0, detail: 1 });
+    expect(windowStartDragging).toHaveBeenCalledOnce();
   });
 
   it("keeps the reload button reachable in a pop-out sized window", () => {

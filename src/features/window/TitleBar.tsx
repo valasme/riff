@@ -5,6 +5,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Wordmark } from "@/components/Wordmark";
 import { WindowControls } from "./WindowControls";
+import { handleWindowDrag } from "./windowDrag";
 
 export function TitleBar({
   onToggleSidebar,
@@ -34,19 +35,17 @@ export function TitleBar({
     // tooltip outside a provider throws. Nesting providers is supported and
     // costs nothing.
     <TooltipProvider delayDuration={500}>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: A native window drag is pointer-only; a role or keyboard binding would falsely expose the whole titlebar as a control. */}
       <header
-        data-tauri-drag-region
+        onMouseDown={handleWindowDrag}
         // `border-b` is the line the bar never had. Without it the title bar
         // and the content below it were the same flat #242424 with nothing
         // between them, so the window read as one undifferentiated slab.
         className="@container/titlebar relative z-30 flex h-[var(--spacing-titlebar)] shrink-0 items-center gap-3 border-b border-line bg-surface px-2"
       >
-        <div data-tauri-drag-region className="flex min-w-0 flex-1 items-center gap-2.5">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
           {badge ? (
-            <span
-              data-tauri-drag-region
-              className="grid size-8 shrink-0 place-items-center text-muted-foreground"
-            >
+            <span className="grid size-8 shrink-0 place-items-center text-muted-foreground">
               <badge.icon size={17} aria-hidden />
             </span>
           ) : (
@@ -103,7 +102,7 @@ export function TitleBar({
           <Kbd chord="Alt+K" className="@max-[44rem]/titlebar:hidden" />
         </button>
 
-        <div data-tauri-drag-region className="flex flex-1 items-center justify-end">
+        <div className="flex flex-1 items-center justify-end">
           <WindowControls />
         </div>
       </header>

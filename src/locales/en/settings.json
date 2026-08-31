@@ -3,7 +3,7 @@
   "sections": { "general": "General", "appearance": "Appearance", "about": "About" },
   "sectionDescriptions": {
     "general": "How Riff starts, where it keeps things, and how to move or reset it.",
-    "appearance": "Theme, spacing, scale and the window frame.",
+    "appearance": "Theme, spacing, scale, motion and contrast.",
     "about": "Build identity, licences and diagnostics."
   },
   "general": {
@@ -64,8 +64,7 @@
     "groups": {
       "theme": "Theme",
       "layout": "Layout",
-      "accessibility": "Motion and contrast",
-      "window": "Window"
+      "accessibility": "Motion and contrast"
     },
     "theme": {
       "label": "Theme",
@@ -102,11 +101,6 @@
       "description": "Darkens a rendered score so a white page does not glare in a dark room. Independent of the theme, and off at zero.",
       "reset": "Reset dim to off"
     },
-    "titleBar": {
-      "label": "Title bar",
-      "description": "Use Riff's own title bar, or ask your window manager for its decorations."
-    },
-    "titleBarOptions": { "custom": "Riff's title bar", "system": "System decorations" },
     "rememberSidebar": {
       "label": "Remember sidebar state",
       "description": "Reopen Riff with the sidebar as you left it."

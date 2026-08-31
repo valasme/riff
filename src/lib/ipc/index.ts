@@ -57,8 +57,7 @@ export const ipc = {
   windowToggleMaximize: () => invoke<void>("window_toggle_maximize"),
   windowClose: () => invoke<void>("window_close"),
   windowQuitConfirmed: () => invoke<void>("window_quit_confirmed"),
-  windowSetDecorations: (enabled: boolean) =>
-    invoke<boolean>("window_set_decorations", { enabled }),
+  windowStartDragging: () => invoke<void>("window_start_dragging"),
   /**
    * Each of these answers with the whole popped-out set rather than an
    * acknowledgement: Rust owns it, and a reply saying only "done" would leave

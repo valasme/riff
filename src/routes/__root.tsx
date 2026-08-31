@@ -62,7 +62,6 @@ export function RootLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [announcement, setAnnouncement] = useState("");
   const { collapsed, rememberCollapsed } = useAppearance().sidebar;
-  const titleBar = useAppearance().titleBar;
   const settings = useSettings((s) => s.settings);
   const patch = useSettings((s) => s.patch);
   // The sidebar's state for this session only, used when the user has asked
@@ -229,23 +228,19 @@ export function RootLayout() {
       >
         {t("skipToContent")}
       </a>
-      {/* Choosing System decorations has to hide Riff's own bar live, or the
-          window ends up with two title bars stacked. */}
-      {titleBar === "custom" && (
-        <TitleBar
-          onToggleSidebar={toggleSidebar}
-          // The toggle needs the state, not only the handler: without it the
-          // button showed one icon for both directions and never said which
-          // way it was about to go.
-          sidebarCollapsed={effectiveCollapsed}
-          onOpenPalette={() => setPaletteOpen(true)}
-          badge={
-            popoutPane
-              ? { icon: PANE_ICONS[popoutPane], label: t(`common:panes.${popoutPane}`) }
-              : undefined
-          }
-        />
-      )}
+      <TitleBar
+        onToggleSidebar={toggleSidebar}
+        // The toggle needs the state, not only the handler: without it the
+        // button showed one icon for both directions and never said which
+        // way it was about to go.
+        sidebarCollapsed={effectiveCollapsed}
+        onOpenPalette={() => setPaletteOpen(true)}
+        badge={
+          popoutPane
+            ? { icon: PANE_ICONS[popoutPane], label: t(`common:panes.${popoutPane}`) }
+            : undefined
+        }
+      />
       {/* The container the sidebar's rail breakpoint measures. The query is
           written in rem, so raising the UI scale grows the threshold while the
           window stays the same number of pixels — which is what makes the rail

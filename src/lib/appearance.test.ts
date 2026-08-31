@@ -8,7 +8,6 @@ const base: Appearance = {
   uiScale: 1,
   reduceMotion: "system",
   highContrast: false,
-  titleBar: "custom",
   sidebar: { collapsed: false, rememberCollapsed: true },
   scoreDim: 0,
 };

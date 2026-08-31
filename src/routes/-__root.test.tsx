@@ -20,7 +20,6 @@ const settings = {
     uiScale: 1,
     reduceMotion: "system",
     highContrast: false,
-    titleBar: "custom",
     sidebar: { collapsed: false, rememberCollapsed: true },
   },
   onboarding: { completedAt: "2026-08-28T10:00:00Z", version: 1 },
@@ -34,7 +33,6 @@ vi.mock("@/stores/settings", () => ({
     { getState: () => ({ settings, patch }) },
   ),
   useAppearance: () => settings.appearance,
-  useTitleBarStyle: () => settings.appearance.titleBar,
   subscribeToBackend: () => Promise.resolve(() => {}),
   reportRecovery: () => reportRecovery(),
 }));
@@ -165,11 +163,9 @@ describe("the shell", () => {
     settings.appearance.sidebar = { collapsed: false, rememberCollapsed: true };
   });
 
-  it("hides riffs own title bar when system decorations are chosen", async () => {
-    settings.appearance.titleBar = "system";
-    const { container } = renderShell();
-    expect(container.querySelector("[data-tauri-drag-region]")).toBeNull();
-    settings.appearance.titleBar = "custom";
+  it("renders riffs title bar", () => {
+    renderShell();
+    expect(screen.getByRole("banner")).toBeInTheDocument();
   });
 
   it("has no accessibility violations, dialogs included", async () => {

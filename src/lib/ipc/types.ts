@@ -1,7 +1,6 @@
 export type Theme = "dark" | "darker" | "light";
 export type Density = "comfortable" | "compact";
 export type ReduceMotion = "system" | "always" | "never";
-export type TitleBarStyle = "custom" | "system";
 export type StartupRoute = "practice" | "history" | "last-used";
 export type Section = "general" | "appearance" | "onboarding" | "practice";
 export type Pane = "score" | "video" | "audio";
@@ -28,7 +27,6 @@ export interface Appearance {
   uiScale: number;
   reduceMotion: ReduceMotion;
   highContrast: boolean;
-  titleBar: TitleBarStyle;
   sidebar: Sidebar;
   /** 0 to 0.4. Zero means off, so there is no separate toggle. */
   scoreDim: number;

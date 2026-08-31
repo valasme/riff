@@ -65,7 +65,6 @@ const DEFAULTS: Settings = {
     uiScale: 1,
     reduceMotion: "system",
     highContrast: false,
-    titleBar: "custom",
     sidebar: { collapsed: false, rememberCollapsed: true },
     scoreDim: 0,
   },
@@ -225,7 +224,6 @@ export const useTheme = () => useSettings((s) => s.settings.appearance.theme);
 export const useDensity = () => useSettings((s) => s.settings.appearance.density);
 export const useUiScale = () => useSettings((s) => s.settings.appearance.uiScale);
 export const useHighContrast = () => useSettings((s) => s.settings.appearance.highContrast);
-export const useTitleBarStyle = () => useSettings((s) => s.settings.appearance.titleBar);
 export const useScoreDim = () => useSettings((s) => s.settings.appearance.scoreDim);
 export const useStartupRoute = () => useSettings((s) => s.settings.general.startupRoute);
 export const useSidebarCollapsed = () =>

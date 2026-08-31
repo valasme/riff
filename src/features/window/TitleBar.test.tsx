@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { I18nextProvider } from "react-i18next";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,9 +7,10 @@ import i18n from "@/app/i18n";
 const windowMinimize = vi.fn().mockResolvedValue(undefined);
 const windowToggleMaximize = vi.fn().mockResolvedValue(undefined);
 const windowClose = vi.fn().mockResolvedValue(undefined);
+const windowStartDragging = vi.fn().mockResolvedValue(undefined);
 vi.mock("@/lib/ipc", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/ipc")>()),
-  ipc: { windowMinimize, windowToggleMaximize, windowClose },
+  ipc: { windowMinimize, windowToggleMaximize, windowClose, windowStartDragging },
   isRiffError: () => false,
 }));
 
@@ -38,6 +39,8 @@ describe("TitleBar", () => {
   beforeEach(() => {
     maximized = false;
     windowMinimize.mockClear();
+    windowToggleMaximize.mockClear();
+    windowStartDragging.mockClear();
   });
 
   it("exposes every window control as a named button", () => {
@@ -84,9 +87,23 @@ describe("TitleBar", () => {
     expect(onOpenPalette).toHaveBeenCalledOnce();
   });
 
-  it("marks the drag region so the window can be moved", () => {
-    const { container } = renderBar();
-    expect(container.querySelector("[data-tauri-drag-region]")).not.toBeNull();
+  it("starts a native drag from titlebar content", () => {
+    renderBar();
+    fireEvent.mouseDown(screen.getByText("riff"), { button: 0, detail: 1 });
+    expect(windowStartDragging).toHaveBeenCalledOnce();
+  });
+
+  it("does not steal mouse input from titlebar controls", async () => {
+    const user = userEvent.setup();
+    renderBar();
+    await user.click(screen.getByRole("button", { name: /search or jump to/i }));
+    expect(windowStartDragging).not.toHaveBeenCalled();
+  });
+
+  it("maximises from a titlebar double-click", () => {
+    renderBar();
+    fireEvent.mouseDown(screen.getByText("riff"), { button: 0, detail: 2 });
+    expect(windowToggleMaximize).toHaveBeenCalledOnce();
   });
 
   it("has no accessibility violations", async () => {

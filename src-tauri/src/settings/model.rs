@@ -181,8 +181,6 @@ pub struct Appearance {
     #[serde(deserialize_with = "lenient")]
     pub reduce_motion: ReduceMotion,
     pub high_contrast: bool,
-    #[serde(deserialize_with = "lenient")]
-    pub title_bar: TitleBar,
     pub sidebar: Sidebar,
     /// How far a rendered score is darkened, so a white page does not glare
     /// in a dark room. A preference — chosen once, about the room and the
@@ -199,7 +197,6 @@ impl Default for Appearance {
             ui_scale: UiScale::default(),
             reduce_motion: ReduceMotion::System,
             high_contrast: false,
-            title_bar: TitleBar::Custom,
             sidebar: Sidebar::default(),
             score_dim: ScoreDim::default(),
             unknown: serde_json::Map::new(),
@@ -323,7 +320,6 @@ kebab_enum!(ReduceMotion {
     Always,
     Never
 });
-kebab_enum!(TitleBar { Custom, System });
 
 /// Clamped on the way in, so an out-of-range value in a hand-edited file is
 /// corrected rather than rejected.
@@ -414,7 +410,6 @@ mod tests {
         assert_eq!(s.appearance.density, Density::Comfortable);
         assert_eq!(s.appearance.ui_scale.get(), 1.0);
         assert!(!s.appearance.high_contrast);
-        assert_eq!(s.appearance.title_bar, TitleBar::Custom);
         assert!(s.onboarding.completed_at.is_none());
         assert!(
             s.practice.popped_out.is_empty(),
@@ -516,6 +511,19 @@ mod tests {
         let round_tripped = serde_json::to_value(&s).expect("serialises");
         assert_eq!(round_tripped["appearance"]["accentColor"], "#ff0000");
         assert_eq!(round_tripped["appearance"]["theme"], "light");
+    }
+
+    #[test]
+    fn the_retired_title_bar_choice_survives_only_as_unknown_data() {
+        // Removing a setting does not suspend the downgrade-safety rule. An
+        // existing choice is inert, but a later write must not silently erase
+        // a key from the user's file merely because this build retired it.
+        let original = r#"{"version":1,"appearance":{"titleBar":"system"}}"#;
+        let s: Settings = serde_json::from_str(original).expect("loads");
+        assert_eq!(s.appearance.unknown["titleBar"], "system");
+
+        let round_tripped = serde_json::to_value(&s).expect("serialises");
+        assert_eq!(round_tripped["appearance"]["titleBar"], "system");
     }
 
     #[test]

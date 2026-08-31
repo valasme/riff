@@ -4,9 +4,9 @@ import { cn } from "@/lib/cn";
 /**
  * A titled card holding a run of related rows.
  *
- * Settings used to be one long card with fifteen undifferentiated rows in it,
- * which made "where is the title bar setting" a scanning problem. Grouping
- * costs one heading per four rows and turns it into a reading problem.
+ * Settings used to be one long card of undifferentiated rows, which made
+ * finding any one choice a scanning problem. Small related groups turn it
+ * into a reading problem.
  */
 export function SettingsGroup({
   title,

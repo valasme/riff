@@ -43,7 +43,7 @@ macro_rules! riff_handlers {
             $crate::commands::window::window_close,
             $crate::commands::window::window_quit_confirmed,
             $crate::commands::window::window_minimize,
-            $crate::commands::window::window_set_decorations,
+            $crate::commands::window::window_start_dragging,
             $crate::commands::window::window_toggle_maximize,
         ]
     };

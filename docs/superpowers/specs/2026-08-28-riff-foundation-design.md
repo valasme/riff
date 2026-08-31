@@ -154,7 +154,6 @@ Defaults follow the specification: `~/.config`, `~/.local/share`, `~/.local/stat
     "uiScale": 1.0,                    // 0.8 – 1.5, step 0.05
     "reduceMotion": "system",          // "system" | "always" | "never"
     "highContrast": false,
-    "titleBar": "custom",              // "custom" | "system"
     "sidebar": { "collapsed": false, "rememberCollapsed": true }
   },
   "onboarding": {
@@ -242,7 +241,7 @@ The guarantee that would have been lost — Rust and TypeScript agreeing — is 
 | `app_ready` | `() -> ()` | Reveals the window. |
 | `diagnostics_export` | `() -> Option<PathBuf>` | Opens the save dialog in Rust and writes the redacted bundle (§18). Same output as `riff logs export`. |
 | `log_write` | `(LogLevel, String, Option<Value>) -> ()` | Frontend diagnostics into the session log. Without it a React crash leaves no trace on disk. |
-| `window_minimize` / `window_toggle_maximize` / `window_close` | `() -> ()` | Custom title bar controls. |
+| `window_minimize` / `window_toggle_maximize` / `window_close` / `window_start_dragging` | `() -> ()` | Custom title bar controls and movement. |
 
 Neither import nor export accepts a path. The picker is opened by Rust, so no filesystem path is ever chosen by, passed through, or visible to the webview — the same rule `open_path` and `open_external` follow. An earlier draft had these two taking `PathBuf` from the frontend, which quietly contradicted that rule and would have been the one hole in it.
 
@@ -486,7 +485,7 @@ focus something to land on. Its icon and its label both follow the sidebar's
 state (`panel-left-close` / `panel-left-open`, "Collapse" / "Expand"), and it
 carries `aria-expanded`.
 
-The drag region uses `data-tauri-drag-region`. Double-click-to-maximise is verified against Tauri 2.11's built-in drag-region behaviour first, and only hand-implemented if it turns out not to be covered — writing the handler unconditionally risks toggling maximise twice per double-click. Window controls are 32×32 rounded hit targets with `aria-label`s, inset 8px from the window edge — flush controls put the close button's hover fill on the window corner. The maximise control subscribes to the real window state through `is_maximized` and a resize listener (both inside `core:default`, so no new capability), because the window manager can maximise the window without the button: a double-click on the drag region, a keyboard shortcut, a tiling rule. Its glyph and its label follow. Setting `appearance.titleBar` to `system` calls `set_decorations(true)` and hides the custom bar live, with no restart — this matters on GNOME and KDE, where users expect their own decorations. Under Wayland, whether a compositor honours the request is up to the compositor; Hyprland and others may ignore it entirely. Riff therefore reads `is_decorated()` back after the call, and if the window manager refused, reverts to the custom bar and says so in a toast rather than leaving the user with a window that has no title bar at all and a setting that claims otherwise.
+The title bar handles its own mouse-down boundary: interactive descendants keep their input, a primary press on everything else calls the typed Rust command `window_start_dragging`, and a double-click calls `window_toggle_maximize`. Tauri's built-in `data-tauri-drag-region` handler cannot be used here because its `start_dragging` plugin command is deliberately outside `core:default`; expanding the webview capability just to move a window would break the security invariant instead of fixing the title bar. Window controls are 32×32 rounded hit targets with `aria-label`s, inset 8px from the window edge — flush controls put the close button's hover fill on the window corner. The maximise control subscribes to the real window state through `is_maximized` and a resize listener, because the window manager can maximise the window without the button: a title-bar double-click, a keyboard shortcut, a tiling rule. Its glyph and its label follow. Every Riff window is undecorated and always wears this title bar; there is no second system-decoration path to drift from it.
 
 ### 8.2 Onboarding
 
@@ -518,23 +517,23 @@ A strip along the bottom of the card states plainly that Riff records nothing ye
 
 Three-column shell: sidebar, 248px sub-navigation (General, Appearance, About), and a centred content column of grouped cards.
 
-The content is **grouped**, not one long card. General splits into Startup / Data / Settings file / Start over; Appearance into Theme / Layout / Motion and contrast / Window; About into Build / Legal / Support. Fifteen undifferentiated rows in a single panel made "where is the title bar setting" a scanning problem; one small heading per three or four rows makes it a reading problem.
+The content is **grouped**, not one long card. General splits into Startup / Data / Settings file / Start over; Appearance into Theme / Layout / Motion and contrast; About into Build / Legal / Support. Undifferentiated rows in a single panel make finding any one choice a scanning problem; one small heading per three or four rows makes it a reading problem.
 
 Three control types carry the sections:
 
-- **Segmented controls** for every two- or three-way choice (density, reduce motion, title bar). A row of loose radio dots and labels reads as a form to be filled in and submitted, which is exactly wrong for a screen with no Save button. It is still a Radix radio group underneath, so arrow keys, the roving tabindex and the group name are the primitive's behaviour rather than a re-implementation.
+- **Segmented controls** for every two- or three-way choice (density and reduce motion). A row of loose radio dots and labels reads as a form to be filled in and submitted, which is exactly wrong for a screen with no Save button. It is still a Radix radio group underneath, so arrow keys, the roving tabindex and the group name are the primitive's behaviour rather than a re-implementation.
 - **Theme cards** with live miniatures, shared with onboarding (§8.2). Theme is the one setting whose effect can be shown instead of described.
 - **A themed listbox**, never `<select>`. GTK draws the native popup, not Riff, so it ignored every token in the design system and rendered as light-on-light on the dark themes — a control the user could operate but not read. There is no CSS that fixes that, because the popup is not in the document.
 
 Every control writes through `useSettings.patch()` and takes effect immediately. There is no Save button and no dirty state — a settings screen that can be abandoned half-applied is a settings screen with a bug in it.
 
-The sections are written by hand, **not generated** from the JSON Schema. Fifteen controls do not repay a rendering framework, and a generator would immediately need escape hatches for the UI-scale slider's live preview, the destructive-reset confirmation and the licence viewer. Hand-written sections stay readable and are trivially testable; a generator would be the more impressive and worse decision.
+The sections are written by hand, **not generated** from the JSON Schema. This number of controls does not repay a rendering framework, and a generator would immediately need escape hatches for the UI-scale slider's live preview, the destructive-reset confirmation and the licence viewer. Hand-written sections stay readable and are trivially testable; a generator would be the more impressive and worse decision.
 
 **General** — Startup route; Restore window size and position; Confirm before quitting; Data locations with per-directory Open buttons; Export settings; Import settings; Reset all settings (destructive confirmation dialog); Re-run onboarding.
 
-Window *position* restore is a request, not a guarantee: under Wayland the compositor owns placement and Hyprland, the primary development target, ignores it outright. Size is honoured everywhere. The control's description says so plainly rather than promising behaviour the user's desktop will quietly discard — the same honesty the title bar setting applies in §8.1.
+Window *position* restore is a request, not a guarantee: under Wayland the compositor owns placement and Hyprland, the primary development target, ignores it outright. Size is honoured everywhere. The control's description says so plainly rather than promising behaviour the user's desktop will quietly discard.
 
-**Appearance** — Theme (Dark / Darker / Light); Density; UI scale slider with a Reset affordance; Reduce motion; High contrast; Title bar style; Remember sidebar state.
+**Appearance** — Theme (Dark / Darker / Light); Density; UI scale slider with a Reset affordance; Reduce motion; High contrast; Remember sidebar state.
 
 The UI scale slider applies **when the gesture ends**, not on every pointer move, and that is forced by the control's own subject matter. Radix caches the slider's bounding rect on pointer-down and maps the pointer through it for the whole drag; applying the scale live changes the root font size, which changes the slider's own width *and* its position — the settings column is centred and the sub-navigation grows beside it. From the first pixel of the drag the cached rect describes an element that has moved, so the thumb (placed by percentage of the new track) separates from the cursor: the handle stops following the pointer while the percentage keeps climbing, which reads as a broken control. Holding the value locally until release breaks the loop. The thumb and the readout both follow the draft, so the drag is still live feedback; the interface resizes once, on release. Arrow keys are unaffected — Radix commits on every step key — so the keyboard path applies immediately.
 

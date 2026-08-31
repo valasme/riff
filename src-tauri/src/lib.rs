@@ -266,8 +266,8 @@ pub fn run() {
                 // VISIBLE and DECORATIONS: on restore the plugin would call
                 // show() before React has painted, reintroducing the flash of
                 // unthemed content §3.1 exists to make impossible — on every
-                // launch after the first — and would make the state file a
-                // second owner of `appearance.titleBar`.
+                // launch after the first — and could put an OS frame around
+                // Riff's custom titlebar.
                 .with_state_flags(StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED)
                 .build(),
         );

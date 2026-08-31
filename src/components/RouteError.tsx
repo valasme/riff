@@ -3,11 +3,11 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { WindowControls } from "@/features/window/WindowControls";
+import { handleWindowDrag } from "@/features/window/windowDrag";
 import { isInCrashLoop, recordCrash, requestSafeMode } from "@/lib/crash-loop";
 import { fire, ipc, isRiffError } from "@/lib/ipc";
 import { log } from "@/lib/logger";
 import { redact } from "@/lib/redact";
-import { useTitleBarStyle } from "@/stores/settings";
 
 export function RouteError({ error }: { error: unknown }) {
   const { t } = useTranslation("errors");
@@ -116,12 +116,10 @@ export function RouteError({ error }: { error: unknown }) {
  * whose application has just crashed.
  */
 function CrashChrome() {
-  const titleBar = useTitleBarStyle();
-  if (titleBar !== "custom") return null;
-
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: A native window drag is pointer-only; a role or keyboard binding would falsely expose crash chrome as a control.
     <header
-      data-tauri-drag-region
+      onMouseDown={handleWindowDrag}
       className="flex h-[var(--spacing-titlebar)] shrink-0 items-center justify-end border-b border-line bg-surface px-2"
     >
       <WindowControls />

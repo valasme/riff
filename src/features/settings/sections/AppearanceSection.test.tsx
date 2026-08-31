@@ -11,14 +11,12 @@ const appearance = {
   uiScale: 1,
   reduceMotion: "system" as const,
   highContrast: false,
-  titleBar: "custom" as const,
   sidebar: { collapsed: false, rememberCollapsed: true },
 };
 vi.mock("@/stores/settings", () => ({
   useAppearance: () => appearance,
   useSettings: (selector: (s: { patch: typeof patch }) => unknown) => selector({ patch }),
 }));
-vi.mock("@/lib/ipc", () => ({ ipc: { windowSetDecorations: vi.fn().mockResolvedValue(false) } }));
 
 const { AppearanceSection } = await import("./AppearanceSection");
 
