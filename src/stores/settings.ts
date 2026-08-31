@@ -67,6 +67,7 @@ const DEFAULTS: Settings = {
     highContrast: false,
     titleBar: "custom",
     sidebar: { collapsed: false, rememberCollapsed: true },
+    scoreDim: 0,
   },
   onboarding: { completedAt: null, version: 1 },
   practice: { poppedOut: [] },
@@ -225,6 +226,7 @@ export const useDensity = () => useSettings((s) => s.settings.appearance.density
 export const useUiScale = () => useSettings((s) => s.settings.appearance.uiScale);
 export const useHighContrast = () => useSettings((s) => s.settings.appearance.highContrast);
 export const useTitleBarStyle = () => useSettings((s) => s.settings.appearance.titleBar);
+export const useScoreDim = () => useSettings((s) => s.settings.appearance.scoreDim);
 export const useStartupRoute = () => useSettings((s) => s.settings.general.startupRoute);
 export const useSidebarCollapsed = () =>
   useSettings((s) => s.settings.appearance.sidebar.collapsed);

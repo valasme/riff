@@ -241,6 +241,48 @@ export function AppearanceSection() {
             onCheckedChange={(highContrast) => void patch({ appearance: { highContrast } })}
           />
         </SettingRow>
+
+        {/* Dim lives here rather than on the score toolbar because it is a
+            preference — about the room and the monitor and the person, the
+            same for every score — not part of the view that travels with a
+            popping-out pane. Spec §7 draws that line, and ADR 0004 is why
+            it falls between configuration and derived state. */}
+        <SettingRow
+          label={t("settings:appearance.scoreDim.label")}
+          description={t("settings:appearance.scoreDim.description")}
+        >
+          <div className="flex w-[16rem] items-center gap-3">
+            <Slider
+              thumbLabel={t("settings:appearance.scoreDim.label")}
+              min={0}
+              max={0.4}
+              step={0.05}
+              value={[appearance.scoreDim]}
+              // Applied on every step, unlike UI scale: this changes a CSS
+              // filter on a canvas rather than the root font size, so
+              // nothing it touches can move the slider out from under the
+              // pointer mid-drag.
+              onValueChange={([next]) => {
+                if (next !== undefined) void patch({ appearance: { scoreDim: next } });
+              }}
+            />
+            {/* §10: numbers go through Intl, never hand-formatted. */}
+            <span className="w-11 shrink-0 text-end font-mono text-xs tabular-nums text-foreground">
+              {new Intl.NumberFormat(i18n.language, { style: "percent" }).format(
+                appearance.scoreDim,
+              )}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => void patch({ appearance: { scoreDim: 0 } })}
+              aria-label={t("settings:appearance.scoreDim.reset")}
+              disabled={appearance.scoreDim === 0}
+            >
+              <RotateCcw aria-hidden />
+            </Button>
+          </div>
+        </SettingRow>
       </SettingsGroup>
 
       <SettingsGroup title={t("settings:appearance.groups.window")}>

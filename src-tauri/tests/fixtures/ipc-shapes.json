@@ -162,6 +162,7 @@
       "density": "comfortable",
       "highContrast": false,
       "reduceMotion": "system",
+      "scoreDim": 0.0,
       "sidebar": {
         "collapsed": false,
         "rememberCollapsed": true

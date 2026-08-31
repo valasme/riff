@@ -184,6 +184,11 @@ pub struct Appearance {
     #[serde(deserialize_with = "lenient")]
     pub title_bar: TitleBar,
     pub sidebar: Sidebar,
+    /// How far a rendered score is darkened, so a white page does not glare
+    /// in a dark room. A preference — chosen once, about the room and the
+    /// monitor and the person — which is why it lives here and not in
+    /// `workspace.json` with the view (spec §7, ADR 0004).
+    pub score_dim: ScoreDim,
 }
 
 impl Default for Appearance {
@@ -196,6 +201,7 @@ impl Default for Appearance {
             high_contrast: false,
             title_bar: TitleBar::Custom,
             sidebar: Sidebar::default(),
+            score_dim: ScoreDim::default(),
             unknown: serde_json::Map::new(),
         }
     }
@@ -356,6 +362,43 @@ impl<'de> Deserialize<'de> for UiScale {
     }
 }
 
+/// How far a score's rendered page is darkened: 0 is off, 0.4 is as far as
+/// Riff will go. Clamped on the way in exactly as `UiScale` is, so an
+/// out-of-range value in a hand-edited file is corrected rather than
+/// rejected.
+///
+/// A magnitude, not a mode — which is why there is no separate toggle, and
+/// why it does not follow the theme: with a number the user chose, engaging
+/// automatically under a dark theme would be fighting them.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, JsonSchema)]
+pub struct ScoreDim(f32);
+
+impl ScoreDim {
+    pub const MIN: f32 = 0.0;
+    pub const MAX: f32 = 0.4;
+
+    pub fn new(value: f32) -> Self {
+        if value.is_finite() {
+            Self(value.clamp(Self::MIN, Self::MAX))
+        } else {
+            Self::default()
+        }
+    }
+
+    pub fn get(self) -> f32 {
+        self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for ScoreDim {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let raw = serde_json::Value::deserialize(deserializer)?;
+        Ok(serde_json::from_value::<f32>(raw)
+            .map(Self::new)
+            .unwrap_or_default())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -429,6 +472,38 @@ mod tests {
         let junk: Settings =
             serde_json::from_str(r#"{"appearance":{"uiScale":"big"}}"#).expect("loads");
         assert_eq!(junk.appearance.ui_scale.get(), 1.0);
+    }
+
+    #[test]
+    fn score_dim_clamps_out_of_range_values_rather_than_rejecting_them() {
+        let high: Settings =
+            serde_json::from_str(r#"{"appearance":{"scoreDim":9.0}}"#).expect("loads");
+        assert_eq!(high.appearance.score_dim.get(), 0.4);
+        let low: Settings =
+            serde_json::from_str(r#"{"appearance":{"scoreDim":-1.0}}"#).expect("loads");
+        assert_eq!(low.appearance.score_dim.get(), 0.0);
+        let junk: Settings =
+            serde_json::from_str(r#"{"appearance":{"scoreDim":"dark"}}"#).expect("loads");
+        assert_eq!(junk.appearance.score_dim.get(), 0.0);
+    }
+
+    #[test]
+    fn dim_is_off_by_default_and_does_not_follow_the_theme() {
+        // A magnitude, not a mode: zero means off, so there is no separate
+        // toggle — and engaging automatically under a dark theme would be
+        // fighting a number the user chose.
+        let dark = Settings::default();
+        assert_eq!(dark.appearance.theme, Theme::Dark);
+        assert_eq!(dark.appearance.score_dim.get(), 0.0);
+
+        let light: Settings =
+            serde_json::from_str(r#"{"appearance":{"theme":"light","scoreDim":0.3}}"#)
+                .expect("loads");
+        assert_eq!(
+            light.appearance.score_dim.get(),
+            0.3,
+            "dim is independent of the theme in both directions"
+        );
     }
 
     #[test]

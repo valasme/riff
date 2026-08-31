@@ -4,6 +4,7 @@ import "./score.css";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { fire, ipc, type OpenScore, type View } from "@/lib/ipc";
+import { useScoreDim } from "@/stores/settings";
 import {
   clampPage,
   PDFJS_SCROLL_MODE,
@@ -67,6 +68,10 @@ export function ScoreViewer({
   onLoadError: (message: string) => void;
 }) {
   const { t } = useTranslation(["common", "errors"]);
+  // A primitive selector, not `useAppearance()`: `adopt` replaces `settings`
+  // wholesale, so an object selector would re-render the viewer on every
+  // unrelated preference change.
+  const dim = useScoreDim();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const viewerRef = useRef<HTMLDivElement | null>(null);
   // The live `PDFViewer`, reachable outside the effect that builds it so the
@@ -277,7 +282,21 @@ export function ScoreViewer({
         />
       )}
       <div className="relative min-h-0 flex-1">
-        <div ref={containerRef} className="riff-score-viewer absolute inset-0 overflow-auto">
+        <div
+          ref={containerRef}
+          className="riff-score-viewer absolute inset-0 overflow-auto"
+          // Dim is a brightness reduction on the rendered page, applied by
+          // `score.css` to `canvas` rather than `.page` so search highlights
+          // stay at full strength while the page behind them darkens. It
+          // costs no re-render: changing this while reading is a repaint,
+          // where pdf.js's own `pageColors` would re-render every visible
+          // page — and would invert to light-on-dark, which is a different
+          // feature Riff does not have.
+          data-dimmed={dim > 0}
+          style={
+            dim > 0 ? ({ "--score-dim-brightness": 1 - dim } as React.CSSProperties) : undefined
+          }
+        >
           <div ref={viewerRef} className="pdfViewer" />
         </div>
         {!ready && (

@@ -34,6 +34,7 @@ const DEFAULTS: Settings = {
     highContrast: false,
     titleBar: "custom",
     sidebar: { collapsed: false, rememberCollapsed: true },
+    scoreDim: 0,
   },
   onboarding: { completedAt: null, version: 1 },
   practice: { poppedOut: [] },

@@ -10,6 +10,7 @@ const base: Appearance = {
   highContrast: false,
   titleBar: "custom",
   sidebar: { collapsed: false, rememberCollapsed: true },
+  scoreDim: 0,
 };
 
 function mockPrefersReducedMotion(matches: boolean) {

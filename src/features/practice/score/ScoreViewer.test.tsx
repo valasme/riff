@@ -8,6 +8,8 @@ import type { OpenScore } from "@/lib/ipc";
 const scoreBytes = vi.fn();
 const appInfo = vi.fn();
 const scoreViewPatch = vi.fn().mockResolvedValue(undefined);
+let dim = 0;
+vi.mock("@/stores/settings", () => ({ useScoreDim: () => dim }));
 vi.mock("@/lib/ipc", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/ipc")>()),
   ipc: { scoreBytes, appInfo, scoreViewPatch },
@@ -128,6 +130,7 @@ describe("ScoreViewer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     lastViewer = undefined;
+    dim = 0;
     ensureWorker.mockResolvedValue(undefined);
     scoreBytes.mockResolvedValue(new ArrayBuffer(4));
     scoreViewPatch.mockResolvedValue(undefined);
@@ -353,6 +356,28 @@ describe("ScoreViewer", () => {
     scoreViewPatch.mockClear();
     await userEvent.click(screen.getByRole("button", { name: "Next page" }));
     expect(scoreViewPatch).not.toHaveBeenCalled();
+  });
+
+  // A brightness reduction on the rendered page, not an inversion, and
+  // applied to `canvas` rather than `.page` so search highlights — which sit
+  // in the text layer above it — keep their full strength while the page
+  // behind them darkens. `score.css` owns that selector; this is the value
+  // it reads.
+  it("applies no filter at all when dim is off, which is the default", async () => {
+    const { container } = await renderReady();
+    const surface = container.querySelector(".riff-score-viewer") as HTMLElement;
+    // Not `brightness(1)`: a filter promotes every canvas to its own
+    // compositing layer even when it changes nothing.
+    expect(surface.dataset.dimmed).toBe("false");
+    expect(surface.style.getPropertyValue("--score-dim-brightness")).toBe("");
+  });
+
+  it("darkens the page as dim rises", async () => {
+    dim = 0.4;
+    const { container } = await renderReady();
+    const surface = container.querySelector(".riff-score-viewer") as HTMLElement;
+    expect(surface.dataset.dimmed).toBe("true");
+    expect(surface.style.getPropertyValue("--score-dim-brightness")).toBe("0.6");
   });
 
   it("tears the loading task down on unmount, per the StrictMode fix", async () => {

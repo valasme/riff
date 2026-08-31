@@ -78,7 +78,13 @@
 /* Dim (spec §6.2): a brightness reduction on the rendered page, applied to
    `canvas` rather than `.page` so search highlights — drawn in the text
    layer, above the canvas — stay at full strength while the page behind
-   them dims. Not pdf.js's `pageColors`, which inverts to light-on-dark. */
-.riff-score-viewer canvas {
-  filter: brightness(var(--score-dim-brightness, 1));
+   them dims. Not pdf.js's `pageColors`, which inverts to light-on-dark.
+
+   Behind an attribute rather than relying on `brightness(1)` being a no-op:
+   a filter promotes every element it touches to its own compositing layer
+   whether or not it changes a pixel, and dim is off by default — so the
+   common path would pay a layer per page, on the one feature whose stated
+   performance target is that memory does not grow with the page count. */
+.riff-score-viewer[data-dimmed="true"] canvas {
+  filter: brightness(var(--score-dim-brightness));
 }

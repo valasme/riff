@@ -97,6 +97,11 @@
       "label": "High contrast",
       "description": "Strengthens borders and secondary text to meet WCAG contrast minimums."
     },
+    "scoreDim": {
+      "label": "Dim scores",
+      "description": "Darkens a rendered score so a white page does not glare in a dark room. Independent of the theme, and off at zero.",
+      "reset": "Reset dim to off"
+    },
     "titleBar": {
       "label": "Title bar",
       "description": "Use Riff's own title bar, or ask your window manager for its decorations."

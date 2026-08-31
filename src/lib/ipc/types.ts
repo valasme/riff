@@ -30,6 +30,8 @@ export interface Appearance {
   highContrast: boolean;
   titleBar: TitleBarStyle;
   sidebar: Sidebar;
+  /** 0 to 0.4. Zero means off, so there is no separate toggle. */
+  scoreDim: number;
 }
 
 export interface Onboarding {
