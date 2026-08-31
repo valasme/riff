@@ -14,7 +14,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { formatChord } from "@/features/keybindings/chord";
 import type { Keybinding } from "@/features/keybindings/keymap";
 
-const GROUPS = ["navigation", "appearance", "application"] as const;
+const GROUPS = ["navigation", "score", "appearance", "application"] as const;
 
 export function CommandPalette({
   open,

@@ -4,6 +4,7 @@ import { I18nextProvider } from "react-i18next";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/app/i18n";
 import type { OpenScore } from "@/lib/ipc";
+import { runScoreCommand } from "./commands";
 
 const scoreBytes = vi.fn();
 const appInfo = vi.fn();
@@ -545,6 +546,69 @@ describe("ScoreViewer", () => {
       // One write, for the spread — not a second one for the page.
       expect(scoreViewPatch).toHaveBeenCalledTimes(1);
       expect(scoreViewPatch).toHaveBeenCalledWith(expect.objectContaining({ spread: "odd" }));
+    });
+  });
+
+  describe("the command channel", () => {
+    // Chords and palette commands reach the viewer here rather than through
+    // the store, so the view stays local to the component driving pdf.js.
+    it("turns pages", async () => {
+      await renderReady();
+      act(() => runScoreCommand({ kind: "page", delta: 1 }));
+      expect(lastViewer?.currentPageNumber).toBe(2);
+      act(() => runScoreCommand({ kind: "page", delta: -1 }));
+      expect(lastViewer?.currentPageNumber).toBe(1);
+    });
+
+    it("zooms, fits, rotates, spreads and switches scroll mode", async () => {
+      await renderReady();
+      act(() => runScoreCommand({ kind: "fit" }));
+      expect(lastViewer?.currentScaleValue).toBe("page-fit");
+      act(() => runScoreCommand({ kind: "rotate" }));
+      expect(lastViewer?.pagesRotation).toBe(90);
+      act(() => runScoreCommand({ kind: "spread" }));
+      expect(lastViewer?.spreadMode).toBe(1);
+      act(() => runScoreCommand({ kind: "scrollMode" }));
+      expect(lastViewer?.scrollMode).toBe(3);
+      if (lastViewer) lastViewer.currentScale = 1;
+      act(() => runScoreCommand({ kind: "zoom", direction: 1 }));
+      expect(lastViewer?.currentScaleValue).toBe("1.1");
+    });
+
+    it("opens search", async () => {
+      await renderReady();
+      act(() => runScoreCommand({ kind: "search" }));
+      expect(await screen.findByLabelText("Search the score")).toBeInTheDocument();
+    });
+
+    // Stoppable from the chord as well as the toolbar — which is what the
+    // reduced-motion exemption rests on.
+    it("starts and stops auto-scroll", async () => {
+      await renderReady();
+      act(() => runScoreCommand({ kind: "autoScroll" }));
+      expect(screen.getByRole("button", { name: "Stop auto-scroll" })).toBeInTheDocument();
+      act(() => runScoreCommand({ kind: "autoScroll" }));
+      expect(screen.getByRole("button", { name: "Start auto-scroll" })).toBeInTheDocument();
+    });
+
+    it("steps the speed and records it, since speed is part of the view", async () => {
+      await renderReady();
+      act(() => runScoreCommand({ kind: "speed", delta: 1 }));
+      expect(scoreViewPatch).toHaveBeenLastCalledWith(
+        expect.objectContaining({ autoScrollSpeed: 1.1 }),
+      );
+    });
+
+    // A pin is not part of the view: it starts off every time.
+    it("pins without recording it", async () => {
+      await renderReady();
+      scoreViewPatch.mockClear();
+      act(() => runScoreCommand({ kind: "pin" }));
+      expect(screen.getByRole("button", { name: "Pin to this page" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      expect(scoreViewPatch).not.toHaveBeenCalled();
     });
   });
 

@@ -16,6 +16,8 @@ import { ONBOARDING_VERSION, shouldShowOnboarding } from "@/features/onboarding/
 import { CommandPalette } from "@/features/palette/CommandPalette";
 import { popoutPaneFrom } from "@/features/practice/layout";
 import { PANE_ICONS } from "@/features/practice/paneIcons";
+import { runScoreCommand } from "@/features/practice/score/commands";
+import { useOpenScore } from "@/features/practice/score/useOpenScore";
 import { PopoutQuitDialog } from "@/features/window/PopoutQuitDialog";
 import { QuitConfirmation } from "@/features/window/QuitConfirmation";
 import { TitleBar } from "@/features/window/TitleBar";
@@ -73,6 +75,9 @@ export function RootLayout() {
   const onboardingActive = pathname === "/onboarding";
   const popoutPane = popoutPaneFrom(pathname);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // Mirrored from Rust so the palette can hide the score commands when
+  // there is nothing to run them against.
+  const openScore = useOpenScore();
   const [quitPromptOpen, setQuitPromptOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -124,8 +129,15 @@ export function RootLayout() {
         // dialog asks rather than picking a side.
         quit: () => (popoutPane ? setQuitPromptOpen(true) : fire(ipc.windowClose(), "quitting")),
         closeOverlay: () => setPaletteOpen(false),
+        // Only whether a score is open, never its view — see KeymapContext.
+        openScore,
+        openScorePicker: () => fire(ipc.scoreOpen(), "opening a score"),
+        closeScore: () => fire(ipc.scoreClose(), "closing the score"),
+        // Reaches whichever viewer is mounted in this window, and is a
+        // no-op in the window that is not hosting the Score pane.
+        scoreCommand: runScoreCommand,
       }),
-    [navigate, toggleSidebar, patch, settings, popoutPane],
+    [navigate, toggleSidebar, patch, settings, popoutPane, openScore],
   );
 
   useKeybindings(bindings);

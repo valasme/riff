@@ -72,6 +72,11 @@ vi.mock("@/lib/ipc", async (importOriginal) => ({
     practicePopOut: vi.fn(),
     practiceDockBack: vi.fn(),
     practiceDockAll: vi.fn(),
+    // `__root` mirrors whether a score is open, so the palette can hide the
+    // score commands when there is nothing to run them against.
+    scoreState: vi.fn().mockResolvedValue(null),
+    scoreOpen: vi.fn(),
+    scoreClose: vi.fn(),
   },
 }));
 

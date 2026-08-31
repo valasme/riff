@@ -10,6 +10,7 @@
   },
   "groups": {
     "navigation": "Navigation",
+    "score": "Score",
     "appearance": "Appearance",
     "application": "Application"
   },
@@ -35,6 +36,23 @@
       "dockBack": "Dock this pane back into Riff"
     },
     "ui.closeOverlay": "Close the topmost overlay",
+    "score": {
+      "open": "Open a score…",
+      "close": "Close the score",
+      "nextPage": "Turn to the next page",
+      "previousPage": "Turn to the previous page",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "fit": "Switch between fit width and fit page",
+      "search": "Search this score",
+      "rotate": "Rotate the score 90°",
+      "spread": "Cycle single pages and spreads",
+      "scrollMode": "Switch between continuous pages and one at a time",
+      "autoScroll": "Start or stop auto-scroll",
+      "speedUp": "Auto-scroll faster",
+      "speedDown": "Auto-scroll slower",
+      "pin": "Pin auto-scroll to this page"
+    },
     "app.quit": "Quit Riff"
   }
 }

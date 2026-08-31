@@ -5,12 +5,19 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { fire, ipc, type OpenScore, type View } from "@/lib/ipc";
 import { useScoreDim } from "@/stores/settings";
+import { onScoreCommand } from "./commands";
 import {
   clampPage,
+  clampSpeed,
   NO_SEARCH,
+  nextFit,
+  nextRotation,
+  nextScrollMode,
+  nextSpread,
   PDFJS_SCROLL_MODE,
   PDFJS_SPREAD_MODE,
   type SearchStatus,
+  SPEED_STEP,
   scaleValue,
   searchStateFrom,
   steppedScale,
@@ -318,6 +325,41 @@ export function ScoreViewer({
     // see `workspace::Score` in Rust — and is exactly what should retrigger
     // this effect: a new score, not a changed `t` or callback identity.
   }, [open.score.name, open.score.size]);
+
+  // Chords and palette commands arrive here rather than through the store,
+  // so the view stays local to the component driving pdf.js. Only the
+  // window hosting the Score pane has a viewer mounted, so a chord pressed
+  // in the other window simply finds no listener.
+  useEffect(() =>
+    onScoreCommand((command) => {
+      switch (command.kind) {
+        case "page":
+          return goToPage(page + command.delta);
+        case "zoom":
+          return zoom(command.direction);
+        case "fit":
+          return changeView({ scale: nextFit(viewRef.current.scale) });
+        case "rotate":
+          return changeView({ rotation: nextRotation(viewRef.current.rotation) });
+        case "spread":
+          return changeView({ spread: nextSpread(viewRef.current.spread) });
+        case "scrollMode":
+          return changeView({ scrollMode: nextScrollMode(viewRef.current.scrollMode) });
+        case "search":
+          return setSearching((was) => !was);
+        case "autoScroll":
+          return setScrolling((was) => !was);
+        case "speed":
+          return changeView({
+            autoScrollSpeed: clampSpeed(
+              viewRef.current.autoScrollSpeed + command.delta * SPEED_STEP,
+            ),
+          });
+        case "pin":
+          return setPinned((was) => !was);
+      }
+    }),
+  );
 
   useAutoScroll({
     running: scrolling,
