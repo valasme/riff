@@ -34,11 +34,23 @@ class FakePDFLinkService {
   setDocument() {}
 }
 
+let lastViewer: FakePDFViewer | undefined;
+
 class FakePDFViewer {
   pdfDocument: unknown = null;
-  currentScaleValue: string | number = "page-width";
+  // `null`, exactly as the real `_resetView()` leaves it — a viewer nothing
+  // has chosen a scale for renders at 100%, which is the bug `pagesinit`
+  // below exists to close.
+  currentScaleValue: string | null = null;
+  #eventBus: FakeEventBus;
+  constructor(options: { eventBus: FakeEventBus }) {
+    this.#eventBus = options.eventBus;
+    lastViewer = this;
+  }
   setDocument(document: unknown) {
     this.pdfDocument = document;
+    // The real `setDocument` dispatches this once the page views exist.
+    this.#eventBus.dispatch("pagesinit", { source: this });
   }
 }
 
@@ -99,6 +111,7 @@ function renderViewer(onLoadError: (message: string) => void = () => {}) {
 describe("ScoreViewer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    lastViewer = undefined;
     ensureWorker.mockResolvedValue(undefined);
     scoreBytes.mockResolvedValue(new ArrayBuffer(4));
     appInfo.mockResolvedValue({
@@ -186,6 +199,28 @@ describe("ScoreViewer", () => {
         "This score could not be found. It may have been moved or deleted.",
       ),
     );
+  });
+
+  // Without this the viewer sits at pdf.js's UNKNOWN_SCALE, whose getter
+  // answers 1.0 — so an 816px US Letter page renders at full size inside a
+  // ~500px Score pane and the score arrives with a horizontal scrollbar.
+  it("applies the view's fit mode as soon as the pages exist", async () => {
+    getDocumentImpl = () => ({ promise: Promise.resolve(fakeDocument()), destroy: vi.fn() });
+    renderViewer();
+    await waitFor(() => expect(lastViewer?.currentScaleValue).toBe("page-width"));
+  });
+
+  it("applies free zoom as a number-valued scale rather than a fit keyword", async () => {
+    getDocumentImpl = () => ({ promise: Promise.resolve(fakeDocument()), destroy: vi.fn() });
+    render(
+      <I18nextProvider i18n={i18n}>
+        <ScoreViewer
+          open={{ ...OPEN, view: { ...OPEN.view, scale: { mode: "custom", value: 1.25 } } }}
+          onLoadError={() => {}}
+        />
+      </I18nextProvider>,
+    );
+    await waitFor(() => expect(lastViewer?.currentScaleValue).toBe("1.25"));
   });
 
   it("tears the loading task down on unmount, per the StrictMode fix", async () => {

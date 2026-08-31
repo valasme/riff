@@ -8,16 +8,26 @@
  */
 
 .riff-score-viewer {
-  /* The gap between pages, and the border around each one. pdf.js's own
-     `.page` already carries a box-shadow; this is Riff's page separation on
-     top of it, sized in rem so it grows with UI scale like the rest of the
-     chrome around it. */
+  /* Riff's page separation, in rem so it grows with UI scale like the rest
+     of the chrome around it. */
   --score-page-gap: 1rem;
 }
 
-.riff-score-viewer .pdfViewer .page {
-  margin: 0 auto var(--score-page-gap);
-  border: 1px solid var(--line);
+/* Set through pdf.js's OWN variables rather than by overwriting the
+   `border`/`margin` declarations that read them. The two are a matched pair
+   — stock is a 9px transparent border with `1px auto -8px` margins pulling
+   it back — so overwriting one and not the other, or both without the
+   pairing, is how the gap between pages stops meaning what it says.
+
+   `@media not (forced-colors: active)` is the reason this is not simply set
+   on the container: under forced colours pdf.js swaps the same pair to
+   `1px solid CanvasText` / `8px auto -1px`, and a class selector would beat
+   its `:root` rule and silently take the system's page border away. */
+@media not (forced-colors: active) {
+  .riff-score-viewer .pdfViewer {
+    --page-border: 1px solid var(--line);
+    --page-margin: 0 auto var(--score-page-gap);
+  }
 }
 
 /* An imported stylesheet is exactly how the desktop-flat cursor Riff resets

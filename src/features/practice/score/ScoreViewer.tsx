@@ -4,6 +4,7 @@ import "./score.css";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ipc, type OpenScore } from "@/lib/ipc";
+import { scaleValue } from "./geometry";
 import {
   AnnotationMode,
   EventBus,
@@ -100,6 +101,19 @@ export function ScoreViewer({
     }
     eventBus.on("pagerendered", onPageRendered);
 
+    // `pagesinit` fires from inside `setDocument` once the page views exist,
+    // which is the earliest point a fit mode can be resolved — the fit-width
+    // maths needs the first page's width. This is the same seam pdf.js's own
+    // reference viewer uses, and without it the viewer stays at
+    // `UNKNOWN_SCALE` and renders every page at 100%: see `geometry.ts`.
+    function onPagesInit() {
+      // Stringified because that is what the setter stores anyway
+      // (`newValue.toString()`) and what its `parseFloat` reads back — a
+      // number reaches the same branch, but only the string is type-honest.
+      viewer.currentScaleValue = String(scaleValue(open.view.scale));
+    }
+    eventBus.on("pagesinit", onPagesInit);
+
     let loadingTask: ReturnType<typeof getDocument> | null = null;
 
     void (async () => {
@@ -156,6 +170,7 @@ export function ScoreViewer({
       cancelled = true;
       resizeObserver.disconnect();
       eventBus.off("pagerendered", onPageRendered);
+      eventBus.off("pagesinit", onPagesInit);
       abortController.abort();
       void loadingTask?.destroy();
     };
