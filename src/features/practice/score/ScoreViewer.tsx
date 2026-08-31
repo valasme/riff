@@ -48,7 +48,11 @@ interface PageRenderedEvent {
  * one has been set. Setting it first and letting the others follow is what
  * keeps a rotated score still fitted to the pane.
  */
-function applyViewToViewer(viewer: InstanceType<typeof PDFViewer>, view: View) {
+function applyViewToViewer(
+  viewer: InstanceType<typeof PDFViewer>,
+  view: View,
+  { page = false }: { page?: boolean } = {},
+) {
   viewer.pagesRotation = view.rotation;
   viewer.spreadMode = PDFJS_SPREAD_MODE[view.spread];
   viewer.scrollMode = PDFJS_SCROLL_MODE[view.scrollMode];
@@ -56,6 +60,11 @@ function applyViewToViewer(viewer: InstanceType<typeof PDFViewer>, view: View) {
   // (`newValue.toString()`) and what its `parseFloat` reads back — a number
   // reaches the same branch, but only the string is type-honest.
   viewer.currentScaleValue = String(scaleValue(view.scale));
+  // Only on a restore. A change to spread or zoom must not yank the reader
+  // back to a page they have since scrolled away from.
+  if (page) {
+    viewer.currentPageNumber = clampPage(view.page, viewer.pagesCount, view.page);
+  }
 }
 
 /**
@@ -104,6 +113,21 @@ export function ScoreViewer({
   // every render would tear the viewer down and rebuild it.
   const onLoadErrorRef = useRef(onLoadError);
   onLoadErrorRef.current = onLoadError;
+  // The latest view, for the event handlers the effect creates once.
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  /**
+   * Set while Riff is driving the viewer, so the events that driving
+   * produces are not mistaken for the user doing something.
+   *
+   * Restoring a view is the case that needs it: setting `currentPageNumber`
+   * makes `PDFViewer` dispatch `pagechanging` synchronously, and the handler
+   * listening for it is the one that records the page — so a restore would
+   * write straight back what it had just read. `settings/watcher.rs` solves
+   * the same problem the same way, by filtering out its own last write.
+   */
+  const applying = useRef(false);
+  const recordView = useRef<(next: View) => void>(() => {});
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on open.score identity only, by design — see the comment above the dependency array
   useEffect(() => {
@@ -185,6 +209,9 @@ export function ScoreViewer({
     // being set wherever a page turn is requested.
     function onPageChanging(event: { pageNumber: number }) {
       setPage(event.pageNumber);
+      // Riff's own restore echoing back, not a page the reader turned to.
+      if (applying.current) return;
+      recordView.current({ ...viewRef.current, page: event.pageNumber });
     }
     eventBus.on("pagechanging", onPageChanging);
 
@@ -202,7 +229,17 @@ export function ScoreViewer({
     // reference viewer uses, and without it the viewer stays at
     // `UNKNOWN_SCALE` and renders every page at 100%: see `geometry.ts`.
     function onPagesInit() {
-      applyViewToViewer(viewer, open.view);
+      // The whole view, page included: this is the arriving window of a
+      // pop-out or a dock-back, and everything spec §6.4 lists has to come
+      // back with it. Scroll position *within* the page deliberately does
+      // not — it was never recorded, because a pixel offset means nothing
+      // once the pane has changed width or the scale has changed.
+      applying.current = true;
+      try {
+        applyViewToViewer(viewer, open.view, { page: true });
+      } finally {
+        applying.current = false;
+      }
     }
     eventBus.on("pagesinit", onPagesInit);
 
@@ -313,12 +350,27 @@ export function ScoreViewer({
    * restore exists would overwrite the very page a reopen is meant to
    * return to.
    */
-  function changeView(patch: Partial<View>) {
-    const next = { ...view, ...patch };
+  function recordViewNow(next: View) {
+    viewRef.current = next;
     setView(next);
-    const viewer = pdfViewerRef.current;
-    if (viewer) applyViewToViewer(viewer, next);
     fire(ipc.scoreViewPatch(next), "saving the view");
+  }
+  recordView.current = recordViewNow;
+
+  function changeView(patch: Partial<View>) {
+    const next = { ...viewRef.current, ...patch };
+    recordViewNow(next);
+    const viewer = pdfViewerRef.current;
+    if (!viewer) return;
+    // Suppressed for the same reason a restore is: changing the spread can
+    // move the current page, and that is Riff driving the viewer rather
+    // than the reader turning a page.
+    applying.current = true;
+    try {
+      applyViewToViewer(viewer, next);
+    } finally {
+      applying.current = false;
+    }
   }
 
   /**

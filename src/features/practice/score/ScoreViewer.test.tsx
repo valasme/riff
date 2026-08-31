@@ -68,6 +68,7 @@ class FakePDFViewer {
     this.#currentPageNumber = value;
     this.#eventBus.dispatch("pagechanging", { source: this, pageNumber: value });
   }
+  pagesCount = 12;
   setDocument(document: unknown) {
     this.pdfDocument = document;
     // The real `setDocument` dispatches this once the page views exist.
@@ -382,15 +383,6 @@ describe("ScoreViewer", () => {
     expect(lastViewer?.currentScaleValue).toBe("0.66");
   });
 
-  // Page moves far more often than these do, and Task 11 owns writing it
-  // alongside the restore that reads it back.
-  it("does not write the page number yet, which would overwrite what a reopen restores", async () => {
-    await renderReady();
-    scoreViewPatch.mockClear();
-    await userEvent.click(screen.getByRole("button", { name: "Next page" }));
-    expect(scoreViewPatch).not.toHaveBeenCalled();
-  });
-
   // A brightness reduction on the rendered page, not an inversion, and
   // applied to `canvas` rather than `.page` so search highlights — which sit
   // in the text layer above it — keep their full strength while the page
@@ -471,6 +463,89 @@ describe("ScoreViewer", () => {
     await userEvent.click(screen.getByRole("button", { name: "Close search" }));
     expect(closed).toBe(true);
     expect(screen.queryByLabelText("Search the score")).not.toBeInTheDocument();
+  });
+
+  describe("the pop-out round trip", () => {
+    function openAt(view: Partial<OpenScore["view"]>) {
+      getDocumentImpl = () => ({
+        promise: Promise.resolve(fakeDocument([{ str: "a" }], 12)),
+        destroy: vi.fn(),
+      });
+      return render(
+        <I18nextProvider i18n={i18n}>
+          <ScoreViewer open={{ ...OPEN, view: { ...OPEN.view, ...view } }} onLoadError={() => {}} />
+        </I18nextProvider>,
+      );
+    }
+
+    // The arriving window of a pop-out or a dock-back: everything spec §6.4
+    // lists comes back, from the in-memory value score_state answers with —
+    // never from the file, which can be behind the flush scheduler.
+    it("restores the whole view a score arrives with", async () => {
+      openAt({ page: 7, rotation: 90, spread: "odd", scrollMode: "page" });
+      await screen.findByText("of 12");
+      expect(lastViewer?.currentPageNumber).toBe(7);
+      expect(lastViewer?.pagesRotation).toBe(90);
+      expect(lastViewer?.spreadMode).toBe(1);
+      expect(lastViewer?.scrollMode).toBe(3);
+      expect(screen.getByLabelText("Page number")).toHaveValue(7);
+    });
+
+    /**
+     * Setting `currentPageNumber` makes pdf.js dispatch `pagechanging`
+     * synchronously, and the handler for it is the one that records the
+     * page — so without suppression a restore writes straight back what it
+     * has just read, and the write races the arriving window.
+     */
+    it("does not write the view back while restoring it", async () => {
+      openAt({ page: 7 });
+      await screen.findByText("of 12");
+      expect(scoreViewPatch).not.toHaveBeenCalled();
+    });
+
+    it("records a page the reader actually turned to", async () => {
+      openAt({ page: 7 });
+      await screen.findByText("of 12");
+      await userEvent.click(screen.getByRole("button", { name: "Next page" }));
+      expect(scoreViewPatch).toHaveBeenCalledWith(expect.objectContaining({ page: 8 }));
+    });
+
+    /**
+     * Every change was written when it happened, so a farewell patch has
+     * nothing new to say — and everything to lose, because the arriving
+     * window may already have mounted and a dying viewer would overwrite it.
+     */
+    it("writes nothing on the way out", async () => {
+      const { unmount } = openAt({ page: 7 });
+      await screen.findByText("of 12");
+      scoreViewPatch.mockClear();
+      unmount();
+      expect(scoreViewPatch).not.toHaveBeenCalled();
+    });
+
+    // The hurried user: pop the pane out before the score has finished
+    // loading. Nothing may be left running behind it.
+    it("tears down mid-load without leaving a worker running", async () => {
+      const destroy = vi.fn().mockResolvedValue(undefined);
+      getDocumentImpl = () => ({ promise: new Promise(() => {}), destroy });
+      const { unmount } = renderViewer();
+      await screen.findByText("Opening sonata.pdf…");
+      unmount();
+      expect(destroy).toHaveBeenCalledTimes(1);
+      expect(scoreViewPatch).not.toHaveBeenCalled();
+    });
+
+    // Changing the spread can move the current page, but that is Riff
+    // driving the viewer rather than the reader turning a page.
+    it("does not mistake a view change's own page shift for a page turn", async () => {
+      openAt({ page: 7 });
+      await screen.findByText("of 12");
+      scoreViewPatch.mockClear();
+      await userEvent.click(screen.getByRole("button", { name: "Single pages" }));
+      // One write, for the spread — not a second one for the page.
+      expect(scoreViewPatch).toHaveBeenCalledTimes(1);
+      expect(scoreViewPatch).toHaveBeenCalledWith(expect.objectContaining({ spread: "odd" }));
+    });
   });
 
   it("tears the loading task down on unmount, per the StrictMode fix", async () => {
