@@ -146,7 +146,7 @@ describe("the score toolbar", () => {
 
   it("switches between continuous and one page at a time", async () => {
     const { onViewChange } = renderToolbar();
-    await userEvent.click(screen.getByRole("button", { name: "Scrolling continuously" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continuous pages" }));
     expect(onViewChange).toHaveBeenCalledWith({ scrollMode: "page" });
   });
 

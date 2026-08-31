@@ -47,7 +47,7 @@
     "zoomOut": "Zoom out",
     "rotate": "Rotate 90°",
     "scrollMode": {
-      "continuous": "Scrolling continuously",
+      "continuous": "Continuous pages",
       "page": "One page at a time"
     },
     "spread": {

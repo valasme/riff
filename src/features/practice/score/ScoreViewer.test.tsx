@@ -313,7 +313,7 @@ describe("ScoreViewer", () => {
     await userEvent.click(screen.getByRole("button", { name: "Single pages" }));
     expect(lastViewer?.spreadMode).toBe(1);
 
-    await userEvent.click(screen.getByRole("button", { name: "Scrolling continuously" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continuous pages" }));
     expect(lastViewer?.scrollMode).toBe(3);
 
     // The command takes a whole view, not a partial patch, so the last call
