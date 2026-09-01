@@ -33,6 +33,7 @@
     "audio": "A backing track will play here."
   },
   "score": {
+    "slowLoading": "Taking longer than expected. You can retry or open another score.",
     "loading": "Opening {{name}}…",
     "noText": "This score has no searchable text.",
     "toolbar": "Score controls",

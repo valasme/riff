@@ -6,7 +6,7 @@
 
 use std::path::Path;
 
-#[derive(Debug, thiserror::Error, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, thiserror::Error, serde::Serialize)]
 #[serde(tag = "code", content = "details", rename_all = "kebab-case")]
 pub enum RiffError {
     #[error("io error at {path}: {message}")]
@@ -48,6 +48,12 @@ pub enum RiffError {
     /// fourth code nobody would act on differently.
     #[error("score could not be read: {reason}")]
     ScoreUnreadable { reason: String },
+
+    #[error("score operation is stale")]
+    ScoreStale,
+
+    #[error("score infrastructure failure: {operation}")]
+    ScoreInfrastructure { operation: String },
 }
 
 impl RiffError {
@@ -124,7 +130,12 @@ mod tests {
             serde_json::from_str(&std::fs::read_to_string(path).expect("errors.json"))
                 .expect("valid json");
         let codes = document["code"].as_object().expect("a code object");
-        for code in ["score-missing", "score-encrypted", "score-unreadable"] {
+        for code in [
+            "score-missing",
+            "score-encrypted",
+            "score-unreadable",
+            "score-stale",
+        ] {
             let message = codes.get(code).and_then(serde_json::Value::as_str);
             assert!(
                 message.is_some_and(|m| !m.is_empty()),

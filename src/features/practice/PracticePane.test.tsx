@@ -47,6 +47,7 @@ function renderPane(props: Partial<Parameters<typeof PracticePane>[0]> = {}) {
 }
 
 const OPEN: OpenScore = {
+  generation: "g1",
   score: { name: "sonata.pdf", size: 1024 },
   view: {
     page: 1,

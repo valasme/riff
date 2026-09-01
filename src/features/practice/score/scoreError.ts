@@ -1,4 +1,9 @@
-import { isRiffError } from "@/lib/ipc";
+import { isRiffError, type RiffError } from "@/lib/ipc";
+
+export type ScoreLoadFailure =
+  | { kind: "riff"; error: RiffError }
+  | { kind: "unsupportedWebkit"; installed: string; required: string }
+  | { kind: "renderer"; details: string };
 
 /**
  * Localises a `RiffError`'s code — shared by `PracticePane` (the picker and

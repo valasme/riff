@@ -109,10 +109,12 @@ class PasswordException extends Error {}
 class InvalidPDFException extends Error {}
 
 const ensureWorker = vi.fn();
+let scoreWorker: { destroy: ReturnType<typeof vi.fn> };
 let getDocumentImpl: (options: unknown) => {
   promise: Promise<unknown>;
   destroy: () => Promise<void>;
 };
+const getDocument = vi.fn((options: unknown) => getDocumentImpl(options));
 
 vi.mock("./pdfjs", () => ({
   AnnotationMode: { ENABLE: 1 },
@@ -125,12 +127,13 @@ vi.mock("./pdfjs", () => ({
   PasswordException,
   InvalidPDFException,
   ensureWorker: () => ensureWorker(),
-  getDocument: (options: unknown) => getDocumentImpl(options),
+  getDocument,
 }));
 
 const { ScoreViewer } = await import("./ScoreViewer");
 
 const OPEN: OpenScore = {
+  generation: "g1",
   score: { name: "sonata.pdf", size: 10 },
   view: {
     page: 1,
@@ -151,10 +154,13 @@ function fakeDocument(textItems: unknown[] = [{}], numPages = 1) {
   };
 }
 
-function renderViewer(onLoadError: (message: string) => void = () => {}) {
+function renderViewer(
+  onLoadError: (message: string) => void = () => {},
+  onFirstPagePaint?: () => void,
+) {
   return render(
     <I18nextProvider i18n={i18n}>
-      <ScoreViewer open={OPEN} onLoadError={onLoadError} />
+      <ScoreViewer open={OPEN} onLoadError={onLoadError} onFirstPagePaint={onFirstPagePaint} />
     </I18nextProvider>,
   );
 }
@@ -165,8 +171,9 @@ describe("ScoreViewer", () => {
     lastViewer = undefined;
     lastBus = undefined;
     dim = 0;
+    scoreWorker = { destroy: vi.fn() };
     FakePDFFindController.result = { state: 0, current: 1, total: 3 };
-    ensureWorker.mockResolvedValue(undefined);
+    ensureWorker.mockResolvedValue(scoreWorker);
     scoreBytes.mockResolvedValue(new ArrayBuffer(4));
     scoreViewPatch.mockResolvedValue(undefined);
     appInfo.mockResolvedValue({
@@ -189,6 +196,16 @@ describe("ScoreViewer", () => {
     getDocumentImpl = () => ({ promise: Promise.resolve(fakeDocument()), destroy: vi.fn() });
     renderViewer();
     await waitFor(() => expect(screen.queryByText("Opening sonata.pdf…")).not.toBeInTheDocument());
+  });
+
+  it("uses the started worker for the document instead of starting a second one", async () => {
+    getDocumentImpl = () => ({ promise: Promise.resolve(fakeDocument()), destroy: vi.fn() });
+    renderViewer();
+
+    await waitFor(() =>
+      expect(getDocument).toHaveBeenCalledWith(expect.objectContaining({ worker: scoreWorker })),
+    );
+    expect(ensureWorker).toHaveBeenCalledTimes(1);
   });
 
   it("says a scan has no searchable text", async () => {
@@ -263,6 +280,31 @@ describe("ScoreViewer", () => {
     getDocumentImpl = () => ({ promise: Promise.resolve(fakeDocument()), destroy: vi.fn() });
     renderViewer();
     await waitFor(() => expect(lastViewer?.currentScaleValue).toBe("page-width"));
+  });
+
+  it("reports ready only when the restored page has painted", async () => {
+    getDocumentImpl = () => ({
+      promise: Promise.resolve(fakeDocument([{ str: "a" }], 12)),
+      destroy: vi.fn(),
+    });
+    const onFirstPagePaint = vi.fn();
+    render(
+      <I18nextProvider i18n={i18n}>
+        <ScoreViewer
+          open={{ ...OPEN, view: { ...OPEN.view, page: 5 } }}
+          onLoadError={() => {}}
+          onFirstPagePaint={onFirstPagePaint}
+        />
+      </I18nextProvider>,
+    );
+    await waitFor(() => expect(lastViewer?.currentPageNumber).toBe(5));
+
+    act(() => lastBus?.dispatch("pagerendered", { source: {}, pageNumber: 1 }));
+    expect(onFirstPagePaint).not.toHaveBeenCalled();
+
+    act(() => lastBus?.dispatch("pagerendered", { source: {}, pageNumber: 5 }));
+    act(() => lastBus?.dispatch("pagerendered", { source: {}, pageNumber: 5 }));
+    expect(onFirstPagePaint).toHaveBeenCalledTimes(1);
   });
 
   it("applies free zoom as a number-valued scale rather than a fit keyword", async () => {
@@ -357,6 +399,7 @@ describe("ScoreViewer", () => {
     // The command takes a whole view, not a partial patch, so the last call
     // carries every value the round trip has to survive.
     expect(scoreViewPatch).toHaveBeenLastCalledWith(
+      "g1",
       expect.objectContaining({ rotation: 90, spread: "odd", scrollMode: "page" }),
     );
   });
@@ -369,6 +412,7 @@ describe("ScoreViewer", () => {
     // what this follows.
     expect(lastViewer?.currentScaleValue).toBe("page-fit");
     expect(scoreViewPatch).toHaveBeenLastCalledWith(
+      "g1",
       expect.objectContaining({ scale: { mode: "fit-page" } }),
     );
   });
@@ -379,6 +423,7 @@ describe("ScoreViewer", () => {
     if (lastViewer) lastViewer.currentScale = 0.6;
     await userEvent.click(screen.getByRole("button", { name: "Zoom in" }));
     expect(scoreViewPatch).toHaveBeenLastCalledWith(
+      "g1",
       expect.objectContaining({ scale: { mode: "custom", value: 0.66 } }),
     );
     expect(lastViewer?.currentScaleValue).toBe("0.66");
@@ -508,7 +553,7 @@ describe("ScoreViewer", () => {
       openAt({ page: 7 });
       await screen.findByText("of 12");
       await userEvent.click(screen.getByRole("button", { name: "Next page" }));
-      expect(scoreViewPatch).toHaveBeenCalledWith(expect.objectContaining({ page: 8 }));
+      expect(scoreViewPatch).toHaveBeenCalledWith("g1", expect.objectContaining({ page: 8 }));
     });
 
     /**
@@ -533,6 +578,7 @@ describe("ScoreViewer", () => {
       await screen.findByText("Opening sonata.pdf…");
       unmount();
       expect(destroy).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(scoreWorker.destroy).toHaveBeenCalledTimes(1));
       expect(scoreViewPatch).not.toHaveBeenCalled();
     });
 
@@ -545,7 +591,7 @@ describe("ScoreViewer", () => {
       await userEvent.click(screen.getByRole("button", { name: "Single pages" }));
       // One write, for the spread — not a second one for the page.
       expect(scoreViewPatch).toHaveBeenCalledTimes(1);
-      expect(scoreViewPatch).toHaveBeenCalledWith(expect.objectContaining({ spread: "odd" }));
+      expect(scoreViewPatch).toHaveBeenCalledWith("g1", expect.objectContaining({ spread: "odd" }));
     });
   });
 
@@ -595,6 +641,7 @@ describe("ScoreViewer", () => {
       await renderReady();
       act(() => runScoreCommand({ kind: "speed", delta: 1 }));
       expect(scoreViewPatch).toHaveBeenLastCalledWith(
+        "g1",
         expect.objectContaining({ autoScrollSpeed: 1.1 }),
       );
     });

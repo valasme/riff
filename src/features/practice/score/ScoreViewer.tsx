@@ -42,7 +42,9 @@ import { useAutoScroll } from "./useAutoScroll";
 import { MIN_WEBKITGTK } from "./webkitVersion";
 
 interface PageRenderedEvent {
+  pageNumber: number;
   source: { canvas?: HTMLCanvasElement };
+  error?: unknown;
 }
 
 /**
@@ -85,9 +87,11 @@ function applyViewToViewer(
 export function ScoreViewer({
   open,
   onLoadError,
+  onFirstPagePaint,
 }: {
   open: OpenScore;
   onLoadError: (message: string) => void;
+  onFirstPagePaint?: () => void;
 }) {
   const { t } = useTranslation(["common", "errors"]);
   // A primitive selector, not `useAppearance()`: `adopt` replaces `settings`
@@ -120,6 +124,8 @@ export function ScoreViewer({
   // every render would tear the viewer down and rebuild it.
   const onLoadErrorRef = useRef(onLoadError);
   onLoadErrorRef.current = onLoadError;
+  const onFirstPagePaintRef = useRef(onFirstPagePaint);
+  onFirstPagePaintRef.current = onFirstPagePaint;
   // The latest view, for the event handlers the effect creates once.
   const viewRef = useRef(view);
   viewRef.current = view;
@@ -186,6 +192,8 @@ export function ScoreViewer({
     const viewer = new PDFViewer({ ...viewerOptions, findController });
     pdfViewerRef.current = viewer;
     linkService.setViewer(viewer);
+    let restoredPage = open.view.page;
+    let firstPagePainted = false;
 
     function onFindState(event: {
       state: number;
@@ -227,6 +235,14 @@ export function ScoreViewer({
       // a raster of the same page and would otherwise be presented as a
       // second, unlabelled region.
       event.source.canvas?.setAttribute("aria-hidden", "true");
+      // `setDocument` can schedule work for several pages at once. The
+      // surface is ready only once the page the reader restored to is on
+      // screen; a page rendered in the background must not hide its
+      // slow-loading watchdog.
+      if (!firstPagePainted && !event.error && event.pageNumber === restoredPage) {
+        firstPagePainted = true;
+        onFirstPagePaintRef.current?.();
+      }
     }
     eventBus.on("pagerendered", onPageRendered);
 
@@ -244,6 +260,7 @@ export function ScoreViewer({
       applying.current = true;
       try {
         applyViewToViewer(viewer, open.view, { page: true });
+        restoredPage = viewer.currentPageNumber;
       } finally {
         applying.current = false;
       }
@@ -251,6 +268,7 @@ export function ScoreViewer({
     eventBus.on("pagesinit", onPagesInit);
 
     let loadingTask: ReturnType<typeof getDocument> | null = null;
+    let worker: Awaited<ReturnType<typeof ensureWorker>> | null = null;
 
     void (async () => {
       try {
@@ -258,11 +276,17 @@ export function ScoreViewer({
         // see `pdfjs.ts`. A worker that silently falls back to pdf.js's
         // main-thread "fake worker" is a frozen pane with no diagnostic,
         // which is the one outcome this must not allow through.
-        await ensureWorker();
-        const bytes = await ipc.scoreBytes();
+        worker = await ensureWorker();
+        if (cancelled) {
+          worker.destroy();
+          worker = null;
+          return;
+        }
+        const bytes = await ipc.scoreBytes(open.generation);
         if (cancelled) return;
         loadingTask = getDocument({
           data: new Uint8Array(bytes),
+          worker,
           ...SCORE_DOCUMENT_OPTIONS,
         });
         const pdfDocument = await loadingTask.promise;
@@ -319,7 +343,8 @@ export function ScoreViewer({
       findControllerRef.current = null;
       eventBusRef.current = null;
       abortController.abort();
-      void loadingTask?.destroy();
+      if (loadingTask) void Promise.resolve(loadingTask.destroy()).finally(() => worker?.destroy());
+      else worker?.destroy();
     };
     // `open.score` (name and size) is the only identity `Score` carries —
     // see `workspace::Score` in Rust — and is exactly what should retrigger
@@ -395,7 +420,7 @@ export function ScoreViewer({
   function recordViewNow(next: View) {
     viewRef.current = next;
     setView(next);
-    fire(ipc.scoreViewPatch(next), "saving the view");
+    fire(ipc.scoreViewPatch(open.generation, next), "saving the view");
   }
   recordView.current = recordViewNow;
 

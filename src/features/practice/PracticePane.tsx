@@ -1,16 +1,18 @@
 import { listen } from "@tauri-apps/api/event";
 import type { LucideIcon } from "lucide-react";
 import { PictureInPicture2, X } from "lucide-react";
-import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { lazy, type ReactNode, Suspense, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { fire, ipc, type Pane, type RiffError } from "@/lib/ipc";
 import { PANE_ICONS } from "./paneIcons";
-import { ScoreViewer } from "./score/ScoreViewer";
 import { scoreErrorMessage } from "./score/scoreError";
 import { useOpenScore } from "./score/useOpenScore";
+
+const ScoreSurface = lazy(() =>
+  import("./score/ScoreSurface").then((module) => ({ default: module.ScoreSurface })),
+);
 
 /**
  * One practice pane, drawn identically whether it is a cell of the grid or
@@ -71,7 +73,7 @@ export function PracticePane({
   }
 
   function handleCloseScore() {
-    fire(ipc.scoreClose(), "closing the score");
+    if (openScore) fire(ipc.scoreClose(openScore.generation), "closing the score");
   }
 
   const closeScore = isScore && openScore ? handleCloseScore : undefined;
@@ -113,7 +115,15 @@ export function PracticePane({
         </div>
       </header>
       {isScore && openScore ? (
-        <ScoreViewer open={openScore} onLoadError={setScoreError} />
+        <Suspense
+          fallback={
+            <div className="grid flex-1 place-items-center text-sm text-muted-foreground">
+              {t("score.loading", { ns: "common", name: openScore.score.name })}
+            </div>
+          }
+        >
+          <ScoreSurface open={openScore} />
+        </Suspense>
       ) : (
         <EmptyPaneBody
           icon={Icon}

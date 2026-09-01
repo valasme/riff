@@ -7,6 +7,7 @@ export type Pane = "score" | "video" | "audio";
 export type PathKind = "config" | "data" | "cache" | "logs";
 export type ExternalLink = "repository" | "issues" | "license";
 export type LogLevel = "error" | "warn" | "info" | "debug" | "trace";
+export type ScoreGeneration = string;
 
 export interface General {
   startupRoute: StartupRoute;
@@ -78,6 +79,7 @@ export interface Score {
 }
 
 export interface OpenScore {
+  generation: string;
   score: Score;
   view: View;
 }
@@ -150,7 +152,9 @@ export type RiffError =
   // A unit variant: adjacently-tagged serde omits `details` entirely rather
   // than writing `null`, so this arm carries no second field at all.
   | { code: "score-encrypted" }
-  | { code: "score-unreadable"; details: { reason: string } };
+  | { code: "score-unreadable"; details: { reason: string } }
+  | { code: "score-stale" }
+  | { code: "score-infrastructure"; details: { operation: string } };
 
 /** Mirrors the Rust merge patch: every field optional, recursively. */
 export type DeepPartial<T> = {

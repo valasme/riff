@@ -13,7 +13,7 @@ use riff_lib::diagnostics::health::{Check, Severity};
 use riff_lib::error::RiffError;
 use riff_lib::settings::model::{Pane, Settings};
 use riff_lib::settings::store::Section;
-use riff_lib::workspace::{OpenScore, Scale, Score, ScrollMode, SpreadMode, View};
+use riff_lib::workspace::{OpenScore, Scale, Score, ScoreGeneration, ScrollMode, SpreadMode, View};
 use serde_json::json;
 
 // Every type that crosses to the frontend belongs here, including the ones
@@ -82,10 +82,12 @@ fn shapes() -> serde_json::Value {
             RiffError::ScoreMissing { name: "n".into() },
             RiffError::ScoreEncrypted,
             RiffError::ScoreUnreadable { reason: "r".into() },
+            RiffError::ScoreStale,
+            RiffError::ScoreInfrastructure { operation: "o".into() },
         ],
         "Score": Score { name: "n".into(), size: 0 },
         "View": View::default(),
-        "OpenScore": OpenScore { score: Score { name: "n".into(), size: 0 }, view: View::default() },
+        "OpenScore": OpenScore { generation: ScoreGeneration("g1".into()), score: Score { name: "n".into(), size: 0 }, view: View::default() },
         "ScrollMode": [ScrollMode::Continuous, ScrollMode::Page],
         "SpreadMode": [SpreadMode::None, SpreadMode::Odd, SpreadMode::Even],
         "Scale": [Scale::FitWidth, Scale::FitPage, Scale::Custom { value: 1.0 }],

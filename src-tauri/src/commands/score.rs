@@ -18,7 +18,7 @@ use crate::practice;
 use crate::settings::model::Pane;
 use crate::settings::store::FlushScheduler;
 use crate::workspace::{
-    self, OpenScore, OpenScoreRecord, PendingReopen, Score, View, WorkspaceStore,
+    OpenScore, OpenScoreRecord, PendingReopen, Score, ScoreGeneration, View, WorkspaceStore,
 };
 
 /// Broadcast, not targeted — see the design spec §3: every window needs to
@@ -29,21 +29,24 @@ use crate::workspace::{
 pub const SCORE_CHANGED: &str = "score://changed";
 
 #[tauri::command]
-pub async fn score_open(
-    app: AppHandle,
-    workspace: tauri::State<'_, Arc<WorkspaceStore>>,
-    scheduler: tauri::State<'_, Arc<FlushScheduler<WorkspaceStore>>>,
-) -> RiffResult<Option<OpenScore>> {
-    let Some(path) = app
-        .dialog()
+pub async fn score_open(app: AppHandle) -> RiffResult<Option<OpenScore>> {
+    let (sender, mut receiver) = tauri::async_runtime::channel(1);
+    app.dialog()
         .file()
         .add_filter("PDF", &["pdf"])
-        .blocking_pick_file()
-        .and_then(|p| p.into_path().ok())
-    else {
+        .pick_file(move |picked| {
+            let _ = sender.blocking_send(picked);
+        });
+    let picked = receiver
+        .recv()
+        .await
+        .ok_or_else(|| RiffError::ScoreInfrastructure {
+            operation: "receiving the native score picker result".to_owned(),
+        })?;
+    let Some(path) = picked.and_then(|file| file.into_path().ok()) else {
         return Ok(None);
     };
-    open_at(&app, &workspace, &scheduler, path).map(Some)
+    open_at(app, path).await.map(Some)
 }
 
 /// `tauri::ipc::Response::new(Vec<u8>)` — `ipc-protocol.js` decodes any
@@ -56,30 +59,34 @@ pub async fn score_open(
 /// worker, once pdf.js has it — and a score deleted while open fails honestly
 /// here instead of succeeding from a stale cache.
 #[tauri::command]
-pub fn score_bytes(
+pub async fn score_bytes(
+    generation: ScoreGeneration,
     workspace: tauri::State<'_, Arc<WorkspaceStore>>,
 ) -> RiffResult<tauri::ipc::Response> {
-    let open = workspace.get().open.ok_or_else(|| RiffError::NotFound {
-        what: "no score is open".to_owned(),
-    })?;
-    let bytes = workspace::read_and_validate(&open.path)?;
+    let path = workspace.path_for(&generation)?;
+    let bytes = crate::score::read_bytes(path).await?;
+    workspace.path_for(&generation)?;
     Ok(tauri::ipc::Response::new(bytes))
 }
 
 #[tauri::command]
 pub fn score_close(
     app: AppHandle,
+    generation: ScoreGeneration,
     workspace: tauri::State<'_, Arc<WorkspaceStore>>,
     scheduler: tauri::State<'_, Arc<FlushScheduler<WorkspaceStore>>>,
-) {
-    workspace.set_open(None);
+) -> bool {
+    if !workspace.close(&generation) {
+        return false;
+    }
     scheduler.notify();
     broadcast(&app, None);
+    true
 }
 
 #[tauri::command]
 pub fn score_state(workspace: tauri::State<'_, Arc<WorkspaceStore>>) -> Option<OpenScore> {
-    workspace.get().open.map(|record| record.as_open_score())
+    workspace.active().map(|active| active.as_open_score())
 }
 
 /// Unlike `settings_patch`, this replaces the view wholesale rather than deep
@@ -93,12 +100,21 @@ pub fn score_state(workspace: tauri::State<'_, Arc<WorkspaceStore>>) -> Option<O
 /// closes.
 #[tauri::command]
 pub fn score_view_patch(
+    generation: ScoreGeneration,
     view: View,
+    app: AppHandle,
     workspace: tauri::State<'_, Arc<WorkspaceStore>>,
     scheduler: tauri::State<'_, Arc<FlushScheduler<WorkspaceStore>>>,
 ) -> RiffResult<View> {
-    let next = workspace.patch_view(move |current| *current = view)?;
+    let next = workspace.replace_view(&generation, view)?;
     scheduler.notify();
+    let open = workspace
+        .active()
+        .ok_or_else(|| RiffError::NotFound {
+            what: "no score is open".to_owned(),
+        })?
+        .as_open_score();
+    broadcast(&app, Some(&open));
     Ok(next)
 }
 
@@ -111,7 +127,7 @@ pub fn score_pending_reopen(pending: tauri::State<'_, PendingReopen>) -> Option<
 }
 
 #[tauri::command]
-pub fn score_reopen(
+pub async fn score_reopen(
     app: AppHandle,
     workspace: tauri::State<'_, Arc<WorkspaceStore>>,
     scheduler: tauri::State<'_, Arc<FlushScheduler<WorkspaceStore>>>,
@@ -124,45 +140,51 @@ pub fn score_reopen(
     // last session, and spec §9 is explicit that the offer is made from the
     // recorded path without stat-ing it first — a move is reported here, at
     // the moment of use, rather than guessed at when the offer was drawn.
-    let bytes = workspace::read_and_validate(&record.path)?;
-    record.size = bytes.len() as u64;
-    workspace.set_open(Some(record.clone()));
+    let file = crate::score::preflight(record.path.clone()).await?;
+    record.size = file.size;
+    let ticket = app.state::<crate::score::ScoreCoordinator>().begin();
+    let open = app
+        .state::<crate::score::ScoreCoordinator>()
+        .commit(ticket, || {
+            let active = workspace.activate(record.clone());
+            let open = active.as_open_score();
+            broadcast(&app, Some(&open));
+            Ok(open)
+        })?;
     scheduler.notify();
-    let open = record.as_open_score();
-    broadcast(&app, Some(&open));
     Ok(Some(open))
 }
 
 /// Shared by `score_open` and the drag-and-drop handler in `lib.rs` — the two
 /// ways a path reaches Rust without ever crossing IPC.
-pub fn open_at(
-    app: &AppHandle,
-    workspace: &WorkspaceStore,
-    scheduler: &FlushScheduler<WorkspaceStore>,
-    path: PathBuf,
-) -> RiffResult<OpenScore> {
-    let bytes = workspace::read_and_validate(&path)?;
-    let name = path
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let size = bytes.len() as u64;
+pub async fn open_at(app: AppHandle, path: PathBuf) -> RiffResult<OpenScore> {
+    let file = crate::score::preflight(path).await?;
+    let workspace = app.state::<Arc<WorkspaceStore>>();
+    let scheduler = app.state::<Arc<FlushScheduler<WorkspaceStore>>>();
+    let name = file.name;
+    let size = file.size;
     // Basename and byte count, never the directory: `riff.log` is in the
     // diagnostics bundle and `$HOME` redaction does not hide a filename.
     tracing::info!(name, size, "score opened");
 
     let record = OpenScoreRecord {
-        path,
+        path: file.path,
         name,
         size,
         view: View::default(),
         unknown: serde_json::Map::new(),
     };
-    workspace.set_open(Some(record.clone()));
+    let ticket = app.state::<crate::score::ScoreCoordinator>().begin();
+    let open = app
+        .state::<crate::score::ScoreCoordinator>()
+        .commit(ticket, || {
+            let active = workspace.activate(record.clone());
+            let open = active.as_open_score();
+            broadcast(&app, Some(&open));
+            Ok(open)
+        })?;
     scheduler.notify();
-    let open = record.as_open_score();
-    broadcast(app, Some(&open));
-    focus_score_host(app);
+    focus_score_host(&app);
     Ok(open)
 }
 
@@ -233,6 +255,7 @@ mod tests {
         // the webview receives would hand a compromised renderer a
         // filesystem layout it has no other way to see.
         let open = OpenScore {
+            generation: ScoreGeneration(String::new()),
             score: Score {
                 name: "sonata.pdf".into(),
                 size: 42,
