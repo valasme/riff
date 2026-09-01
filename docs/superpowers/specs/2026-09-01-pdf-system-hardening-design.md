@@ -1,6 +1,6 @@
 # Riff — PDF System Hardening Design
 
-**Status:** approved architecture; written for user review before implementation planning.
+**Status:** approved architecture; implementation handoff in `docs/superpowers/plans/2026-09-01-pdf-system-hardening.md`.
 **Date:** 2026-09-01.
 **Supplements:** `docs/superpowers/specs/2026-08-30-score-viewer-design.md`. Where the two
 documents conflict, this document wins.
@@ -156,6 +156,11 @@ that code as cancellation and does not show a toast. The error still has a local
 preserve the repository rule that every public error code is explainable, but normal UI never
 surfaces it.
 
+Failures in the score command/event delivery seam use `score-infrastructure`, distinct from a
+preflight denial. This lets a picker caller suppress a normal error already presented in the Score
+host—even when that host is another window—while still surfacing a missing target, closed picker
+channel, or failed event delivery as an actionable global failure.
+
 The generation is also carried in `score://changed` and `score://command` payloads. A viewer ignores
 any event whose generation differs from its own even though Rust already guards the command.
 Defence at both ends prevents a later refactor from reopening the race.
@@ -237,9 +242,11 @@ auto-scroll, announcements, PDF.js objects, and DOM:
 <ScoreViewer key={`${open.generation}:${attempt}`} open={open} />
 ```
 
-The loading state remains visible until the first page's `pagerendered` event, not merely until
-`viewer.setDocument()`. Page count may appear earlier, but the loading overlay is removed only when
-the user can see a page. A first-page render failure enters `load-error`.
+The loading state remains visible until the first `pagerendered` event for the visible restored
+page, not merely until `viewer.setDocument()`. It is not hard-coded to PDF page 1: a workspace that
+reopens on page 50 must become ready when page 50 paints. Page count may appear earlier, but the
+loading overlay is removed only when the user can see a page. A first-visible-page render failure
+enters `load-error`.
 
 After ten seconds without first paint, loading becomes an actionable slow-loading state. Parsing
 continues, but the pane says that opening is taking longer than expected and offers Retry, Open
@@ -604,7 +611,7 @@ Vitest tests prove:
 - a same-name/same-size replacement resets every transient viewer state;
 - cancellation after runtime import, worker start, byte read, and document load never continues to
   the next stage;
-- ready begins only after first-page `pagerendered`;
+- ready begins only after the first visible page's `pagerendered` event;
 - keymap and palette commands invoke Rust routing and targeted events affect only the matching
   generation;
 - Equal/Minus, Space, slider focus, and text-entry chord cases match the rules in §9;
