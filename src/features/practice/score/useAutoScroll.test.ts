@@ -63,8 +63,8 @@ describe("auto-scroll", () => {
     const { element, ref } = fakeContainer();
     renderHook(() => useAutoScroll({ ...BASE, container: ref }));
     tick(1000);
-    // 12000px over 12 pages is 1000px a page; one page a second.
-    expect(element.scrollTop).toBeCloseTo(1000, 0);
+    // A background-throttled frame cannot jump an unbounded distance.
+    expect(element.scrollTop).toBeCloseTo(100, 0);
   });
 
   it("does nothing at all while it is stopped", () => {
@@ -114,7 +114,7 @@ describe("auto-scroll", () => {
     const onPause = vi.fn();
     const { element, ref } = fakeContainer();
     renderHook(() => useAutoScroll({ ...BASE, onPause, container: ref }));
-    tick(20_000);
+    for (let i = 0; i < 120; i += 1) tick(100);
     expect(onPause).toHaveBeenCalled();
     expect(element.scrollTop).toBe(12_000 - 800);
   });
@@ -131,9 +131,9 @@ describe("auto-scroll", () => {
         container: ref,
       }),
     );
-    tick(29_000);
+    for (let i = 0; i < 290; i += 1) tick(100);
     expect(onAdvancePage).not.toHaveBeenCalled();
-    tick(2_000);
+    for (let i = 0; i < 20; i += 1) tick(100);
     expect(onAdvancePage).toHaveBeenCalledTimes(1);
     // And it turns pages rather than scrolling them.
     expect(element.scrollTop).toBe(0);
@@ -154,7 +154,7 @@ describe("auto-scroll", () => {
         container: ref,
       }),
     );
-    tick(2000);
+    for (let i = 0; i < 20; i += 1) tick(100);
     expect(onAdvancePage).not.toHaveBeenCalled();
     expect(onPause).toHaveBeenCalled();
   });

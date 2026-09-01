@@ -17,11 +17,11 @@ import { CommandPalette } from "@/features/palette/CommandPalette";
 import { popoutPaneFrom } from "@/features/practice/layout";
 import { PANE_ICONS } from "@/features/practice/paneIcons";
 import { runScoreCommand } from "@/features/practice/score/commands";
-import { useOpenScore } from "@/features/practice/score/useOpenScore";
 import { PopoutQuitDialog } from "@/features/window/PopoutQuitDialog";
 import { QuitConfirmation } from "@/features/window/QuitConfirmation";
 import { TitleBar } from "@/features/window/TitleBar";
-import { fire, ipc } from "@/lib/ipc";
+import { fire, ipc, reportFailure } from "@/lib/ipc";
+import { useScore } from "@/stores/score";
 import { reportRecovery, subscribeToBackend, useAppearance, useSettings } from "@/stores/settings";
 
 export const Route = createRootRoute({
@@ -76,7 +76,9 @@ export function RootLayout() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   // Mirrored from Rust so the palette can hide the score commands when
   // there is nothing to run them against.
-  const openScore = useOpenScore();
+  const openScore = useScore((state) => state.open);
+  const openScorePicker = useScore((state) => state.openFromPicker);
+  const closeScoreAction = useScore((state) => state.close);
   const [quitPromptOpen, setQuitPromptOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -130,16 +132,44 @@ export function RootLayout() {
         closeOverlay: () => setPaletteOpen(false),
         // Only whether a score is open, never its view — see KeymapContext.
         openScore,
-        openScorePicker: () => fire(ipc.scoreOpen(), "opening a score"),
-        closeScore: () => fire(ipc.scoreClose(), "closing the score"),
+        openScorePicker: () => void openScorePicker(),
+        closeScore: () => {
+          if (openScore) void closeScoreAction(openScore.generation);
+        },
         // Reaches whichever viewer is mounted in this window, and is a
         // no-op in the window that is not hosting the Score pane.
         scoreCommand: runScoreCommand,
       }),
-    [navigate, toggleSidebar, patch, settings, popoutPane, openScore],
+    [
+      navigate,
+      toggleSidebar,
+      patch,
+      settings,
+      popoutPane,
+      openScore,
+      openScorePicker,
+      closeScoreAction,
+    ],
   );
 
   useKeybindings(bindings);
+
+  useEffect(() => {
+    let disposed = false;
+    let release: (() => void) | undefined;
+    void useScore
+      .getState()
+      .subscribe()
+      .then((unsubscribe) => {
+        if (disposed) unsubscribe();
+        else release = unsubscribe;
+      })
+      .catch((error: unknown) => reportFailure(error, "subscribing to score state"));
+    return () => {
+      disposed = true;
+      release?.();
+    };
+  }, []);
 
   // The offer to reopen last session's pop-out windows, made exactly once.
   // Rust already took the list out of the file at launch, so declining or

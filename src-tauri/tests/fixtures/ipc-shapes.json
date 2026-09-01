@@ -40,6 +40,7 @@
     "trace"
   ],
   "OpenScore": {
+    "generation": "g1",
     "score": {
       "name": "n",
       "size": 0
@@ -127,6 +128,15 @@
       "code": "score-unreadable",
       "details": {
         "reason": "r"
+      }
+    },
+    {
+      "code": "score-stale"
+    },
+    {
+      "code": "score-infrastructure",
+      "details": {
+        "operation": "o"
       }
     }
   ],

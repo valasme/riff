@@ -9,7 +9,7 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::sync::RwLock;
+use std::sync::{PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -123,6 +123,26 @@ impl Default for View {
     }
 }
 
+impl View {
+    pub(crate) fn canonicalized(mut self) -> Self {
+        self.page = self.page.max(1);
+        self.scale = match self.scale {
+            Scale::Custom { value } if value.is_finite() => Scale::Custom {
+                value: value.clamp(0.1, 25.0),
+            },
+            Scale::Custom { .. } => Scale::FitWidth,
+            value => value,
+        };
+        self.rotation = Rotation::new(i32::from(self.rotation.get()));
+        self.auto_scroll_speed = if self.auto_scroll_speed.is_finite() {
+            self.auto_scroll_speed.clamp(0.1, 10.0)
+        } else {
+            1.0
+        };
+        self
+    }
+}
+
 /// What the frontend is told about the open score. Never the path — no
 /// caller-supplied path or URL crosses IPC, and that rule does not stop at
 /// "inbound"; outbound is how a compromised renderer would learn a
@@ -137,9 +157,14 @@ pub struct Score {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct OpenScore {
+    pub generation: ScoreGeneration,
     pub score: Score,
     pub view: View,
 }
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(transparent)]
+pub struct ScoreGeneration(pub String);
 
 /// The on-disk shape. `path` lives here and nowhere the webview can reach —
 /// see `Score` above.
@@ -154,6 +179,7 @@ pub struct OpenScoreRecord {
     /// exactly this cached pair without touching the filesystem first.
     pub name: String,
     pub size: u64,
+    #[serde(deserialize_with = "deserialize_persisted_view")]
     pub view: View,
     #[serde(flatten)]
     #[schemars(skip)]
@@ -170,8 +196,19 @@ impl OpenScoreRecord {
 
     pub fn as_open_score(&self) -> OpenScore {
         OpenScore {
+            generation: ScoreGeneration(String::new()),
             score: self.as_score(),
             view: self.view.clone(),
+        }
+    }
+}
+
+impl ActiveScore {
+    pub fn as_open_score(&self) -> OpenScore {
+        OpenScore {
+            generation: self.generation.clone(),
+            score: self.record.as_score(),
+            view: self.record.view.clone(),
         }
     }
 }
@@ -195,19 +232,36 @@ pub struct WorkspaceFile {
 /// narrows this to a `Score` before it reaches the webview.
 pub struct PendingReopen(pub Option<OpenScoreRecord>);
 
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct ActiveScore {
+    pub generation: ScoreGeneration,
+    pub record: OpenScoreRecord,
+}
+
+#[derive(Clone, Debug)]
+struct WorkspaceState {
+    file: WorkspaceFile,
+    generation: Option<ScoreGeneration>,
+}
+
 pub struct WorkspaceStore {
     paths: AppPaths,
-    state: RwLock<WorkspaceFile>,
+    state: RwLock<WorkspaceState>,
     revision: AtomicU64,
     flushed: AtomicU64,
     writes: AtomicUsize,
+    next_generation: AtomicU64,
 }
 
 impl WorkspaceStore {
     pub fn load(paths: AppPaths) -> Self {
         let file = paths.workspace_file();
         let workspace = match std::fs::read(&file) {
-            Err(_) => WorkspaceFile::default(),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => WorkspaceFile::default(),
+            Err(error) => {
+                tracing::warn!(path = %file.display(), kind = ?error.kind(), %error, "workspace could not be read; starting empty");
+                WorkspaceFile::default()
+            }
             Ok(bytes) => serde_json::from_slice::<WorkspaceFile>(&bytes).unwrap_or_else(|err| {
                 tracing::warn!(
                     %err,
@@ -217,12 +271,17 @@ impl WorkspaceStore {
                 WorkspaceFile::default()
             }),
         };
+        let workspace = workspace.canonicalized();
         Self {
             paths,
-            state: RwLock::new(workspace),
+            state: RwLock::new(WorkspaceState {
+                file: workspace,
+                generation: None,
+            }),
             revision: AtomicU64::new(0),
             flushed: AtomicU64::new(0),
             writes: AtomicUsize::new(0),
+            next_generation: AtomicU64::new(0),
         }
     }
 
@@ -231,7 +290,7 @@ impl WorkspaceStore {
     }
 
     pub fn get(&self) -> WorkspaceFile {
-        self.read().clone()
+        read_lock(&self.state).file.clone()
     }
 
     pub fn write_count(&self) -> usize {
@@ -241,24 +300,101 @@ impl WorkspaceStore {
     /// Replaces the open score wholesale — used when one opens, closes, or is
     /// restored wholesale by a reopen.
     pub fn set_open(&self, open: Option<OpenScoreRecord>) {
-        let mut next = self.read().clone();
-        next.open = open;
-        self.replace(next);
+        match open {
+            Some(record) => {
+                self.activate(record);
+            }
+            None => {
+                let mut state = write_lock(&self.state);
+                state.file.open = None;
+                state.generation = None;
+                self.revision.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+    }
+
+    pub(crate) fn activate(&self, record: OpenScoreRecord) -> ActiveScore {
+        let mut state = write_lock(&self.state);
+        let generation = ScoreGeneration(format!(
+            "g{}",
+            self.next_generation.fetch_add(1, Ordering::Relaxed) + 1
+        ));
+        state.file.open = Some(record.clone());
+        state.generation = Some(generation.clone());
+        self.revision.fetch_add(1, Ordering::Release);
+        ActiveScore { generation, record }
+    }
+
+    pub(crate) fn active(&self) -> Option<ActiveScore> {
+        let state = read_lock(&self.state);
+        Some(ActiveScore {
+            generation: state.generation.clone()?,
+            record: state.file.open.clone()?,
+        })
+    }
+
+    pub(crate) fn path_for(&self, generation: &ScoreGeneration) -> RiffResult<PathBuf> {
+        let state = read_lock(&self.state);
+        if state.generation.as_ref() != Some(generation) {
+            return Err(RiffError::ScoreStale);
+        }
+        state
+            .file
+            .open
+            .as_ref()
+            .map(|record| record.path.clone())
+            .ok_or_else(|| RiffError::NotFound {
+                what: "no score is open".to_owned(),
+            })
+    }
+
+    pub(crate) fn replace_view(
+        &self,
+        generation: &ScoreGeneration,
+        view: View,
+    ) -> RiffResult<View> {
+        let mut state = write_lock(&self.state);
+        if state.generation.as_ref() != Some(generation) {
+            return Err(RiffError::ScoreStale);
+        }
+        let view = view.canonicalized();
+        state
+            .file
+            .open
+            .as_mut()
+            .ok_or_else(|| RiffError::NotFound {
+                what: "no score is open".to_owned(),
+            })?
+            .view = view.clone();
+        self.revision.fetch_add(1, Ordering::Release);
+        Ok(view)
+    }
+
+    pub(crate) fn close(&self, generation: &ScoreGeneration) -> bool {
+        let mut state = write_lock(&self.state);
+        if state.generation.as_ref() != Some(generation) {
+            return false;
+        }
+        state.file.open = None;
+        state.generation = None;
+        self.revision.fetch_add(1, Ordering::Release);
+        true
     }
 
     /// Applies a change to the current view. `Err(NotFound)` if nothing is
     /// open — the caller asked to move a page in a workspace with no score,
     /// which is a bug in the caller, not a state worth silently ignoring.
     pub fn patch_view(&self, f: impl FnOnce(&mut View)) -> RiffResult<View> {
-        let mut next = self.read().clone();
-        let Some(record) = next.open.as_mut() else {
+        let mut state = write_lock(&self.state);
+        let Some(record) = state.file.open.as_mut() else {
             return Err(RiffError::NotFound {
                 what: "no score is open".to_owned(),
             });
         };
         f(&mut record.view);
-        let view = record.view.clone();
-        self.replace(next);
+        let view = record.view.clone().canonicalized();
+        record.view = view.clone();
+        self.revision.fetch_add(1, Ordering::SeqCst);
         Ok(view)
     }
 
@@ -271,30 +407,78 @@ impl WorkspaceStore {
             return Ok(());
         }
         let snapshot = self.revision.load(Ordering::SeqCst);
-        let bytes =
-            serde_json::to_vec_pretty(&*self.read()).map_err(|e| RiffError::Validation {
+        let bytes = serde_json::to_vec_pretty(&read_lock(&self.state).file).map_err(|e| {
+            RiffError::Validation {
                 field: "workspace".to_owned(),
                 reason: e.to_string(),
-            })?;
+            }
+        })?;
         let path = self.paths.workspace_file();
         write_atomic(&path, &bytes).map_err(|e| RiffError::io(&path, &e))?;
         self.writes.fetch_add(1, Ordering::Relaxed);
         self.flushed.store(snapshot, Ordering::SeqCst);
         Ok(())
     }
+}
 
-    fn read(&self) -> std::sync::RwLockReadGuard<'_, WorkspaceFile> {
-        self.state
-            .read()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-    }
+fn read_lock<T>(lock: &RwLock<T>) -> RwLockReadGuard<'_, T> {
+    lock.read().unwrap_or_else(PoisonError::into_inner)
+}
 
-    fn replace(&self, next: WorkspaceFile) {
-        if let Ok(mut guard) = self.state.write() {
-            *guard = next;
+fn write_lock<T>(lock: &RwLock<T>) -> RwLockWriteGuard<'_, T> {
+    lock.write().unwrap_or_else(PoisonError::into_inner)
+}
+
+impl WorkspaceFile {
+    fn canonicalized(mut self) -> Self {
+        if let Some(open) = self.open.as_mut() {
+            open.view = open.view.clone().canonicalized();
         }
-        self.revision.fetch_add(1, Ordering::SeqCst);
+        self
     }
+}
+
+fn deserialize_persisted_view<'de, D>(deserializer: D) -> Result<View, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let mut value = serde_json::Value::deserialize(deserializer)?;
+    let mut view = View::default();
+    let Some(object) = value.as_object_mut() else {
+        return Ok(view);
+    };
+    if let Some(raw) = object.remove("page") {
+        if let Ok(parsed) = serde_json::from_value(raw) {
+            view.page = parsed;
+        }
+    }
+    if let Some(raw) = object.remove("scale") {
+        if let Ok(parsed) = serde_json::from_value(raw) {
+            view.scale = parsed;
+        }
+    }
+    if let Some(raw) = object.remove("rotation") {
+        if let Ok(parsed) = serde_json::from_value(raw) {
+            view.rotation = parsed;
+        }
+    }
+    if let Some(raw) = object.remove("spread") {
+        if let Ok(parsed) = serde_json::from_value(raw) {
+            view.spread = parsed;
+        }
+    }
+    if let Some(raw) = object.remove("scrollMode") {
+        if let Ok(parsed) = serde_json::from_value(raw) {
+            view.scroll_mode = parsed;
+        }
+    }
+    if let Some(raw) = object.remove("autoScrollSpeed") {
+        if let Ok(parsed) = serde_json::from_value(raw) {
+            view.auto_scroll_speed = parsed;
+        }
+    }
+    view.unknown = object.clone();
+    Ok(view.canonicalized())
 }
 
 impl Flushable for WorkspaceStore {
@@ -327,13 +511,8 @@ fn basename(path: &Path) -> String {
 /// so the three cannot drift into three different sets of error codes.
 ///
 /// Not a PDF parser — Riff added no new crate for this (plan 15's Tech
-/// Stack). `/Encrypt` is searched for as a literal byte string because a
-/// PDF's trailer dictionary (classic or, since 1.5, a cross-reference
-/// stream's own dictionary) is never itself compressed — only a stream's
-/// *body* is — so the name is present as plain ASCII in every encrypted PDF
-/// this needs to catch. A false negative here is not a security hole: pdf.js
-/// still throws its own `PasswordException` on an encrypted file that slips
-/// through, so this is a better error message, not a gate.
+/// Stack). PDF.js remains authoritative for encryption and unsupported PDF
+/// structures; this helper only performs the legacy header and tail checks.
 pub fn read_and_validate(path: &Path) -> RiffResult<Vec<u8>> {
     let bytes = std::fs::read(path).map_err(|err| {
         if err.kind() == std::io::ErrorKind::NotFound {
@@ -363,6 +542,8 @@ pub fn read_and_validate(path: &Path) -> RiffResult<Vec<u8>> {
             reason: "the file has no %%EOF marker; it may be truncated".to_owned(),
         });
     }
+    // Compatibility path for the pre-hardening fixture command. New score
+    // opens use `score::preflight`, where PDF.js owns encryption detection.
     if contains(&bytes, b"/Encrypt") {
         return Err(RiffError::ScoreEncrypted);
     }
@@ -449,6 +630,86 @@ mod tests {
         let open = reloaded.get().open.expect("score recorded");
         assert_eq!(open.name, "sonata.pdf");
         assert_eq!(open.view.page, 3);
+    }
+
+    #[test]
+    fn activating_rotates_a_session_generation_without_persisting_it() {
+        let (paths, _tmp) = scratch();
+        let store = WorkspaceStore::load(paths);
+        let first = store.activate(record("sonata.pdf"));
+        let second = store.activate(record("sonata.pdf"));
+        assert_ne!(first.generation, second.generation);
+        assert_eq!(
+            store.path_for(&first.generation),
+            Err(RiffError::ScoreStale)
+        );
+        assert_eq!(store.active(), Some(second.clone()));
+        store.flush_if_dirty().expect("flush");
+        let json = std::fs::read_to_string(store.paths().workspace_file()).expect("workspace");
+        assert!(!json.contains("generation"));
+        assert!(json.contains("sonata.pdf"));
+    }
+
+    #[test]
+    fn patch_view_rejects_stale_and_returns_a_canonical_view() {
+        let (paths, _tmp) = scratch();
+        let store = WorkspaceStore::load(paths);
+        let stale = store.activate(record("first.pdf"));
+        let current = store.activate(record("second.pdf"));
+        let malformed = View {
+            page: 0,
+            scale: Scale::Custom {
+                value: f32::INFINITY,
+            },
+            rotation: Rotation::new(450),
+            scroll_mode: ScrollMode::Continuous,
+            spread: SpreadMode::None,
+            auto_scroll_speed: f32::NAN,
+            unknown: serde_json::Map::new(),
+        };
+        assert_eq!(
+            store.replace_view(&stale.generation, malformed.clone()),
+            Err(RiffError::ScoreStale)
+        );
+        let actual = store
+            .replace_view(&current.generation, malformed)
+            .expect("canonical view");
+        assert_eq!(actual.page, 1);
+        assert_eq!(actual.scale, Scale::FitWidth);
+        assert_eq!(actual.rotation, Rotation::new(90));
+        assert_eq!(actual.auto_scroll_speed, 1.0);
+    }
+
+    #[test]
+    fn a_poisoned_workspace_lock_recovers_the_last_value() {
+        use std::sync::Arc;
+        use std::thread;
+        let (paths, _tmp) = scratch();
+        let store = Arc::new(WorkspaceStore::load(paths));
+        let crashing = Arc::clone(&store);
+        let _ = thread::spawn(move || {
+            let _guard = crashing.state.write().expect("lock");
+            panic!("poison workspace lock");
+        })
+        .join();
+        let open = store.activate(record("recovered.pdf"));
+        assert_eq!(store.active(), Some(open));
+    }
+
+    #[test]
+    fn an_unknown_persisted_view_enum_does_not_discard_the_score() {
+        let (paths, _tmp) = scratch();
+        std::fs::write(
+            paths.workspace_file(),
+            br#"{"open":{"path":"/scores/kept.pdf","name":"kept.pdf","size":42,"view":{"page":7,"spread":"future-spread","scrollMode":"page","futureViewKey":true}}}"#,
+        ).expect("seed");
+        let store = WorkspaceStore::load(paths);
+        let open = store.get().open.expect("open");
+        assert_eq!(open.name, "kept.pdf");
+        assert_eq!(open.view.page, 7);
+        assert_eq!(open.view.spread, SpreadMode::None);
+        assert_eq!(open.view.scroll_mode, ScrollMode::Page);
+        assert_eq!(open.view.unknown["futureViewKey"], true);
     }
 
     #[test]
@@ -565,13 +826,6 @@ mod tests {
         assert!(matches!(
             read_and_validate(&truncated),
             Err(RiffError::ScoreUnreadable { .. })
-        ));
-
-        let encrypted = tmp.path().join("encrypted.pdf");
-        std::fs::write(&encrypted, b"%PDF-1.7\n/Encrypt 5 0 R\n%%EOF").expect("write");
-        assert!(matches!(
-            read_and_validate(&encrypted),
-            Err(RiffError::ScoreEncrypted)
         ));
 
         let ok = tmp.path().join("ok.pdf");

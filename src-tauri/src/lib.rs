@@ -7,6 +7,7 @@ pub mod instance;
 pub mod logging;
 pub mod paths;
 pub mod practice;
+pub mod score;
 pub mod settings;
 pub mod storage;
 pub mod workspace;
@@ -310,6 +311,7 @@ pub fn run() {
         .manage(Arc::clone(&scheduler))
         .manage(Arc::clone(&workspace))
         .manage(Arc::clone(&workspace_scheduler))
+        .manage(score::ScoreCoordinator::default())
         .manage(workspace::PendingReopen(pending_score))
         .manage(QuitApproved(std::sync::atomic::AtomicBool::new(false)))
         .manage(practice::ShuttingDown(std::sync::atomic::AtomicBool::new(
@@ -319,8 +321,6 @@ pub fn run() {
         // Honours `confirmOnQuit`. Without this the setting is decorative.
         .on_window_event({
             let store = Arc::clone(&store);
-            let workspace = Arc::clone(&workspace);
-            let workspace_scheduler = Arc::clone(&workspace_scheduler);
             move |window, event| {
                 // `main` and `popout-score` only: Tauri hands Rust a drop
                 // position in physical pixels, and Rust has no idea where the
@@ -334,14 +334,15 @@ pub fn run() {
                 {
                     if commands::score::accepts_drop(window.label()) {
                         if let Some(path) = commands::score::first_pdf(paths) {
-                            let app = window.app_handle();
-                            if let Err(err) =
-                                commands::score::open_at(app, &workspace, &workspace_scheduler, path)
-                            {
-                                tracing::warn!(%err, "a dropped score could not be opened");
-                                use tauri::Emitter;
-                                let _ = window.emit_to(window.label(), "score://drop-failed", &err);
-                            }
+                            let app = window.app_handle().clone();
+                            let label = window.label().to_owned();
+                            tauri::async_runtime::spawn(async move {
+                                if let Err(err) = commands::score::open_at(app.clone(), path).await {
+                                    tracing::warn!(%err, "a dropped score could not be opened");
+                                    use tauri::Emitter;
+                                    let _ = app.emit_to(&label, "score://open-failed", &err);
+                                }
+                            });
                         }
                     }
                     return;

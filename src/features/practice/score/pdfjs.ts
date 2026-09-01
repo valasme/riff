@@ -31,6 +31,7 @@ import {
   SpreadMode,
 } from "pdfjs-dist/web/pdf_viewer.mjs";
 
+export type { PDFWorker };
 export {
   AnnotationMode,
   EventBus,
@@ -70,11 +71,10 @@ export class WorkerUnavailableError extends Error {
   }
 }
 
-let probe: Promise<void> | null = null;
+let workerSequence = 0;
 
 /**
- * Confirms a real module `Worker` starts, once per session, before anything
- * calls `getDocument`.
+ * Starts one real module worker for a score-viewer attempt.
  *
  * pdf.js's own fallback for a worker that fails to start — for any reason,
  * including a WebKitGTK too old to run `new Worker(url, { type: "module" })`
@@ -85,27 +85,21 @@ let probe: Promise<void> | null = null;
  * `LoopbackPort` (not exported, and not worth importing privately) otherwise
  * — so `instanceof Worker` is the public way to tell which one happened.
  *
- * The probe worker is destroyed either way: its only job is answering this
- * question, and `getDocument` creates its own worker per document from
- * `GlobalWorkerOptions.workerSrc` once the probe has passed.
+ * The caller passes this exact worker to `getDocument` and destroys it when
+ * the attempt ends. Starting a probe and then creating a second worker can
+ * leave WebKitGTK waiting on the second startup with no page ever rendered.
  */
-export function ensureWorker(): Promise<void> {
-  probe ??= (async () => {
-    const worker = PDFWorker.create({ name: "riff-score-probe" });
-    try {
-      await worker.promise;
-      if (!(worker.port instanceof Worker)) {
-        throw new WorkerUnavailableError();
-      }
-    } finally {
-      worker.destroy();
+export async function ensureWorker(): Promise<PDFWorker> {
+  workerSequence += 1;
+  const worker = PDFWorker.create({ name: `riff-score-${workerSequence}` });
+  try {
+    await worker.promise;
+    if (typeof Worker === "undefined" || !(worker.port instanceof Worker)) {
+      throw new WorkerUnavailableError();
     }
-  })().catch((error: unknown) => {
-    // A failed probe must not be cached as a permanent verdict — the next
-    // score open should try again rather than repeating a memoised failure
-    // for the rest of the session.
-    probe = null;
+    return worker;
+  } catch (error) {
+    worker.destroy();
     throw error;
-  });
-  return probe;
+  }
 }

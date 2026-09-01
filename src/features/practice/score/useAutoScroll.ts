@@ -2,6 +2,8 @@ import { type RefObject, useEffect, useRef } from "react";
 import type { ScrollMode, SpreadMode } from "@/lib/ipc";
 import { pageInterval, pinnedBounds, pixelsPerSecond } from "./geometry";
 
+export const MAX_FRAME_SECONDS = 0.1;
+
 /**
  * The score advancing on its own at a pace the musician sets.
  *
@@ -81,10 +83,19 @@ export function useAutoScroll({
     }
     element.addEventListener("scroll", onScroll, { passive: true });
 
+    let pausedForVisibility = false;
+    function onVisibilityChange() {
+      if (document.visibilityState !== "hidden" || pausedForVisibility) return;
+      pausedForVisibility = true;
+      cancelAnimationFrame(frame);
+      latest.current.onPause();
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
     function step(now: number) {
       const surface = container.current;
       if (!surface) return;
-      const delta = (now - previous) / 1000;
+      const delta = Math.min((now - previous) / 1000, MAX_FRAME_SECONDS);
       previous = now;
       const state = latest.current;
 
@@ -145,6 +156,7 @@ export function useAutoScroll({
     return () => {
       cancelAnimationFrame(frame);
       element.removeEventListener("scroll", onScroll);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
     // Only `running` restarts the loop. Everything else is read through the
     // ref above, so changing speed mid-scroll does not stutter.

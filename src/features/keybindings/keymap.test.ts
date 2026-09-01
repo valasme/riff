@@ -4,6 +4,7 @@ import type { KeymapScope } from "./keymap";
 import { createKeymap } from "./keymap";
 
 const OPEN_SCORE: OpenScore = {
+  generation: "g1",
   score: { name: "sonata.pdf", size: 10 },
   view: {
     page: 1,
